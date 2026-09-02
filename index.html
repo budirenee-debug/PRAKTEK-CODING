@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServiCell — POS Service HP Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="brand">
+                    <div class="brand-icon">◈</div>
+                    <div>
+                        <h2>ServiCell</h2>
+                        <p>POS Service HP</p>
+                    </div>
+                </div>
+                <nav class="menu">
+                    <button class="menu-item active" data-view="dashboard">
+                        <span class="mi">▦</span> Dashboard
+                    </button>
+                    <button class="menu-item" data-view="service-masuk">
+                        <span class="mi">＋</span> Service Masuk
+                        <span class="badge">12</span>
+                    </button>
+                    <button class="menu-item" data-view="pelanggan">
+                        <span class="mi">◎</span> Data Pelanggan
+                    </button>
+                    <button class="menu-item" data-view="proses">
+                        <span class="mi">⚙</span> Proses Service
+                    </button>
+                </nav>
+            </div>
+
+            <div class="sidebar-bottom">
+                <div class="user-card">
+                    <img src="https://i.pravatar.cc/100?img=33" alt="user">
+                    <div>
+                        <strong>Admin Toko</strong>
+                        <span>Kasir • Shift Pagi</span>
+                    </div>
+                    <button class="icon-btn">⋯</button>
+                </div>
+                <div class="store-info">
+                    <span>● Sistem Online</span>
+                    <span>v1.0 Elegant</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="hamburger" id="hamburger">☰</button>
+                    <div>
+                        <h1 id="page-title">Dashboard Overview</h1>
+                        <p id="page-subtitle">Ringkasan service hari ini — Selasa, 2 September 2026</p>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <div class="search-box">
+                        <span>⌕</span>
+                        <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, invoice...">
+                    </div>
+                    <button class="btn btn-dark" onclick="switchView('service-masuk')">+ Service Baru</button>
+                    <button class="notif">◐<span class="dot"></span></button>
+                </div>
+            </header>
+
+            <!-- VIEW: DASHBOARD -->
+            <section class="view active" id="view-dashboard">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-head"><span>Service Masuk</span><span class="stat-icon blue">＋</span></div>
+                        <h3 id="stat-masuk">12</h3>
+                        <p class="trend up">▲ +3 dari kemarin</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-head"><span>Dalam Proses</span><span class="stat-icon amber">◷</span></div>
+                        <h3 id="stat-proses">7</h3>
+                        <p class="trend">5 antri • 2 dikerjakan</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-head"><span>Selesai Hari Ini</span><span class="stat-icon green">✓</span></div>
+                        <h3 id="stat-selesai">5</h3>
+                        <p class="trend up">▲ Selesai tepat waktu 92%</p>
+                    </div>
+                    <div class="stat-card dark">
+                        <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
+                        <h3>Rp 2.850.000</h3>
+                        <p>Hari ini • belum termasuk sparepart</p>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-head">
+                            <h3>Antrian Service Terbaru</h3>
+                            <button class="link" onclick="switchView('proses')">Lihat semua →</button>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table" id="tableDashboard">
+                                <thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Status</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>Performa Teknisi</h3><span class="muted">Hari ini</span></div>
+                        <div class="tech-list">
+                            <div class="tech">
+                                <img src="https://i.pravatar.cc/100?img=12"><div><strong>Andi</strong><span>4 device • 2 selesai</span></div><div class="progress"><div style="width:75%"></div></div><span>75%</span>
+                            </div>
+                            <div class="tech">
+                                <img src="https://i.pravatar.cc/100?img=15"><div><strong>Sinta</strong><span>3 device • 3 selesai</span></div><div class="progress"><div style="width:100%"></div></div><span>100%</span>
+                            </div>
+                            <div class="tech">
+                                <img src="https://i.pravatar.cc/100?img=8"><div><strong>Budi</strong><span>5 device • 1 selesai</span></div><div class="progress"><div style="width:45%"></div></div><span>45%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: SERVICE MASUK -->
+            <section class="view" id="view-service-masuk">
+                <div class="grid-form">
+                    <div class="card form-card">
+                        <div class="card-head">
+                            <h3>Form Service Masuk</h3>
+                            <span class="invoice-pill" id="invoicePreview">INV-2026-0123</span>
+                        </div>
+                        <form id="serviceForm" onsubmit="handleServiceSubmit(event)">
+                            <div class="form-grid">
+                                <div class="field"><label>Nama Pelanggan *</label><input id="f-nama" required placeholder="Contoh: Renee Budiman"></div>
+                                <div class="field"><label>No. WhatsApp *</label><input id="f-wa" required placeholder="08xxxxxxxxxx"></div>
+                                <div class="field"><label>Tipe HP / Device *</label><input id="f-device" required placeholder="iPhone 11 / Samsung A54"></div>
+                                <div class="field"><label>IMEI / Serial (opsional)</label><input id="f-imei" placeholder="35xxxxxxxxxxxx"></div>
+                                <div class="field full"><label>Keluhan / Kerusakan *</label><textarea id="f-keluhan" required placeholder="Deskripsi keluhan: mati total, LCD pecah, baterai drop..."></textarea></div>
+                                <div class="field"><label>Kelengkapan</label>
+                                    <div class="chips" id="chips">
+                                        <button type="button" class="chip" data-value="HP Saja">HP Saja</button>
+                                        <button type="button" class="chip" data-value="+ Charger">+ Charger</button>
+                                        <button type="button" class="chip" data-value="+ Dus">+ Dus</button>
+                                        <button type="button" class="chip" data-value="+ Kartu SIM">+ Kartu SIM</button>
+                                    </div>
+                                </div>
+                                <div class="field"><label>Estimasi Biaya</label><input id="f-biaya" type="number" placeholder="Rp 0"></div>
+                                <div class="field"><label>Teknisi</label>
+                                    <select id="f-teknisi"><option>Andi</option><option>Sinta</option><option>Budi</option></select>
+                                </div>
+                                <div class="field"><label>Estimasi Selesai</label><input id="f-estimasi" type="date"></div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-ghost" onclick="resetForm()">Reset</button>
+                                <button type="submit" class="btn btn-dark">Simpan & Cetak Nota →</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="stack">
+                        <div class="card info-card">
+                            <h4>💡 Tips Input</h4>
+                            <ul>
+                                <li>Pastikan No WA aktif untuk notifikasi otomatis.</li>
+                                <li>Foto kondisi HP sebelum service (opsional).</li>
+                                <li>Nota akan ter-generate otomatis + QR tracking.</li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <div class="card-head"><h3>Antrian Hari Ini</h3><span class="badge-count" id="queueCount">12 antrian</span></div>
+                            <div class="queue-list" id="queueList"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: DATA PELANGGAN -->
+            <section class="view" id="view-pelanggan">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left">
+                            <h3>Data Pelanggan</h3>
+                            <span class="count-pill" id="pelangganCount">48 pelanggan</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="search-box small"><span>⌕</span><input id="searchPelanggan" placeholder="Cari nama, HP, device..."></div>
+                            <select id="filterDevice"><option value="">Semua Device</option><option>iPhone</option><option>Samsung</option><option>Xiaomi</option><option>Oppo</option></select>
+                            <button class="btn btn-dark small">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table" id="tablePelanggan">
+                            <thead><tr><th>Pelanggan</th><th>Device</th><th>Total Service</th><th>Terakhir Service</th><th>Status Langganan</th><th></th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination"><span id="paginationInfo">Menampilkan 6 dari 48</span><div><button class="page-btn" disabled>‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">›</button></div></div>
+                </div>
+            </section>
+
+            <!-- VIEW: PROSES SERVICE -->
+            <section class="view" id="view-proses">
+                <div class="tabs">
+                    <button class="tab active" data-filter="all">Semua <span>12</span></button>
+                    <button class="tab" data-filter="Antri">Antri <span>5</span></button>
+                    <button class="tab" data-filter="Dikerjakan">Dikerjakan <span>2</span></button>
+                    <button class="tab" data-filter="Menunggu Sparepart">Sparepart <span>2</span></button>
+                    <button class="tab" data-filter="Selesai">Selesai <span>3</span></button>
+                </div>
+                <div class="kanban" id="kanban"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL DETAIL -->
+    <div class="modal" id="modal">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">Berhasil disimpan!</div>
+
+    <script src="script.js"></script>
+</body>
+</html>
