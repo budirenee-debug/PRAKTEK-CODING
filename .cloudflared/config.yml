@@ -1,0 +1,33 @@
+# Cloudflare Tunnel - B_gadget POS Service HP
+# Dokumentasi: https://developers.cloudflare.com/cloudflare-one/connections/connect/
+# File ini: .cloudflared/config.yml (project) | default global: C:\Users\%USERNAME%\.cloudflared\config.yml
+
+tunnel: b-gadget
+credentials-file: C:\Users\budirenee\.cloudflared\4482781b-c05e-4348-ae22-1739a7a80b83.json
+
+# Optional: log level
+# loglevel: info
+
+ingress:
+  # Domain utama -> Backend FastAPI (port 8000) sudah mount /frontend & /assets
+  # Backend run: uvicorn app.main:app --host 0.0.0.0 --port 8000  (backend/run.py & run.bat:75)
+  - hostname: service.reneepsl.my.id
+    service: http://localhost:8000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: service.reneepsl.my.id
+
+  - hostname: reneepsl.my.id
+    service: http://localhost:8000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: reneepsl.my.id
+
+  - hostname: www.reneepsl.my.id
+    service: http://localhost:8000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: www.reneepsl.my.id
+
+  # Catch-all WAJIB di paling bawah (404 jika hostname tidak cocok)
+  - service: http_status:404

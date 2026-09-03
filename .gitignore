@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+backend/b_gadget.db
+backend/*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Cloudflare Tunnel - jangan commit credential & log sensitif
+.cloudflared/*.json
+.cloudflared/*.pem
+.cloudflared/*.log
+C:\Temp\tunnel*.log
+
+# VSCode
+.vscode/settings.json

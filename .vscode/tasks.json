@@ -1,0 +1,76 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "FastAPI: Run (dev)",
+      "type": "shell",
+      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": true,
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FastAPI: Run + Seed",
+      "type": "shell",
+      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0 & timeout /t 3 & curl -X POST http://localhost:8000/api/seed",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FastAPI: Install deps",
+      "type": "shell",
+      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pip.exe install -r requirements.txt",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FastAPI: Test Login Superadmin",
+      "type": "shell",
+      "command": "curl -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d \"{\\\"username\\\":\\\"superadmin\\\",\\\"password\\\":\\\"bismillah\\\"}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Serve (Live Server)",
+      "type": "shell",
+      "command": "npx --yes live-server --port=5500 --open=frontend/index.html",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

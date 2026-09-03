@@ -1,0 +1,23 @@
+REKRUTMEN B_gadget - POS Service HP (v1.0 Elegant)
+Tanggal: 2 September 2026
+Kontak WA: 08xx-xxxx-xxxx | IG: @b_gadget
+
+LOWONGAN:
+1. Teknisi HP - 2 orang (19-32th, bisa LCD/baterai/speaker/kamera, jujur & rapi)
+2. Admin Kasir / Front Office - 1 orang (20-28th, komunikatif, teliti input POS)
+
+GAJI & BENEFIT:
+- Teknisi: 2.2-3.5jt + bonus 50-150rb/device + lembur
+- Admin: 1.8-2.5jt + insentif kepuasan pelanggan
+- Training mingguan, seragam, THR, shift 09-17/13-21, libur 1x/minggu
+
+TENTANG KAMI:
+Konter HP dengan POS digital (nota QR INV-2026-XXXX, tracking real-time), SOP foto kondisi HP, database SQLite + FastAPI, bukan tulis tangan.
+
+CARA DAFTAR:
+WA ke 08xx-xxxx-xxxx format: Nama # Posisi # Domisili # Pengalaman
+Lampirkan CV + foto KTP. Contoh: Renee # Teknisi HP # Bandung # 2th service iPhone
+Batas: 30 September 2026. Interview Selasa & Jumat 14.00 di konter.
+
+Tolong share ke teman yang butuh!
+-- Admin Toko | B_gadget

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — B_gadget POS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .login-wrap{min-height:100vh;display:grid;place-items:center;background:#f6f6f7;padding:24px}
+    .login-card{background:#fff;border:1px solid #ececec;border-radius:18px;padding:28px;max-width:400px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+    .login-card h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;margin-bottom:6px}
+    .login-card p{color:#8a8f98;font-size:13px;margin-bottom:18px}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    .field label{font-size:12px;font-weight:600}
+    .field input,.field select{padding:11px 12px;border:1px solid #ececec;border-radius:12px;background:#fcfcfc;font-size:13px;outline:0}
+    .field input:focus,.field select:focus{border-color:#111;background:#fff}
+    .alert{padding:10px 12px;border-radius:12px;font-size:13px;display:none;margin-bottom:12px}
+    .alert.err{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .alert.ok{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+    .tabs-login{display:flex;gap:8px;margin-bottom:18px;background:#f3f4f6;padding:4px;border-radius:12px}
+    .tab-login{flex:1;padding:8px;border-radius:8px;border:0;background:transparent;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280}
+    .tab-login.active{background:#111;color:#fff}
+    .hidden{display:none !important}
+    .role-hint{font-size:11px;color:#8a8f98;margin-top:-8px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div style="width:44px;height:44px;background:#111;color:#fff;border-radius:12px;display:grid;place-items:center;font-weight:700;margin-bottom:12px">◈</div>
+      <h1 id="cardTitle">B_gadget Login</h1>
+      <p style="display:none">Superadmin default: <strong>superadmin</strong> / <strong>bismillah</strong></p>
+
+      <div class="tabs-login">
+        <button class="tab-login active" id="tabLogin" onclick="switchTab('login')">Login</button>
+        <button class="tab-login" id="tabRegister" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <!-- FORM LOGIN -->
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="field"><label>Username</label><input id="username" required value="superadmin" placeholder="superadmin"></div>
+        <div class="field"><label>Password</label><input id="password" type="password" required value="bismillah" placeholder="••••••••"></div>
+        <button class="btn btn-dark" style="width:100%;margin-top:8px" type="submit">Masuk →</button>
+      </form>
+
+      <!-- FORM REGISTER -->
+      <form id="registerForm" class="hidden" onsubmit="handleRegister(event)">
+        <div class="field"><label>Username *</label><input id="r-username" required placeholder="contoh: admin1 / kasir_sinta"></div>
+        <div class="field"><label>Password *</label><input id="r-password" type="password" required placeholder="minimal 6 karakter"></div>
+        <div class="field"><label>Konfirmasi Password *</label><input id="r-confirm" type="password" required placeholder="ulang password"></div>
+        <div class="field">
+          <label>Role *</label>
+          <select id="r-role" required>
+            <option value="" disabled selected>Pilih role</option>
+            <option value="admin">Admin</option>
+            <option value="kasir">Kasir</option>
+            <option value="teknisi">Teknisi</option>
+          </select>
+        </div>
+        <p class="role-hint">Admin = kelola user & laporan • Kasir = transaksi & pelanggan • Teknisi = proses service<br><span style="color:#dc2626">⚠️ Akun baru butuh persetujuan superadmin sebelum bisa login</span></p>
+        <button class="btn btn-dark" style="width:100%;margin-top:4px" type="submit">Daftar →</button>
+        <p style="font-size:11px;color:#8a8f98;text-align:center;margin-top:10px">Sudah punya akun? <a href="#" onclick="switchTab('login');return false">Login</a></p>
+      </form>
+
+      <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center" id="footerLink">Lupa password? Hubungi owner • <a href="index.html">Kembali ke Dashboard</a></div>
+    </div>
+  </div>
+  <script>
+    const API = localStorage.getItem('API_BASE') || 'http://localhost:8000/api';
+
+    function switchTab(tab){
+      document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+      document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+      document.getElementById('loginForm').classList.toggle('hidden', tab!=='login');
+      document.getElementById('registerForm').classList.toggle('hidden', tab!=='register');
+      document.getElementById('cardTitle').textContent = tab==='login' ? 'B_gadget Login' : 'B_gadget Register';
+      const alert=document.getElementById('alert'); alert.style.display='none';
+    }
+
+    async function handleLogin(e){
+      e.preventDefault();
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      const alert = document.getElementById('alert');
+      alert.style.display='none';
+      try{
+        const res = await fetch(`${API}/auth/login`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({username:u, password:p})
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.detail || 'Gagal login');
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('role', data.role);
+        alert.className='alert ok'; alert.textContent='Berhasil! Mengalihkan...'; alert.style.display='block';
+        setTimeout(()=> location.href='index.html', 800);
+      }catch(err){
+        // khusus pending approval
+        const msg = err.message.includes('persetujuan') ? '⏳ ' + err.message : err.message;
+        alert.className='alert err'; alert.textContent=msg; alert.style.display='block';
+      }
+    }
+
+    async function handleRegister(e){
+      e.preventDefault();
+      const username = document.getElementById('r-username').value.trim();
+      const password = document.getElementById('r-password').value;
+      const confirm = document.getElementById('r-confirm').value;
+      const role = document.getElementById('r-role').value;
+      const alert = document.getElementById('alert');
+      alert.style.display='none';
+      if(password !== confirm){
+        alert.className='alert err'; alert.textContent='Konfirmasi password tidak cocok'; alert.style.display='block'; return;
+      }
+      try{
+        const res = await fetch(`${API}/auth/register`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({username, password, role})
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.detail || JSON.stringify(data.detail) || 'Gagal register');
+        alert.className='alert ok'; alert.textContent=`✅ Pendaftaran berhasil! Akun "${data.username}" (${data.role}) menunggu persetujuan superadmin. Hubungi superadmin untuk aktivasi.`; alert.style.display='block';
+        document.getElementById('registerForm').reset();
+        // auto fill login username saja
+        document.getElementById('username').value = username;
+        document.getElementById('password').value = '';
+        // tetap di tab register biar user baca pesan, atau auto ke login setelah 2.5s
+        setTimeout(()=> switchTab('login'), 2500);
+      }catch(err){
+        alert.className='alert err'; alert.textContent=err.message; alert.style.display='block';
+      }
+    }
+  </script>
+</body>
+</html>
