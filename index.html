@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
     <div class="app">
@@ -86,6 +86,12 @@
                     <button class="menu-item" data-view="laporan-penjualan">
                         <span class="mi">📊</span> Laporan Penjualan
                     </button>
+
+                    <div class="menu-category" id="cat-superadmin" style="display:none">SUPERADMIN</div>
+                    <button class="menu-item" data-view="approval-akun" id="menu-approval" style="display:none">
+                        <span class="mi">🛡️</span> Persetujuan Akun
+                        <span class="badge" id="badge-pending" style="background:#f59e0b;display:none">0</span>
+                    </button>
                 </nav>
             </div>
 
@@ -125,12 +131,22 @@
                         <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, invoice...">
                     </div>
                     <button class="btn btn-dark" onclick="switchView('service-masuk')">+ Service Baru</button>
-                    <button class="notif">◐<span class="dot"></span></button>
+                    <button class="notif" id="notifBell" onclick="handleNotifClick()" title="Notifikasi persetujuan akun">◐<span class="dot" id="notifDot"></span><span class="notif-count" id="notifCount">0</span></button>
                 </div>
             </header>
 
             <!-- VIEW: DASHBOARD -->
             <section class="view active" id="view-dashboard">
+                <div id="approvalBanner" class="approval-banner" style="display:none" onclick="switchView('approval-akun')">
+                    <div class="approval-banner-left">
+                        <div class="approval-banner-icon">🛡️</div>
+                        <div>
+                            <strong id="bannerTitle" style="font-size:13px">Ada akun menunggu persetujuan</strong>
+                            <p id="bannerSub" style="font-size:12px;color:#92400e;margin-top:2px">Klik untuk setujui admin/teknisi baru</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark small" style="white-space:nowrap" onclick="event.stopPropagation(); switchView('approval-akun')">Lihat →</button>
+                </div>
                 <div class="stats">
                     <div class="stat-card">
                         <div class="stat-head"><span>Service Masuk</span><span class="stat-icon blue">＋</span></div>
@@ -151,6 +167,29 @@
                         <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
                         <h3>Rp 2.850.000</h3>
                         <p>Hari ini • belum termasuk sparepart</p>
+                    </div>
+                </div>
+                <!-- DEADLINE BANNER STATS -->
+                <div class="stats" style="margin-top:-6px">
+                    <div class="stat-card" style="border-left:4px solid #ef4444">
+                        <div class="stat-head"><span>Overdue</span><span class="stat-icon" style="background:#fef2f2;color:#ef4444">⚠</span></div>
+                        <h3 id="stat-overdue" style="color:#ef4444">0</h3>
+                        <p class="trend" style="color:#ef4444">Lewat deadline</p>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid #f59e0b">
+                        <div class="stat-head"><span>Deadline Hari Ini</span><span class="stat-icon" style="background:#fffbeb;color:#f59e0b">⏰</span></div>
+                        <h3 id="stat-deadline-today">0</h3>
+                        <p class="trend">Jatuh tempo hari ini</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-head"><span>Harian (3 hari)</span><span class="stat-icon blue">3h</span></div>
+                        <h3 id="stat-harian">0</h3>
+                        <p class="trend">Deadline 3 hari</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-head"><span>Mingguan (7 hari)</span><span class="stat-icon amber">7h</span></div>
+                        <h3 id="stat-mingguan">0</h3>
+                        <p class="trend">Deadline 7 hari</p>
                     </div>
                 </div>
 
@@ -212,6 +251,13 @@
                                     <select id="f-teknisi"><option>Andi</option><option>Sinta</option><option>Budi</option></select>
                                 </div>
                                 <div class="field"><label>Estimasi Selesai</label><input id="f-estimasi" type="date"></div>
+                                <div class="field"><label>Deadline *</label>
+                                    <select id="f-deadline-type" required onchange="updateDeadlinePreview()">
+                                        <option value="harian" selected>Harian — 3 hari</option>
+                                        <option value="mingguan">Mingguan — 7 hari</option>
+                                    </select>
+                                    <span id="deadlinePreview" style="font-size:11px;color:#059669;margin-top:4px">Deadline: -</span>
+                                </div>
                             </div>
                             <div class="form-actions">
                                 <button type="button" class="btn btn-ghost" onclick="resetForm()">Reset</button>
@@ -268,7 +314,13 @@
                     <button class="tab" data-filter="Antri">Antri <span>5</span></button>
                     <button class="tab" data-filter="Dikerjakan">Dikerjakan <span>2</span></button>
                     <button class="tab" data-filter="Menunggu Sparepart">Sparepart <span>2</span></button>
-                    <button class="tab" data-filter="Selesai">Selesai <span>3</span></button>
+                </div>
+                <div class="tabs" style="margin-top:8px">
+                    <button class="tab active" data-deadline="all" onclick="setDeadlineFilter('all')">Deadline: Semua</button>
+                    <button class="tab" data-deadline="overdue" onclick="setDeadlineFilter('overdue')">⚠ Overdue <span id="countOverdue">0</span></button>
+                    <button class="tab" data-deadline="today" onclick="setDeadlineFilter('today')">⏰ Hari Ini <span id="countToday">0</span></button>
+                    <button class="tab" data-deadline="harian" onclick="setDeadlineFilter('harian')">Harian 3h <span id="countHarian">0</span></button>
+                    <button class="tab" data-deadline="mingguan" onclick="setDeadlineFilter('mingguan')">Mingguan 7h <span id="countMingguan">0</span></button>
                 </div>
                 <div class="kanban" id="kanban"></div>
             </section>
@@ -364,6 +416,76 @@
                 <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 4.2jt</h3><p class="trend up">▲ 12%</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>LCD iPhone</h3><p class="trend">8 unit</p></div></div></div>
             </section>
 
+            <!-- SUPERADMIN: PERSETUJUAN AKUN -->
+            <section class="view" id="view-approval-akun">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left">
+                            <h3>Persetujuan Akun — Superadmin</h3>
+                            <span class="count-pill" id="approvalCount">0 menunggu</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-ghost small" onclick="loadApprovalData()">↻ Refresh</button>
+                            <button class="btn btn-dark small" onclick="switchView('dashboard')">← Dashboard</button>
+                        </div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Daftar admin / teknisi yang baru register dan <strong>belum aktif</strong>. Hanya <strong>superadmin</strong> yang bisa <em>Setujui</em> atau <em>Tolak</em>. Akun yang belum disetujui tidak bisa login.</p>
+                    <div class="table-wrap">
+                        <table class="table" id="tableApproval">
+                            <thead><tr><th>#</th><th>Username</th><th>Role</th><th>Status</th><th>Tanggal Daftar</th><th style="text-align:center">Aksi</th></tr></thead>
+                            <tbody id="tbodyApproval"><tr><td colspan="6" style="text-align:center;padding:24px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;font-size:12px;color:#92400e">
+                        <strong>Alur:</strong> Teknisi/Admin daftar di <code>login.html → Register</code> (is_active = false) → muncul di sini → superadmin klik <strong>Setujui</strong> → akun bisa login. Klik <strong>Tolak</strong> = hapus akun.
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>Semua Akun Terdaftar</h3><span class="count-pill" id="allUsersCount">0 user</span></div>
+                        <div class="toolbar-right">
+                            <div class="search-box small"><span>⌕</span><input id="searchUser" placeholder="Cari username..." oninput="filterAllUsers()"></div>
+                            <select id="filterRoleUser" onchange="filterAllUsers()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Role</option><option value="superadmin">Superadmin</option><option value="admin">Admin</option><option value="kasir">Kasir</option><option value="teknisi">Teknisi</option></select>
+                            <select id="filterStatusUser" onchange="filterAllUsers()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Status</option><option value="aktif">Aktif</option><option value="beku">Beku/Pending</option></select>
+                        </div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Kelola akun yg sudah terdaftar: <strong>Edit</strong> username/role/password, <strong>Bekukan</strong> (nonaktifkan login), atau <strong>Hapus</strong>. Hanya superadmin.</p>
+                    <div class="table-wrap">
+                        <table class="table" id="tableAllUsers">
+                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Dibuat</th><th>Last Login</th><th style="text-align:center">Aksi</th></tr></thead>
+                            <tbody id="tbodyAllUsers"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MODAL EDIT USER -->
+                <div class="modal" id="userEditModal">
+                    <div class="modal-box" style="max-width:440px">
+                        <button class="modal-close" onclick="closeUserModal()">×</button>
+                        <h3 style="margin-bottom:4px">Edit Akun</h3>
+                        <p style="font-size:12px;color:#8a8f98;margin-bottom:14px" id="editUserSub">Ubah username, role, atau password</p>
+                        <form id="userEditForm" onsubmit="submitUserEdit(event)">
+                            <input type="hidden" id="editUserId">
+                            <div class="field" style="margin-bottom:10px"><label>Username</label><input id="editUsername" required minlength="3" placeholder="username"></div>
+                            <div class="field" style="margin-bottom:10px"><label>Role</label>
+                                <select id="editRole" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec">
+                                    <option value="admin">Admin</option>
+                                    <option value="kasir">Kasir</option>
+                                    <option value="teknisi">Teknisi</option>
+                                    <option value="superadmin">Superadmin</option>
+                                </select>
+                            </div>
+                            <div class="field" style="margin-bottom:6px"><label>Password Baru (kosongkan jika tidak ganti)</label><input id="editPassword" type="password" placeholder="minimal 6 karakter, kosong = tidak ganti"></div>
+                            <p style="font-size:11px;color:#8a8f98;margin-bottom:14px">Kosongkan password jika tidak ingin mengganti.</p>
+                            <div style="display:flex;gap:10px">
+                                <button type="button" class="btn btn-ghost" style="flex:1" onclick="closeUserModal()">Batal</button>
+                                <button type="submit" class="btn btn-dark" style="flex:1">Simpan Perubahan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -378,6 +500,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="script.js"></script>
+    <script src="assets/js/script.js?v=proses-bisa-diambil-20260906"></script>
 </body>
 </html>

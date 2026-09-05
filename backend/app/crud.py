@@ -4,6 +4,7 @@ CRUD helper
 import json
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+import datetime
 from datetime import date
 from . import models, schemas
 
@@ -41,11 +42,47 @@ def kelengkapan_from_str(s):
     except:
         return []
 
+def compute_deadline(base_date: date, dtype: str, explicit: date = None):
+    """Harian=3 hari, Mingguan=7 hari dari base_date. Jika explicit deadline dikirim pakai itu."""
+    if explicit:
+        return explicit
+    dtype = (dtype or "harian").lower()
+    days = 3 if dtype == "harian" else 7
+    if not base_date:
+        base_date = date.today()
+    return base_date + datetime.timedelta(days=days)
+
+def enrich_service(svc):
+    """Tambah sisa_hari dan is_overdue dinamis untuk response"""
+    if not svc:
+        return svc
+    try:
+        dl = svc.deadline
+        # fallback hitung jika deadline kosong (data lama)
+        if not dl and hasattr(svc, 'date') and svc.date:
+            dl = compute_deadline(svc.date, getattr(svc, 'deadline_type', 'harian'))
+            svc.deadline = dl
+            if not getattr(svc, 'deadline_type', None):
+                svc.deadline_type = "harian"
+        if dl:
+            delta = (dl - date.today()).days
+            svc.sisa_hari = delta
+            # overdue hanya jika belum selesai dan deadline lewat
+            svc.is_overdue = delta < 0 and svc.status not in ["Selesai", "Sudah Diambil", "Dibatalkan", "Service Failed"]
+        else:
+            svc.sisa_hari = None
+            svc.is_overdue = False
+    except Exception:
+        svc.sisa_hari = None
+        svc.is_overdue = False
+    return svc
+
 # ----- Service -----
 def get_service(db: Session, invoice: str):
-    return db.query(models.Service).filter(models.Service.invoice == invoice).first()
+    svc = db.query(models.Service).filter(models.Service.invoice == invoice).first()
+    return enrich_service(svc)
 
-def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None):
+def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None):
     q = db.query(models.Service)
     if status and status != "all":
         q = q.filter(models.Service.status == status)
@@ -60,8 +97,17 @@ def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = Non
         )
     if device:
         q = q.filter(models.Service.device.ilike(f"%{device}%"))
+    if deadline_type:
+        q = q.filter(models.Service.deadline_type == deadline_type)
     q = q.order_by(desc(models.Service.created_at))
-    return q.offset(skip).limit(limit).all()
+    rows = q.offset(skip).limit(limit).all()
+    # enrich
+    rows = [enrich_service(r) for r in rows]
+    if overdue is True:
+        rows = [r for r in rows if r.is_overdue]
+    elif overdue is False:
+        rows = [r for r in rows if not r.is_overdue]
+    return rows
 
 def count_services(db: Session, status: str = None):
     q = db.query(models.Service)
@@ -89,6 +135,9 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
         if tech:
             tech_id = tech.id
 
+    dtype = (payload.deadline_type or "harian").lower()
+    dl = compute_deadline(date.today(), dtype, payload.deadline)
+
     svc = models.Service(
         invoice=invoice,
         customer_id=customer.id,
@@ -103,15 +152,17 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
         teknisi=payload.teknisi,
         status=payload.status or "Antri",
         date=date.today(),
-        estimasi_selesai=payload.estimasi_selesai
+        estimasi_selesai=payload.estimasi_selesai,
+        deadline_type=dtype,
+        deadline=dl
     )
     db.add(svc)
     db.commit()
     db.refresh(svc)
-    return svc
+    return enrich_service(svc)
 
 def update_service(db: Session, invoice: str, payload: schemas.ServiceUpdate):
-    svc = get_service(db, invoice)
+    svc = db.query(models.Service).filter(models.Service.invoice == invoice).first()
     if not svc:
         return None
     data = payload.model_dump(exclude_unset=True)
@@ -121,11 +172,24 @@ def update_service(db: Session, invoice: str, payload: schemas.ServiceUpdate):
         tech = db.query(models.Technician).filter(models.Technician.nama == data["teknisi"]).first()
         if tech:
             data["technician_id"] = tech.id
+    # handle deadline_type change: recompute deadline jika tidak explicit
+    if "deadline_type" in data or "deadline" in data:
+        new_dtype = data.get("deadline_type", svc.deadline_type or "harian")
+        if new_dtype:
+            new_dtype = new_dtype.lower()
+        new_dl_explicit = data.get("deadline", None)
+        # jika ganti type tapi tidak kasih deadline explicit, hitung ulang dari svc.date
+        if "deadline" not in data or new_dl_explicit is None:
+            base = svc.date or date.today()
+            data["deadline"] = compute_deadline(base, new_dtype, None)
+            data["deadline_type"] = new_dtype
+        else:
+            data["deadline_type"] = new_dtype
     for k, v in data.items():
         setattr(svc, k, v)
     db.commit()
     db.refresh(svc)
-    return svc
+    return enrich_service(svc)
 
 def delete_service(db: Session, invoice: str):
     svc = get_service(db, invoice)
@@ -144,6 +208,22 @@ def get_stats(db: Session):
     dikerjakan = db.query(models.Service).filter(models.Service.status=="Dikerjakan").count()
     sparepart = db.query(models.Service).filter(models.Service.status=="Menunggu Sparepart").count()
     selesai = db.query(models.Service).filter(models.Service.status=="Selesai").count()
+    # deadline stats
+    all_svc = db.query(models.Service).all()
+    overdue = 0
+    deadline_hari_ini = 0
+    harian = 0
+    mingguan = 0
+    for s in all_svc:
+        enrich_service(s)
+        if getattr(s, 'is_overdue', False):
+            overdue += 1
+        if s.deadline == date.today():
+            deadline_hari_ini += 1
+        if (s.deadline_type or "harian") == "harian":
+            harian += 1
+        else:
+            mingguan += 1
     return {
         "total_masuk": total,
         "dalam_proses": dalam_proses,
@@ -152,7 +232,11 @@ def get_stats(db: Session):
         "antri": antri,
         "dikerjakan": dikerjakan,
         "menunggu_sparepart": sparepart,
-        "selesai": selesai
+        "selesai": selesai,
+        "overdue": overdue,
+        "deadline_hari_ini": deadline_hari_ini,
+        "harian": harian,
+        "mingguan": mingguan
     }
 
 # ----- Technician -----

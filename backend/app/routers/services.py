@@ -13,9 +13,11 @@ def list_services(
     status: Optional[str] = None,
     search: Optional[str] = None,
     device: Optional[str] = None,
+    deadline_type: Optional[str] = Query(None, description="harian/mingguan"),
+    overdue: Optional[bool] = Query(None, description="true=overdue saja, false=tidak overdue"),
     db: Session = Depends(get_db)
 ):
-    data = crud.get_services(db, skip=skip, limit=limit, status=status, search=search, device=device)
+    data = crud.get_services(db, skip=skip, limit=limit, status=status, search=search, device=device, deadline_type=deadline_type, overdue=overdue)
     return data
 
 @router.get("/{invoice}", response_model=schemas.ServiceOut)
@@ -42,13 +44,13 @@ def update_status(invoice: str, status: str = Query(..., description="Antri|Dike
     allowed = ["Antri","Dikerjakan","Menunggu Sparepart","Selesai","Dibatalkan","Bisa Diambil","Sudah Diambil","Service Failed","Garansi"]
     if status not in allowed:
         raise HTTPException(status_code=400, detail=f"Status harus {allowed}")
-    svc = crud.get_service(db, invoice)
+    svc = db.query(crud.models.Service).filter(crud.models.Service.invoice == invoice).first()
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     svc.status = status
     db.commit()
     db.refresh(svc)
-    return svc
+    return crud.enrich_service(svc)
 
 @router.delete("/{invoice}")
 def delete_service(invoice: str, db: Session = Depends(get_db)):

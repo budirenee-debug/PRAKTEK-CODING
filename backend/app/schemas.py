@@ -59,6 +59,8 @@ class ServiceBase(BaseModel):
     teknisi: Optional[str] = Field(None, max_length=100)
     status: Optional[str] = Field(default="Antri")
     estimasi_selesai: Optional[datetime.date] = None
+    deadline_type: Optional[str] = Field(default="harian")  # harian=3 hari, mingguan=7 hari
+    deadline: Optional[datetime.date] = None  # auto hitung jika kosong
 
     @field_validator('status')
     @classmethod
@@ -66,6 +68,17 @@ class ServiceBase(BaseModel):
         allowed = ["Antri", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
+        return v
+
+    @field_validator('deadline_type')
+    @classmethod
+    def validate_deadline_type(cls, v):
+        if v is None:
+            return v
+        v = v.lower().strip()
+        allowed = ["harian", "mingguan"]
+        if v not in allowed:
+            raise ValueError(f'deadline_type harus salah satu: {allowed}')
         return v
 
 class ServiceCreate(ServiceBase):
@@ -82,6 +95,8 @@ class ServiceUpdate(BaseModel):
     teknisi: Optional[str] = None
     status: Optional[str] = None
     estimasi_selesai: Optional[datetime.date] = None
+    deadline_type: Optional[str] = None
+    deadline: Optional[datetime.date] = None
 
     @field_validator('status')
     @classmethod
@@ -91,6 +106,17 @@ class ServiceUpdate(BaseModel):
         allowed = ["Antri", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
+        return v
+
+    @field_validator('deadline_type')
+    @classmethod
+    def validate_deadline_type(cls, v):
+        if v is None:
+            return v
+        v = v.lower().strip()
+        allowed = ["harian", "mingguan"]
+        if v not in allowed:
+            raise ValueError(f'deadline_type harus {allowed}')
         return v
 
 class ServiceOut(BaseModel):
@@ -106,6 +132,10 @@ class ServiceOut(BaseModel):
     status: str
     date: Optional[datetime.date] = None
     estimasi_selesai: Optional[datetime.date] = None
+    deadline_type: Optional[str] = None
+    deadline: Optional[datetime.date] = None
+    sisa_hari: Optional[int] = None  # computed: deadline - today
+    is_overdue: Optional[bool] = None
     created_at: Optional[dt] = None
     updated_at: Optional[dt] = None
 
@@ -134,3 +164,7 @@ class StatsOut(BaseModel):
     dikerjakan: int
     menunggu_sparepart: int
     selesai: int
+    overdue: int = 0
+    deadline_hari_ini: int = 0
+    harian: int = 0
+    mingguan: int = 0

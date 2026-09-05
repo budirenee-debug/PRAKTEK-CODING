@@ -53,8 +53,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 def require_superadmin(current = Depends(get_current_user)):
     if not current:
         raise HTTPException(status_code=401, detail="Token tidak valid / belum login")
-    if current.role not in ["superadmin", "admin"]:
-        raise HTTPException(status_code=403, detail="Butuh role superadmin")
+    if current.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Hanya superadmin yang boleh mengakses persetujuan akun")
     return current
 
 @router.post("/login", response_model=LoginOut)
@@ -178,6 +178,71 @@ def update_me(payload: UpdateMeIn, db: Session = Depends(get_db), current = Depe
     db.commit()
     db.refresh(current)
     return current
+
+class UpdateUserIn(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+
+@router.put("/users/{user_id}", response_model=UserOut)
+def update_user(user_id: int, payload: UpdateUserIn, db: Session = Depends(get_db), current = Depends(require_superadmin)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    if payload.username is not None:
+        new_u = payload.username.strip()
+        if len(new_u) < 3:
+            raise HTTPException(status_code=400, detail="Username minimal 3 karakter")
+        if new_u.lower() == "superadmin" and user.username.lower() != "superadmin":
+            raise HTTPException(status_code=400, detail="Username superadmin tidak boleh dipakai")
+        exists = db.query(models.User).filter(models.User.username == new_u, models.User.id != user_id).first()
+        if exists:
+            raise HTTPException(status_code=400, detail="Username sudah dipakai")
+        user.username = new_u
+    if payload.role is not None:
+        r = payload.role.strip().lower()
+        allowed = ["admin", "kasir", "teknisi", "superadmin"]
+        if r not in allowed:
+            raise HTTPException(status_code=400, detail=f"Role harus salah satu: {allowed}")
+        if user.role == "superadmin" and r != "superadmin":
+            raise HTTPException(status_code=400, detail="Tidak bisa downgrade superadmin")
+        # cegah buat superadmin baru sembarangan — hanya boleh jika current superadmin (sudah)
+        user.role = r
+    if payload.password is not None and payload.password != "":
+        if len(payload.password) < 6:
+            raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
+        from ..auth import hash_password
+        user.password_hash = hash_password(payload.password)
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.post("/toggle/{user_id}", response_model=UserOut)
+def toggle_user(user_id: int, db: Session = Depends(get_db), current = Depends(require_superadmin)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    if user.id == current.id:
+        raise HTTPException(status_code=400, detail="Tidak bisa bekukan akun sendiri")
+    if user.role == "superadmin":
+        raise HTTPException(status_code=400, detail="Tidak bisa bekukan superadmin")
+    user.is_active = not user.is_active
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current = Depends(require_superadmin)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    if user.role == "superadmin":
+        raise HTTPException(status_code=400, detail="Tidak bisa hapus superadmin")
+    if user.id == current.id:
+        raise HTTPException(status_code=400, detail="Tidak bisa hapus akun sendiri")
+    db.delete(user)
+    db.commit()
+    return {"message": f"User {user.username} dihapus"}
 
 @router.post("/seed-superadmin")
 def seed_superadmin(db: Session = Depends(get_db)):

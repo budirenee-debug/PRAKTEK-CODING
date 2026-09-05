@@ -15,6 +15,7 @@ function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 let selectedKelengkapan = new Set();
 let pelangganFilter = '';
 let statusFilter = 'all';
+const PROSES_STATUSES = ['Antri','Dikerjakan','Menunggu Sparepart'];
 
 // Init
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -135,9 +136,9 @@ function renderPelanggan(){
 
 function renderKanban(){
   const wrap=document.getElementById('kanban');
-  let filtered = data;
-  if(statusFilter!=='all') filtered=data.filter(d=>d.status===statusFilter);
-  if(pelangganFilter && statusFilter==='all'){
+  let filtered = data.filter(d=> PROSES_STATUSES.includes(d.status));
+  if(statusFilter!=='all') filtered=filtered.filter(d=>d.status===statusFilter);
+  if(pelangganFilter){
      // also apply global search in kanban
      filtered=filtered.filter(d=> (d.nama+d.device+d.keluhan).toLowerCase().includes(pelangganFilter));
   }
@@ -161,12 +162,13 @@ function renderKanban(){
         <button class="btn btn-ghost small" onclick="openDetail('${d.id}')">Detail</button>
       </div>
     </div>
-  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status ini</div>`;
-  // update tab counts
-  document.querySelectorAll('.tab').forEach(tab=>{
+  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Dikerjakan / Menunggu Sparepart</div>`;
+  // update tab counts — hanya untuk tab Proses Service (3 status)
+  document.querySelectorAll('#view-proses .tab[data-filter]').forEach(tab=>{
     const f=tab.dataset.filter;
-    const count = f==='all'? data.length : data.filter(d=>d.status===f).length;
-    tab.querySelector('span').textContent = count;
+    const count = f==='all'? data.filter(d=> PROSES_STATUSES.includes(d.status)).length : data.filter(d=>d.status===f).length;
+    const sp = tab.querySelector('span');
+    if(sp) sp.textContent = count;
   });
 }
 

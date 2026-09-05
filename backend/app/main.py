@@ -18,6 +18,35 @@ from sqlalchemy.orm import Session
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+# Migration: tambah kolom deadline jika DB lama belum ada
+def _migrate_deadline():
+    try:
+        from sqlalchemy import text
+        import datetime
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(services)")).fetchall()]
+            if "deadline_type" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN deadline_type VARCHAR(20) DEFAULT 'harian'"))
+                print("migrated: deadline_type")
+            if "deadline" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN deadline DATE"))
+                print("migrated: deadline")
+            conn.commit()
+            # isi deadline kosong untuk data lama
+            rows = conn.execute(text("SELECT invoice, date, deadline_type, deadline FROM services WHERE deadline IS NULL")).fetchall()
+            for inv, d, dtype, dl in rows:
+                try:
+                    base = datetime.date.fromisoformat(d) if isinstance(d, str) else d
+                except:
+                    base = datetime.date.today()
+                dtype = dtype or "harian"
+                days = 3 if dtype=="harian" else 7
+                dl_date = base + datetime.timedelta(days=days) if base else datetime.date.today() + datetime.timedelta(days=days)
+                conn.execute(text("UPDATE services SET deadline=:dl, deadline_type=:dt WHERE invoice=:inv"), {"dl": dl_date.isoformat(), "dt": dtype, "inv": inv})
+            conn.commit()
+    except Exception as e:
+        print("migrate deadline fail:", e)
+_migrate_deadline()
 # ensure superadmin on startup
 try:
     from sqlalchemy.orm import sessionmaker

@@ -52,6 +52,9 @@ class Service(Base):
 
     date = Column(Date, default=datetime.date.today)  # tanggal masuk
     estimasi_selesai = Column(Date, nullable=True)
+    # deadline: harian = 3 hari, mingguan = 7 hari dari date
+    deadline_type = Column(String(20), default="harian")  # harian / mingguan
+    deadline = Column(Date, nullable=True)  # tanggal deadline (auto hitung)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
