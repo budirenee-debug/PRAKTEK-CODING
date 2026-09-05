@@ -916,9 +916,11 @@ async function handleServiceSubmit(e){
 }
 function resetForm(){
   document.getElementById('serviceForm').reset();
-  // after reset, set default deadline harian
+  // after reset, set default deadline harian & teknisi menunggu
   const sel = document.getElementById('f-deadline-type');
   if(sel) sel.value = 'harian';
+  const teknisiSel = document.getElementById('f-teknisi');
+  if(teknisiSel) teknisiSel.value = 'Menunggu Teknisi';
   updateDeadlinePreview();
   selectedKelengkapan.clear();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));

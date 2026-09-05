@@ -194,6 +194,8 @@ function handleServiceSubmit(e){
 }
 function resetForm(){
   document.getElementById('serviceForm').reset();
+  const teknisiSel = document.getElementById('f-teknisi');
+  if(teknisiSel) teknisiSel.value = 'Menunggu Teknisi';
   selectedKelengkapan.clear();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
   updateInvoicePreview();
