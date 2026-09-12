@@ -97,6 +97,37 @@ def list_users(db: Session = Depends(get_db), current = Depends(require_superadm
 def pending_users(db: Session = Depends(get_db), current = Depends(require_superadmin)):
     return db.query(models.User).filter(models.User.is_active == False).all()
 
+@router.get("/available-technicians")
+def available_technicians(db: Session = Depends(get_db), current = Depends(get_current_user)):
+    """
+    Daftar akun yang bisa di-assign sebagai teknisi/penerima di tab Semua Service & Service Masuk.
+    Menggabungkan User aktif (semua role) + Technician legacy.
+    Butuh login (token), tidak harus superadmin.
+    """
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    # User aktif semua role (teknisi/admin/kasir/superadmin) — untuk penerima butuh semua, teknisi butuh filter di frontend
+    users = db.query(models.User).filter(
+        models.User.is_active == True,
+        models.User.role.in_(["teknisi", "admin", "kasir", "superadmin"])
+    ).all()
+    techs = db.query(models.Technician).filter(models.Technician.is_active == 1).all()
+    names = set()
+    result = []
+    for u in users:
+        if u.username not in names:
+            names.add(u.username)
+            result.append({"username": u.username, "role": u.role, "source": "user", "is_active": u.is_active})
+    for t in techs:
+        if t.nama not in names:
+            names.add(t.nama)
+            result.append({"username": t.nama, "role": "teknisi", "source": "technician", "is_active": True})
+    # fallback jika kosong (DB baru) -> kembalikan legacy default
+    if not result:
+        for fallback in ["Andi", "Sinta", "Budi"]:
+            result.append({"username": fallback, "role": "teknisi", "source": "fallback", "is_active": True})
+    return result
+
 @router.post("/approve/{user_id}", response_model=UserOut)
 def approve_user(user_id: int, db: Session = Depends(get_db), current = Depends(require_superadmin)):
     user = db.query(models.User).filter(models.User.id == user_id).first()

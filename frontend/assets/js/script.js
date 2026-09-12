@@ -10,11 +10,11 @@ const API_BASE = (() => {
 let USE_API = true; // coba API dulu, fallback ke localStorage jika gagal
 
 const defaultData = [
-  {id:'INV-2026-0118', invoice:'INV-2026-0118', nama:'Renee Budiman', wa:'081234567890', device:'iPhone 11 64GB', keluhan:'LCD pecah & baterai drop', teknisi:'Andi', biaya:850000, status:'Dikerjakan', date:'2026-09-02', kelengkapan:['HP Saja','+ Charger']},
-  {id:'INV-2026-0119', invoice:'INV-2026-0119', nama:'Dewi Lestari', wa:'082112345678', device:'Samsung A54', keluhan:'Mati total habis jatuh', teknisi:'Sinta', biaya:450000, status:'Antri', date:'2026-09-02', kelengkapan:['HP Saja']},
-  {id:'INV-2026-0120', invoice:'INV-2026-0120', nama:'Budi Santoso', wa:'081345678901', device:'Xiaomi Redmi Note 12', keluhan:'Kamera belakang blur', teknisi:'Budi', biaya:250000, status:'Menunggu Sparepart', date:'2026-09-01', kelengkapan:['HP Saja','+ Dus']},
-  {id:'INV-2026-0121', invoice:'INV-2026-0121', nama:'Citra Amelia', wa:'085678901234', device:'Oppo Reno 8', keluhan:'Speaker sember', teknisi:'Andi', biaya:180000, status:'Selesai', date:'2026-09-01', kelengkapan:['HP Saja']},
-  {id:'INV-2026-0122', invoice:'INV-2026-0122', nama:'Fajar Pratama', wa:'081987654321', device:'iPhone XR', keluhan:'Face ID tidak berfungsi', teknisi:'Sinta', biaya:650000, status:'Antri', date:'2026-09-02', kelengkapan:['HP Saja','+ Charger']},
+  {id:'INV-2026-0118', invoice:'INV-2026-0118', nama:'Renee Budiman', wa:'081234567890', device:'iPhone 11 64GB', keluhan:'LCD pecah & baterai drop', teknisi:'Andi', penerima:'Admin', biaya:850000, status:'Dikerjakan', date:'2026-09-02', estimasi_selesai:'2026-09-05', deadline:'2026-09-05', deadline_type:'harian', kelengkapan:['HP Saja','+ Charger']},
+  {id:'INV-2026-0119', invoice:'INV-2026-0119', nama:'Dewi Lestari', wa:'082112345678', device:'Samsung A54', keluhan:'Mati total habis jatuh', teknisi:'Sinta', penerima:'Sinta', biaya:450000, status:'Antri', date:'2026-09-02', estimasi_selesai:'2026-09-06', deadline:'2026-09-06', deadline_type:'harian', kelengkapan:['HP Saja']},
+  {id:'INV-2026-0120', invoice:'INV-2026-0120', nama:'Budi Santoso', wa:'081345678901', device:'Xiaomi Redmi Note 12', keluhan:'Kamera belakang blur', teknisi:'Budi', penerima:'Budi', biaya:250000, status:'Menunggu Sparepart', date:'2026-09-01', estimasi_selesai:'2026-09-08', deadline:'2026-09-08', deadline_type:'mingguan', kelengkapan:['HP Saja','+ Dus']},
+  {id:'INV-2026-0121', invoice:'INV-2026-0121', nama:'Citra Amelia', wa:'085678901234', device:'Oppo Reno 8', keluhan:'Speaker sember', teknisi:'Andi', penerima:'Andi', biaya:180000, status:'Selesai', date:'2026-09-01', estimasi_selesai:'2026-09-04', deadline:'2026-09-04', deadline_type:'harian', kelengkapan:['HP Saja']},
+  {id:'INV-2026-0122', invoice:'INV-2026-0122', nama:'Fajar Pratama', wa:'081987654321', device:'iPhone XR', keluhan:'Face ID tidak berfungsi', teknisi:'Sinta', penerima:'Admin', biaya:650000, status:'Antri', date:'2026-09-02', estimasi_selesai:'2026-09-09', deadline:'2026-09-09', deadline_type:'mingguan', kelengkapan:['HP Saja','+ Charger']},
 ];
 
 let data = [];
@@ -32,12 +32,72 @@ function computeSisa(deadlineStr){
   const dl = new Date(deadlineStr); dl.setHours(0,0,0,0);
   return Math.round((dl - today)/86400000);
 }
+function formatTanggal(dateStr){
+  if(!dateStr) return '-';
+  const s = String(dateStr).slice(0,10);
+  const parts = s.split('-');
+  if(parts.length!==3) return s;
+  const [y,m,d] = parts;
+  const bulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const idx = parseInt(m,10)-1;
+  const mm = bulan[idx] || m;
+  return `${d}-${mm}-${y}`;
+}
+function formatTanggalImage(dateStr){
+  if(!dateStr) return '-';
+  const s = String(dateStr).slice(0,10);
+  const parts = s.split('-');
+  if(parts.length!==3) return s;
+  const [y,m,d] = parts;
+  const bulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const idx = parseInt(m,10)-1;
+  const mm = bulan[idx] || m;
+  return `${d} ${mm} ${y}`;
+}
+function hitungLama(dateStr){
+  if(!dateStr) return '-';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tgl = new Date(String(dateStr).slice(0,10)); tgl.setHours(0,0,0,0);
+  const diff = Math.round((today - tgl)/86400000);
+  if(diff<0) return '0 Hari';
+  return `${diff} Hari`;
+}
+function cleanWA(wa){
+  if(!wa) return '';
+  let s = String(wa).replace(/\D/g,'');
+  if(s.startsWith('0')) s = '62' + s.slice(1);
+  else if(s.startsWith('620')) s = s; // already 62
+  return s;
+}
+const WA_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle"><path d="M19.05 4.94A9.88 9.88 0 0012 2C6.48 2 2 6.48 2 12c0 1.76.46 3.48 1.32 4.99L2 22l5.09-1.33A9.88 9.88 0 0012 22c5.52 0 10-4.48 10-10 0-2.64-1.03-5.12-2.95-6.94v-.12z" fill="#25D366"/><path d="M17.1 14.3c-.23-.12-1.35-.67-1.56-.75-.21-.08-.36-.12-.51.12-.15.23-.58.75-.71.9-.13.15-.25.17-.47.06-.22-.12-.94-.35-1.79-1.11-.66-.59-1.1-1.32-1.23-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.25.33-.38.11-.12.15-.22.22-.37.07-.15.04-.27-.02-.38-.06-.11-.51-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43c-.15 0-.38.06-.58.27-.2.22-.77.75-.77 1.84s.79 2.13.9 2.28c.11.15 1.55 2.37 3.76 3.32.53.22.94.36 1.26.46.53.17 1.01.14 1.39.09.42-.06 1.35-.55 1.54-1.08.19-.53.19-.98.13-1.08-.06-.1-.21-.16-.43-.27z" fill="white"/></svg>`;
+function openWhatsApp(wa, nama, device, invoice, keluhan){
+  const clean = cleanWA(wa);
+  if(!clean) return showToast('No WA tidak valid');
+  const name = nama||'Pelanggan';
+  const dev = device||'Device';
+  const inv = invoice||'';
+  const kel = keluhan||'';
+  let msg = `Halo ${name} 👋\n`;
+  msg += `Dari B_gadget POS Service HP\n`;
+  if(inv) msg += `Invoice: ${inv}\n`;
+  if(dev) msg += `Device: ${dev}\n`;
+  if(kel) msg += `Keluhan: ${kel}\n`;
+  msg += `\nTerima kasih 🙏`;
+  // Use wa.me which will open WhatsApp Web/Desktop logged in on PC
+  const url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
 function normalize(item){
-  // backend -> frontend shape
-  const dtype = (item.deadline_type || 'harian').toLowerCase();
-  let dl = item.deadline || null;
+  // backend -> frontend shape — deadline sekarang = estimasi_selesai jika ada (jatuh tempo = estimasi)
+  const dtype = (item.deadline_type || (item.estimasi_selesai ? ((new Date(item.estimasi_selesai)-new Date(item.date||new Date()))/(86400000) <=3 ? 'harian':'mingguan') : 'harian')).toLowerCase();
+  let dl = item.deadline || item.estimasi_selesai || null;
   if(!dl && item.date){
     dl = computeDeadline(item.date, dtype);
+  }
+  // jika deadline masih berbeda dari estimasi dan estimasi ada, sinkronkan (deadline = estimasi)
+  if(item.estimasi_selesai && dl !== item.estimasi_selesai){
+    // backend sudah sync, tapi fallback client
+    dl = item.estimasi_selesai;
   }
   let sisa = item.sisa_hari;
   if(sisa === undefined || sisa === null) sisa = dl ? computeSisa(dl) : null;
@@ -53,28 +113,42 @@ function normalize(item){
     device: item.device,
     keluhan: item.keluhan,
     teknisi: item.teknisi || item.technician || '-',
+    penerima: item.penerima || '-',
     biaya: item.biaya || 0,
     status: item.status,
     date: (item.date || '').slice(0,10),
     kelengkapan: Array.isArray(item.kelengkapan) ? item.kelengkapan : (typeof item.kelengkapan === 'string' ? JSON.parse(item.kelengkapan || '[]') : []),
     estimasi_selesai: item.estimasi_selesai || null,
     deadline_type: dtype,
-    deadline: dl,
+    deadline: dl ? String(dl).slice(0,10) : null,
     sisa_hari: sisa,
     is_overdue: overdue
   };
 }
 
 function updateDeadlinePreview(){
-  const sel = document.getElementById('f-deadline-type');
+  const estInput = document.getElementById('f-estimasi');
   const prev = document.getElementById('deadlinePreview');
-  if(!sel || !prev) return;
-  const dtype = sel.value;
-  const days = dtype === 'mingguan' ? 7 : 3;
-  const today = new Date();
-  const dl = new Date(today); dl.setDate(today.getDate()+days);
-  prev.textContent = `Deadline: ${dl.toLocaleDateString('id-ID')} (${days} hari dari hari ini) • ${dtype}`;
-  prev.style.color = dtype==='mingguan' ? '#2563eb' : '#059669';
+  if(!prev) return;
+  if(!estInput || !estInput.value){
+    prev.textContent = 'Pilih Estimasi Selesai — deadline otomatis = tanggal estimasi';
+    prev.style.color = '#8a8f98';
+    return;
+  }
+  const val = estInput.value;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const est = new Date(val); est.setHours(0,0,0,0);
+  const diff = Math.round((est - today)/86400000);
+  const type = diff <=3 ? 'harian' : 'mingguan';
+  const baseColor = type==='mingguan' ? '#2563eb' : '#059669';
+  let txt = `Deadline: ${formatTanggal(val)} • ${type} • `;
+  if(diff<0) txt += `⚠ Overdue ${Math.abs(diff)} hari dari estimasi`;
+  else if(diff===0) txt += `⏰ Hari ini (jatuh tempo)`;
+  else txt += `⏳ ${diff} hari lagi menuju estimasi`;
+  prev.textContent = txt;
+  if(diff<0) prev.style.color = '#dc2626';
+  else if(diff===0) prev.style.color = '#b45309';
+  else prev.style.color = baseColor;
 }
 
 function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
@@ -147,12 +221,119 @@ async function apiUpdateStatus(invoice, newStatus){
   }
 }
 
+async function loadAvailableTechs(){
+  // ambil daftar akun terdaftar yang bisa di-assign dari backend
+  const fallback = [
+    {username: 'Andi', role: 'teknisi', source: 'fallback'},
+    {username: 'Sinta', role: 'teknisi', source: 'fallback'},
+    {username: 'Budi', role: 'teknisi', source: 'fallback'}
+  ];
+  if(!USE_API){
+    availableTechs = [...fallback];
+    populateTeknisiSelect();
+    return availableTechs;
+  }
+  try{
+    const token = localStorage.getItem('access_token');
+    const headers = token ? getAuthHeaders() : {'Content-Type':'application/json'};
+    const res = await fetch(`${API_BASE}/auth/available-technicians`, {headers});
+    if(!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
+    // rows = [{username, role, source}]
+    availableTechs = rows.length ? rows : [...fallback];
+  }catch(e){
+    console.warn('loadAvailableTechs gagal, fallback:', e.message);
+    // coba fallback ke /technicians legacy
+    try{
+      const rows2 = await apiFetch('/technicians');
+      if(Array.isArray(rows2) && rows2.length){
+        availableTechs = rows2.map(r=>({username: r.nama || r.username, role:'teknisi', source:'technician'}));
+      } else {
+        availableTechs = [...fallback];
+      }
+    }catch{
+      availableTechs = [...fallback];
+    }
+  }
+  populateTeknisiSelect();
+  return availableTechs;
+}
+
+function populateTeknisiSelect(){
+  // isi dropdown Teknisi (Menunggu Teknisi + anggota terdaftar)
+  const sel = document.getElementById('f-teknisi');
+  if(sel){
+    const currentVal = sel.value || 'Menunggu Teknisi';
+    const opts = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
+    const unique = [...new Set(opts)];
+    sel.innerHTML = unique.map(name=>{
+      const tech = availableTechs.find(t=>t.username===name);
+      const label = tech ? `${name} — ${tech.role}` : name;
+      const extra = name==='Menunggu Teknisi' ? ' (belum di-assign)' : '';
+      return `<option value="${escapeHtml(name)}">${escapeHtml(label+extra)}</option>`;
+    }).join('');
+    if(unique.includes(currentVal)) sel.value = currentVal;
+    else sel.value = 'Menunggu Teknisi';
+  }
+  // isi dropdown Penerima (anggota terdaftar — untuk Service Masuk)
+  const selP = document.getElementById('f-penerima');
+  if(selP){
+    const curP = selP.value || '';
+    // penerima: semua anggota + opsi kosong
+    const members = availableTechs.length ? availableTechs : [];
+    // fallback jika belum ada anggota (offline tanpa login) -> tampilkan Andi/Sinta/Budi + current user
+    const fallbackMembers = members.length ? members : [
+      {username:'Andi', role:'teknisi'}, {username:'Sinta', role:'teknisi'}, {username:'Budi', role:'teknisi'}
+    ];
+    const me = localStorage.getItem('username');
+    let optsP = fallbackMembers.map(m=>m.username);
+    if(me && !optsP.includes(me)) optsP.unshift(me);
+    const uniqueP = [...new Set(optsP)];
+    const hasPlaceholder = selP.querySelector('option[disabled]');
+    // jika masih placeholder Memuat anggota..., ganti
+    if(uniqueP.length){
+      const prevVal = curP;
+      selP.innerHTML = `<option value="" disabled ${!prevVal?'selected':''}>Pilih penerima</option>` + uniqueP.map(name=>{
+        const m = fallbackMembers.find(x=>x.username===name) || availableTechs.find(x=>x.username===name);
+        const label = m ? `${name} — ${m.role}` : name;
+        const selAttr = name===prevVal ? 'selected' : '';
+        return `<option value="${escapeHtml(name)}" ${selAttr}>${escapeHtml(label)}</option>`;
+      }).join('');
+      if(prevVal && uniqueP.includes(prevVal)) selP.value = prevVal;
+    }
+  }
+}
+
+async function assignTeknisi(invoice, newTeknisi){
+  if(!invoice || !newTeknisi) return;
+  const prev = data.find(d=>d.id===invoice)?.teknisi;
+  if(prev===newTeknisi) return;
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({teknisi: newTeknisi})});
+      await loadData();
+    } else {
+      const item=data.find(d=>d.id===invoice);
+      if(item){ item.teknisi=newTeknisi; saveLocal(); }
+    }
+    renderAll();
+    renderSemuaService();
+    showToast(`👨‍🔧 ${invoice} → teknisi: ${newTeknisi}`);
+  }catch(e){
+    showToast('Gagal assign teknisi: '+e.message);
+  }
+}
+
 // ---------- App state ----------
 let selectedKelengkapan = new Set();
 let pelangganFilter = '';
 let statusFilter = 'all';
 let deadlineFilter = 'all'; // all, overdue, today, harian, mingguan
-const PROSES_STATUSES = ['Antri','Dikerjakan','Menunggu Sparepart']; // hanya 3 status yang tampil di tab Proses Service
+const PROSES_STATUSES = ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart']; // status yang tampil di tab Proses Service
+let availableTechs = []; // cache akun terdaftar (teknisi/admin) + Technician legacy untuk assign di Semua Service
+let currentPageProses = 1;
+let currentPageSemua = 1;
+const pageSize = 20;
 
 function setDeadlineFilter(v){
   deadlineFilter = v;
@@ -164,7 +345,8 @@ function setDeadlineFilter(v){
 }
 function deadlineBadge(d){
   const sisa = d.sisa_hari;
-  const dl = d.deadline || '-';
+  const dlRaw = d.deadline || '-';
+  const dl = dlRaw !== '-' ? formatTanggal(dlRaw) : '-';
   const typeLabel = d.deadline_type==='mingguan' ? '7h' : '3h';
   let cls='meta-pill';
   let txt='';
@@ -512,7 +694,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setupNavigation();
   setupChips();
   await loadData();
+  await loadAvailableTechs();
   renderAll();
+  renderSemuaService();
   updateInvoicePreview();
   // listeners
   const gs = document.getElementById('globalSearch');
@@ -599,7 +783,7 @@ function switchView(view){
     'service-masuk':['Service Masuk','Input device baru & kelola antrian masuk'],
     pelanggan:['Data Pelanggan','Kelola pelanggan loyal & riwayat service'],
     'tambah-pelanggan':['Tambah Pelanggan','Tambah data pelanggan baru'],
-    proses:['Proses Service','Hanya Antri • Dikerjakan • Menunggu Sparepart (status lain ada di menu masing-masing)'],
+    proses:['Proses Service','Antri • Menunggu Konfirmasi • Dikerjakan • Menunggu Sparepart (status lain ada di menu masing-masing)'],
     'bisa-diambil':['Bisa Diambil','Device Selesai & siap diambil pelanggan (status Selesai otomatis masuk sini)'],
     'sudah-diambil':['Sudah Diambil','Riwayat device yang sudah diambil'],
     'service-failed':['Service Failed','Gagal diperbaiki — perlu follow-up'],
@@ -623,7 +807,8 @@ function switchView(view){
   else document.getElementById('sidebar').classList.remove('open');
   if(view==='dashboard') renderDashboard();
   if(view==='proses') renderKanban();
-  if(view==='semua-service') renderSemuaService();
+  if(view==='semua-service'){ if(!availableTechs.length) loadAvailableTechs().then(renderSemuaService); else renderSemuaService(); }
+  if(view==='service-masuk'){ if(!availableTechs.length) loadAvailableTechs(); else populateTeknisiSelect(); }
   if(view==='bisa-diambil') renderStatusView('kanbanBisaDiambil','Bisa Diambil');
   if(view==='sudah-diambil') renderStatusView('kanbanSudahDiambil','Sudah Diambil');
   if(view==='service-failed') renderStatusView('kanbanFailed','Service Failed');
@@ -651,7 +836,7 @@ function escapeHtml(s){
 
 function updateStats(){
   document.getElementById('stat-masuk').textContent = data.length;
-  document.getElementById('stat-proses').textContent = data.filter(d=>['Antri','Dikerjakan','Menunggu Sparepart'].includes(d.status)).length;
+  document.getElementById('stat-proses').textContent = data.filter(d=>['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart'].includes(d.status)).length;
   document.getElementById('stat-selesai').textContent = data.filter(d=>d.status==='Selesai').length;
   document.getElementById('queueCount').textContent = data.length+' antrian';
   const badge = document.querySelector('.menu-item[data-view="service-masuk"] .badge');
@@ -694,7 +879,7 @@ function renderDashboard(){
   if(!tbody) return;
   tbody.innerHTML = data.slice(0,4).map(d=>`
     <tr>
-      <td><strong>${escapeHtml(d.id)}</strong><br><span style="color:#8a8f98;font-size:11px">${escapeHtml(d.date)}</span></td>
+      <td><strong>${escapeHtml(d.id)}</strong><br><span style="color:#8a8f98;font-size:11px">${escapeHtml(formatTanggal(d.date))}</span></td>
       <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98">${escapeHtml(d.device)}</span></div></div></td>
       <td>${escapeHtml(d.keluhan)}</td>
       <td><span class="badge-status ${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></td>
@@ -726,7 +911,7 @@ function renderPelanggan(){
       <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98;font-size:12px">${escapeHtml(d.wa)}</span></div></div></td>
       <td>${escapeHtml(d.device)}</td>
       <td><span style="background:#f3f4f6;padding:4px 8px;border-radius:20px;font-size:12px">1x</span></td>
-      <td>${escapeHtml(d.date)}</td>
+      <td>${escapeHtml(formatTanggal(d.date))}</td>
       <td><span class="badge-status Selesai">Member</span></td>
       <td><button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></td>
     </tr>
@@ -738,7 +923,7 @@ function renderPelanggan(){
 }
 
 function statusOptions(){
-  return ['Antri','Dikerjakan','Menunggu Sparepart','Selesai','Bisa Diambil','Sudah Diambil','Service Failed','Garansi','Dibatalkan'];
+  return ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart','Selesai','Bisa Diambil','Sudah Diambil','Service Failed','Garansi','Dibatalkan'];
 }
 function passesDeadlineFilter(d){
   if(deadlineFilter==='all') return true;
@@ -756,7 +941,7 @@ function renderKanban(){
     statusFilter='all';
     document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=> b.classList.toggle('active', b.dataset.filter==='all'));
   }
-  // Basis: hanya 3 status yang boleh tampil di tab Proses Service
+  // Basis: 4 status yang tampil di tab Proses Service (Antri, Menunggu Konfirmasi, Dikerjakan, Menunggu Sparepart)
   let filtered = data.filter(d=> PROSES_STATUSES.includes(d.status));
   if(statusFilter!=='all') filtered=filtered.filter(d=>d.status===statusFilter);
   if(pelangganFilter){
@@ -782,10 +967,11 @@ function renderKanban(){
           <option disabled selected>Ubah status</option>
           ${opts}
         </select>
+        <button class="btn btn-ghost small" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" style="background:#dcfce7;border-color:#bbf7d0;color:#166534" title="Direct WA">${WA_ICON}</button>
         <button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button>
       </div>
     </div>
-  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Dikerjakan / Menunggu Sparepart</div>`;
+  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Menunggu Konfirmasi / Dikerjakan / Menunggu Sparepart</div>`;
   // update hitungan tab hanya untuk tab filter di view-proses
   document.querySelectorAll('#view-proses .tab[data-filter]').forEach(tab=>{
     const f=tab.dataset.filter;
@@ -800,21 +986,118 @@ function renderSemuaService(){
   const q = (document.getElementById('searchSemua')?.value || '').toLowerCase();
   const f = document.getElementById('filterStatusSemua')?.value || '';
   let filtered=[...data];
-  if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.keluhan).toLowerCase().includes(q));
+  if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.keluhan+d.penerima).toLowerCase().includes(q));
   if(f) filtered=filtered.filter(d=>d.status===f);
   filtered = filtered.filter(passesDeadlineFilter);
-  tbody.innerHTML = filtered.map(d=>`
-    <tr style="${d.is_overdue?'background:#fffafa':''}">
-      <td><strong>${escapeHtml(d.id)}</strong><br><span style="color:#8a8f98;font-size:11px">${escapeHtml(d.date)} • ${deadlineBadge(d).replace(/<[^>]*>/g,'')}</span></td>
-      <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98">${escapeHtml(d.device)}</span></div></div></td>
-      <td>${escapeHtml(d.keluhan)}<br><span style="font-size:11px">${deadlineBadge(d)}</span></td>
-      <td>${escapeHtml(d.teknisi)}</td>
-      <td>Rp ${Number(d.biaya).toLocaleString('id-ID')}</td>
-      <td><span class="badge-status ${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></td>
-      <td><button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></td>
+  tbody.innerHTML = filtered.map(d=>{
+    const isMenunggu = d.teknisi==='Menunggu Teknisi' || !d.teknisi || d.teknisi==='-';
+    const baseOpts = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
+    if(d.teknisi && !baseOpts.includes(d.teknisi)) baseOpts.push(d.teknisi);
+    const uniqOpts = [...new Set(baseOpts)];
+    const optionsHtml = uniqOpts.map(name=>{
+      const sel = name===d.teknisi ? 'selected' : '';
+      const tech = availableTechs.find(t=>t.username===name);
+      const label = tech ? `${name} (${tech.role})` : name;
+      return `<option value="${escapeHtml(name)}" ${sel}>${escapeHtml(label)}</option>`;
+    }).join('');
+    const selectStyle = isMenunggu
+      ? 'background:#fffbeb;border-color:#fde68a;color:#92400e;font-weight:600'
+      : 'background:#fff;border-color:#ececec';
+    const statusOpts = statusOptions();
+    const statusOptionsHtml = statusOpts.map(s=>`<option value="${escapeHtml(s)}" ${s===d.status?'selected':''}>${escapeHtml(s)}</option>`).join('');
+    const statusStyle = (()=>{ const s=d.status; if(s==='Antri') return 'background:#fffbeb;border-color:#fde68a;color:#92400e'; if(s==='Menunggu Konfirmasi') return 'background:#fef9c3;border-color:#fde68a;color:#854d0e'; if(s==='Dikerjakan') return 'background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8'; if(s==='Menunggu Sparepart') return 'background:#fef3c7;border-color:#fde68a;color:#92400e'; if(s==='Selesai'||s==='Bisa Diambil') return 'background:#ecfdf5;border-color:#a7f3d0;color:#065f46'; if(s==='Sudah Diambil') return 'background:#f3f4f6;border-color:#e5e7eb;color:#374151'; if(s==='Service Failed') return 'background:#fef2f2;border-color:#fecaca;color:#991b1b'; if(s==='Garansi') return 'background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6'; if(s==='Dibatalkan') return 'background:#f3f4f6;border-color:#e5e7eb;color:#6b7280'; return 'background:#fff;border-color:#ececec'; })();
+    return `
+    <tr data-invoice="${escapeHtml(d.id)}" style="${d.is_overdue?'background:#fffafa':''}">
+      <td><strong style="font-size:11px">${escapeHtml(d.id)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(formatTanggal(d.date))}</span></td>
+      <td><div class="avatar-cell" style="gap:6px"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}" style="width:26px;height:26px"><div><strong style="font-size:11px">${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(d.device)}</span></div></div></td>
+      <td style="font-size:11px">${escapeHtml(d.keluhan)}<br><span style="font-size:10px">${deadlineBadge(d)}</span></td>
+      <td>
+        <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Ubah teknisi" style="padding:5px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;min-width:120px;${selectStyle}">
+          ${optionsHtml}
+        </select>
+      </td>
+      <td>
+        ${(()=>{ 
+          const isEmpty = !d.penerima || d.penerima==='-' || d.penerima==='';
+          const baseP = [...availableTechs.map(t=>t.username)];
+          if(d.penerima && d.penerima!=='-' && !baseP.includes(d.penerima)) baseP.push(d.penerima);
+          const uniqP = [...new Set(baseP.filter(Boolean))];
+          const optsP = uniqP.map(name=>{
+            const m = availableTechs.find(t=>t.username===name);
+            const label = m ? `${name} (${m.role})` : name;
+            return `<option value="${escapeHtml(name)}" ${name===d.penerima?'selected':''}>${escapeHtml(label)}</option>`;
+          }).join('');
+          const styleP = isEmpty ? 'background:#fffbeb;border-color:#fde68a;color:#92400e' : 'background:#f0f9ff;border-color:#bae6fd;color:#0369a1';
+          const placeholder = isEmpty ? `<option value="" disabled selected>Pilih</option>` : '';
+          return `<select onchange="assignPenerima('${escapeHtml(d.id)}', this.value)" title="Ubah penerima" style="padding:5px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;min-width:110px;font-weight:600;${styleP}">${placeholder}${optsP}</select>`;
+        })()}
+      </td>
+      <td><button class="btn btn-ghost small" style="padding:5px 6px;font-size:11px;background:#dcfce7;border-color:#bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" title="Direct WhatsApp ke ${escapeHtml(d.wa)} (pakai WA yang login di PC)">${WA_ICON} WA</button></td>
+      <td style="font-size:11px">Rp ${Number(d.biaya).toLocaleString('id-ID')}</td>
+      <td>
+        <select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" title="Ubah status" style="padding:5px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;min-width:110px;font-weight:600;${statusStyle}">
+          ${statusOptionsHtml}
+        </select>
+      </td>
+      <td><button class="btn btn-ghost small" style="padding:4px 6px;font-size:11px" onclick="toggleInlineDetail('${escapeHtml(d.id)}')" id="btn-detail-${escapeHtml(d.id)}">Detail</button></td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#8a8f98">Tidak ada data</td></tr>`;
+  `;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;padding:14px;color:#8a8f98;font-size:11px">Tidak ada data</td></tr>`;
   const el=document.getElementById('semuaCount'); if(el) el.textContent = filtered.length + ' service';
+}
+function toggleInlineDetail(invoice){
+  const existing = document.getElementById(`inline-detail-${invoice}`);
+  const btn = document.getElementById(`btn-detail-${invoice}`);
+  // tutup jika sudah terbuka
+  if(existing){
+    existing.remove();
+    if(btn) btn.textContent = '▼ Detail';
+    return;
+  }
+  // tutup detail lain (hanya satu inline terbuka)
+  document.querySelectorAll('.inline-detail-row').forEach(r=>r.remove());
+  document.querySelectorAll('[id^="btn-detail-"]').forEach(b=>{ if(b.id!==`btn-detail-${invoice}`) b.textContent='▼ Detail'; });
+  const d = data.find(x=>x.id===invoice);
+  if(!d) return;
+  const dlBadge = deadlineBadge(d);
+  const row = document.querySelector(`tr[data-invoice="${invoice}"]`);
+  if(!row) return;
+  const kelengkapan = Array.isArray(d.kelengkapan) ? d.kelengkapan.join(', ') : (d.kelengkapan||'-');
+  const detailHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;font-size:13px">
+      <div style="display:grid;gap:6px">
+        <div><strong>Device:</strong> ${escapeHtml(d.device)}</div>
+        <div><strong>Pelanggan:</strong> ${escapeHtml(d.nama)} • ${escapeHtml(d.wa)}</div>
+        <div><strong>Keluhan:</strong> ${escapeHtml(d.keluhan)}</div>
+        <div><strong>Kelengkapan:</strong> ${escapeHtml(kelengkapan||'-')}</div>
+      </div>
+      <div style="display:grid;gap:6px">
+        <div><strong>Teknisi:</strong> <span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span></div>
+        <div><strong>Penerima:</strong> <span class="meta-pill" style="background:#f0f9ff;border-color:#bae6fd;color:#0369a1">📥 ${escapeHtml(d.penerima||'-')}</span></div>
+        <div><strong>Biaya:</strong> Rp ${Number(d.biaya).toLocaleString('id-ID')}</div>
+        <div><strong>Status:</strong> <span class="badge-status ${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></div>
+      </div>
+      <div style="display:grid;gap:6px">
+        <div><strong>Tgl Masuk:</strong> ${escapeHtml(formatTanggal(d.date))}</div>
+        <div><strong>Estimasi Selesai:</strong> ${escapeHtml(formatTanggal(d.estimasi_selesai))} <span style="font-size:11px;color:#8a8f98">(jatuh tempo)</span></div>
+        <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''}</div>
+        <div style="font-size:11px;color:#6b7280">Invoice ${escapeHtml(d.id)} • ${escapeHtml(d.deadline_type||'harian')}</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn small" style="background:#dcfce7;border:1px solid #bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')">${WA_ICON} Direct WhatsApp</button>
+      <button class="btn btn-dark small" onclick="window.print()">🖨 Cetak Nota</button>
+      <button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">↗ Modal Lengkap</button>
+      <button class="btn btn-ghost small" onclick="toggleInlineDetail('${escapeHtml(d.id)}')">▲ Tutup</button>
+    </div>
+  `;
+  const tr = document.createElement('tr');
+  tr.id = `inline-detail-${invoice}`;
+  tr.className = 'inline-detail-row';
+  tr.innerHTML = `<td colspan="8" style="background:#f9fafb;padding:16px;border:1px solid #ececec;border-top:3px solid #111;animation:fade .18s"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong style="font-size:13px">📋 Detail Inline — ${escapeHtml(d.id)}</strong><button class="btn btn-ghost small" onclick="toggleInlineDetail('${escapeHtml(d.id)}')">✕ Tutup</button></div>${detailHtml}</td>`;
+  row.insertAdjacentElement('afterend', tr);
+  tr.scrollIntoView({behavior:'smooth', block:'nearest'});
+  if(btn) btn.textContent = '▲ Tutup';
 }
 function renderStatusView(targetId, statusName){
   const wrap=document.getElementById(targetId);
@@ -854,7 +1137,7 @@ async function updateStatus(id, newStatus){
     if(item) item.status=newStatus;
     if(!USE_API) saveLocal();
     else await loadData();
-    renderAll(); showToast(`Status ${id} → ${newStatus}`);
+    renderAll(); renderSemuaService(); showToast(`Status ${id} → ${newStatus}`);
   }catch(e){
     showToast('Gagal update: '+ e.message);
   }
@@ -887,9 +1170,11 @@ async function handleServiceSubmit(e){
   const biaya=parseInt(document.getElementById('f-biaya').value)||0;
   const teknisi=document.getElementById('f-teknisi').value;
   const estimasi=document.getElementById('f-estimasi').value || null;
+  const penerima=document.getElementById('f-penerima')?.value || null;
   if(!nama||!wa||!device||!keluhan) return showToast('Lengkapi field wajib!');
+  if(!estimasi) return showToast('Estimasi Selesai wajib diisi — deadline mengikuti estimasi');
+  if(!penerima) return showToast('Penerima wajib dipilih');
 
-  const dlType = document.getElementById('f-deadline-type')?.value || 'harian';
   const payload = {
     nama, wa,
     device: device,
@@ -898,9 +1183,9 @@ async function handleServiceSubmit(e){
     kelengkapan: [...selectedKelengkapan],
     biaya,
     teknisi,
+    penerima,
     status: "Antri",
-    estimasi_selesai: estimasi,
-    deadline_type: dlType
+    estimasi_selesai: estimasi
   };
 
   try{
@@ -916,11 +1201,13 @@ async function handleServiceSubmit(e){
 }
 function resetForm(){
   document.getElementById('serviceForm').reset();
-  // after reset, set default deadline harian & teknisi menunggu
-  const sel = document.getElementById('f-deadline-type');
-  if(sel) sel.value = 'harian';
+  // after reset, set default teknisi menunggu & repopulate penerima
   const teknisiSel = document.getElementById('f-teknisi');
   if(teknisiSel) teknisiSel.value = 'Menunggu Teknisi';
+  // reset penerima ke placeholder & reload anggota
+  const penerimaSel = document.getElementById('f-penerima');
+  if(penerimaSel) penerimaSel.value = '';
+  if(availableTechs.length) populateTeknisiSelect();
   updateDeadlinePreview();
   selectedKelengkapan.clear();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
@@ -944,25 +1231,45 @@ function openDetail(id){
   const d=data.find(x=>x.id===id);
   if(!d) return;
   const dlBadge = deadlineBadge(d);
+  const baseOpts = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
+  if(d.teknisi && !baseOpts.includes(d.teknisi)) baseOpts.push(d.teknisi);
+  const uniqOpts = [...new Set(baseOpts)];
+  const teknisiOptions = uniqOpts.map(name=>{
+    const tech = availableTechs.find(t=>t.username===name);
+    const label = tech ? `${name} (${tech.role})` : name;
+    return `<option value="${escapeHtml(name)}" ${name===d.teknisi?'selected':''}>${escapeHtml(label)}</option>`;
+  }).join('');
+  // penerima options
+  const penerimaOpts = [...new Set(availableTechs.map(t=>t.username).concat(d.penerima && d.penerima!=='-' ? [d.penerima] : []))];
+  const penerimaOptions = penerimaOpts.map(name=>{
+    const m = availableTechs.find(t=>t.username===name);
+    const label = m ? `${name} (${m.role})` : name;
+    return `<option value="${escapeHtml(name)}" ${name===d.penerima?'selected':''}>${escapeHtml(label)}</option>`;
+  }).join('');
+  const hasPenerima = penerimaOpts.length>0;
   document.getElementById('modalContent').innerHTML=`
     <h3 style="margin-bottom:6px">${escapeHtml(d.device)}</h3>
-    <p style="color:#8a8f98;font-size:13px;margin-bottom:14px">${escapeHtml(d.id)} • ${escapeHtml(d.date)} • ${escapeHtml(d.deadline_type)} • deadline ${escapeHtml(d.deadline||'-')}</p>
+    <p style="color:#8a8f98;font-size:13px;margin-bottom:14px">${escapeHtml(d.id)} • ${escapeHtml(formatTanggal(d.date))} • ${escapeHtml(d.deadline_type)} • deadline ${escapeHtml(formatTanggal(d.deadline))} ${d.estimasi_selesai? ' • estimasi '+escapeHtml(formatTanggal(d.estimasi_selesai)):''}</p>
     <div style="display:grid;gap:10px;font-size:13px">
-      <div><strong>Pelanggan:</strong> ${escapeHtml(d.nama)} (${escapeHtml(d.wa)})</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Pelanggan:</strong> ${escapeHtml(d.nama)} (${escapeHtml(d.wa)}) <button class="btn small" style="background:#dcfce7;border:1px solid #bbf7d0;color:#166534;padding:5px 10px" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')">${WA_ICON} WA Direct</button></div>
       <div><strong>Keluhan:</strong> ${escapeHtml(d.keluhan)}</div>
       <div><strong>Kelengkapan:</strong> ${escapeHtml((d.kelengkapan||[]).join(', ')||'-')}</div>
-      <div><strong>Teknisi:</strong> ${escapeHtml(d.teknisi)}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Teknisi:</strong> <span class="meta-pill">${escapeHtml(d.teknisi)}</span>
+        <select id="modalTeknisi" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px;min-width:160px">${teknisiOptions}</select>
+        <button class="btn btn-ghost small" onclick="assignTeknisiFromModal('${escapeHtml(d.id)}')">Assign</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Penerima:</strong> <span class="meta-pill">${escapeHtml(d.penerima||'-')}</span>
+        <select id="modalPenerima" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px;min-width:160px">${hasPenerima? penerimaOptions : '<option value="">- Belum ada anggota -</option>'}</select>
+        <button class="btn btn-ghost small" onclick="assignPenerimaFromModal('${escapeHtml(d.id)}')">Simpan</button>
+      </div>
       <div><strong>Biaya:</strong> Rp ${Number(d.biaya).toLocaleString('id-ID')}</div>
       <div><strong>Status:</strong> <span class="badge-status ${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></div>
-      <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-        <label style="font-size:11px">Ubah deadline:</label>
-        <select id="modalDeadlineType" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px">
-          <option value="harian" ${d.deadline_type==='harian'?'selected':''}>Harian (3 hari)</option>
-          <option value="mingguan" ${d.deadline_type==='mingguan'?'selected':''}>Mingguan (7 hari)</option>
-        </select>
-        <button class="btn btn-ghost small" onclick="updateDeadline('${escapeHtml(d.id)}')">Simpan Deadline</button>
+      <div><strong>Estimasi Selesai:</strong> ${escapeHtml(formatTanggal(d.estimasi_selesai))} <span style="font-size:11px;color:#8a8f98">(jatuh tempo = estimasi)</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="modalEstimasi" type="date" value="${escapeHtml(d.estimasi_selesai||'')}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px">
+        <button class="btn btn-ghost small" onclick="updateEstimasi('${escapeHtml(d.id)}')">Ubah Estimasi</button>
       </div>
+      <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''} <span style="font-size:11px;color:#6b7280">otomatis mengikuti Estimasi Selesai</span></div>
     </div>
     <div style="margin-top:18px;display:flex;gap:10px">
       <button class="btn btn-dark" style="flex:1" onclick="window.print()">Cetak Nota</button>
@@ -970,6 +1277,44 @@ function openDetail(id){
     </div>
   `;
   document.getElementById('modal').classList.add('show');
+}
+function assignTeknisiFromModal(invoice){
+  const sel = document.getElementById('modalTeknisi');
+  if(!sel) return;
+  assignTeknisi(invoice, sel.value).then(()=>{ closeModal(); openDetail(invoice); });
+}
+function assignPenerimaFromModal(invoice){
+  const sel = document.getElementById('modalPenerima');
+  if(!sel || !sel.value) return showToast('Pilih penerima');
+  assignPenerima(invoice, sel.value).then(()=>{ closeModal(); openDetail(invoice); });
+}
+async function assignPenerima(invoice, newPenerima){
+  if(!invoice || !newPenerima) return;
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({penerima: newPenerima})});
+      await loadData();
+    } else {
+      const item=data.find(d=>d.id===invoice);
+      if(item){ item.penerima=newPenerima; saveLocal(); }
+    }
+    renderAll(); renderSemuaService(); showToast(`📥 ${invoice} → penerima: ${newPenerima}`);
+  }catch(e){ showToast('Gagal assign penerima: '+e.message); }
+}
+async function updateEstimasi(invoice){
+  const inp = document.getElementById('modalEstimasi');
+  if(!inp || !inp.value) return showToast('Pilih tanggal estimasi');
+  const newDate = inp.value;
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({estimasi_selesai: newDate})});
+      await loadData();
+    } else {
+      const item=data.find(d=>d.id===invoice);
+      if(item){ item.estimasi_selesai=newDate; item.deadline=newDate; item.deadline_type = (new Date(newDate)-new Date(item.date))/(86400000) <=3 ? 'harian':'mingguan'; item.sisa_hari=computeSisa(newDate); saveLocal(); }
+    }
+    renderAll(); renderSemuaService(); closeModal(); showToast(`📅 ${invoice} estimasi → ${newDate} (deadline mengikuti)`); updateDeadlinePreview();
+  }catch(e){ showToast('Gagal ubah estimasi: '+e.message); }
 }
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
 function showToast(msg){
@@ -980,12 +1325,15 @@ function showToast(msg){
 }
 // expose for inline onclick
 window.switchView=switchView; window.handleServiceSubmit=handleServiceSubmit; window.resetForm=resetForm;
-window.openDetail=openDetail; window.closeModal=closeModal; window.updateStatus=updateStatus;
+window.openDetail=openDetail; window.toggleInlineDetail=toggleInlineDetail; window.closeModal=closeModal; window.updateStatus=updateStatus;
 window.handleLogout=handleLogout; window.handleCustomerSubmit=handleCustomerSubmit;
 window.renderSemuaService=renderSemuaService; window.renderStatusView=renderStatusView;
 window.loadApprovalData=loadApprovalData; window.approveUser=approveUser; window.rejectUser=rejectUser;
 window.refreshPendingBadge=refreshPendingBadge; window.handleNotifClick=handleNotifClick;
 window.openEditUserModal=openEditUserModal; window.closeUserModal=closeUserModal; window.submitUserEdit=submitUserEdit;
 window.toggleFreezeUser=toggleFreezeUser; window.deleteUser=deleteUser; window.filterAllUsers=filterAllUsers; window.renderAllUsers=renderAllUsers;
+window.loadAvailableTechs=loadAvailableTechs; window.populateTeknisiSelect=populateTeknisiSelect; window.assignTeknisi=assignTeknisi; window.assignTeknisiFromModal=assignTeknisiFromModal;
+window.assignPenerima=assignPenerima; window.assignPenerimaFromModal=assignPenerimaFromModal; window.updateEstimasi=updateEstimasi;
 window.setDeadlineFilter=setDeadlineFilter; window.updateDeadline=updateDeadline; window.updateDeadlinePreview=updateDeadlinePreview;
+window.hitungLama=hitungLama; window.formatTanggalImage=formatTanggalImage; window.cleanWA=cleanWA; window.openWhatsApp=openWhatsApp;
 window.API_BASE=API_BASE;

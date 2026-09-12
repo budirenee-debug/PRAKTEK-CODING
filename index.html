@@ -250,13 +250,12 @@
                                 <div class="field"><label>Teknisi</label>
                                     <select id="f-teknisi"><option selected>Menunggu Teknisi</option><option>Andi</option><option>Sinta</option><option>Budi</option></select>
                                 </div>
-                                <div class="field"><label>Estimasi Selesai</label><input id="f-estimasi" type="date"></div>
-                                <div class="field"><label>Deadline *</label>
-                                    <select id="f-deadline-type" required onchange="updateDeadlinePreview()">
-                                        <option value="harian" selected>Harian — 3 hari</option>
-                                        <option value="mingguan">Mingguan — 7 hari</option>
+                                <div class="field"><label>Estimasi Selesai *</label><input id="f-estimasi" type="date" required onchange="updateDeadlinePreview()"></div>
+                                <div class="field"><label>Penerima *</label>
+                                    <select id="f-penerima" required>
+                                        <option value="" disabled selected>Memuat anggota...</option>
                                     </select>
-                                    <span id="deadlinePreview" style="font-size:11px;color:#059669;margin-top:4px">Deadline: -</span>
+                                    <span id="deadlinePreview" style="font-size:11px;color:#059669;margin-top:4px">Deadline otomatis = Estimasi Selesai</span>
                                 </div>
                             </div>
                             <div class="form-actions">
@@ -312,6 +311,7 @@
                 <div class="tabs">
                     <button class="tab active" data-filter="all">Semua <span>12</span></button>
                     <button class="tab" data-filter="Antri">Antri <span>5</span></button>
+                    <button class="tab" data-filter="Menunggu Konfirmasi">Menunggu Konfirmasi <span>0</span></button>
                     <button class="tab" data-filter="Dikerjakan">Dikerjakan <span>2</span></button>
                     <button class="tab" data-filter="Menunggu Sparepart">Sparepart <span>2</span></button>
                 </div>
@@ -327,13 +327,13 @@
 
             <!-- SERVICE: SEMUA SERVICE -->
             <section class="view" id="view-semua-service">
-                <div class="card">
+                <div class="card compact-card">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>Semua Service</h3><span class="count-pill" id="semuaCount">0 service</span></div>
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchSemua" placeholder="Cari invoice, pelanggan..."></div>
-                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Selesai</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select></div>
+                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Menunggu Konfirmasi</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Selesai</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select></div>
                     </div>
-                    <div class="table-wrap"><table class="table" id="tableSemua"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Teknisi</th><th>Biaya</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table class="table compact" id="tableSemua"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Teknisi</th><th>Penerima</th><th>WA</th><th>Biaya</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
                 </div>
             </section>
 

@@ -57,15 +57,16 @@ class ServiceBase(BaseModel):
     kelengkapan: Optional[List[str]] = Field(default_factory=list)
     biaya: int = Field(default=0, ge=0)
     teknisi: Optional[str] = Field(None, max_length=100)
+    penerima: Optional[str] = Field(None, max_length=100)  # penerima di Service Masuk (anggota terdaftar)
     status: Optional[str] = Field(default="Antri")
     estimasi_selesai: Optional[datetime.date] = None
-    deadline_type: Optional[str] = Field(default="harian")  # harian=3 hari, mingguan=7 hari
-    deadline: Optional[datetime.date] = None  # auto hitung jika kosong
+    deadline_type: Optional[str] = Field(default=None)  # harian=3 hari, mingguan=7 hari — auto dari estimasi_selesai jika kosong
+    deadline: Optional[datetime.date] = None  # auto hitung dari estimasi_selesai jika kosong
 
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):
-        allowed = ["Antri", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
+        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
         return v
@@ -93,6 +94,7 @@ class ServiceUpdate(BaseModel):
     kelengkapan: Optional[List[str]] = None
     biaya: Optional[int] = Field(None, ge=0)
     teknisi: Optional[str] = None
+    penerima: Optional[str] = None
     status: Optional[str] = None
     estimasi_selesai: Optional[datetime.date] = None
     deadline_type: Optional[str] = None
@@ -103,7 +105,7 @@ class ServiceUpdate(BaseModel):
     def validate_status(cls, v):
         if v is None:
             return v
-        allowed = ["Antri", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
+        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
         return v
@@ -129,6 +131,7 @@ class ServiceOut(BaseModel):
     kelengkapan: List[str] = []
     biaya: int
     teknisi: Optional[str] = None
+    penerima: Optional[str] = None
     status: str
     date: Optional[datetime.date] = None
     estimasi_selesai: Optional[datetime.date] = None

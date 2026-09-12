@@ -113,6 +113,7 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .table td{padding:12px 8px;border-bottom:1px solid #f3f3f3;vertical-align:middle}
 .badge-status{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block}
 .badge-status.Antri{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+.badge-status.Menunggu\ Konfirmasi{background:#fef9c3;color:#854d0e;border:1px solid #fde68a}
 .badge-status.Dikerjakan{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
 .badge-status.Selesai{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
 .badge-status.Menunggu\ Sparepart{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
@@ -191,6 +192,55 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 /* MOBILE OVERLAY */
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);backdrop-filter:blur(2px);z-index:14;opacity:0;transition:.2s}
 .sidebar-overlay.show{display:block;opacity:1}
+
+/* IMAGE STYLE - Proses Servis like 1.png */
+.image-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.image-topbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;flex-wrap:wrap}
+.image-topbar .tab-proses{background:#e5e7eb;color:#374151;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #d1d5db}
+.image-topbar .tab-masuk{background:#fff;color:#111;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid #e5e7eb;display:flex;gap:6px;align-items:center}
+.image-topbar .badge-red{background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700}
+.image-topbar .search-mini{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e5e7eb;padding:6px 10px;border-radius:6px;min-width:160px}
+.image-topbar .search-mini input{border:0;outline:0;font-size:12px;width:100%}
+.image-topbar .filter-btn,.image-topbar .page-btn-top{background:#fff;border:1px solid #e5e7eb;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+.image-topbar .lama-filter{display:flex;gap:6px;margin-left:auto;align-items:center}
+.image-topbar .lama-filter button{padding:6px 10px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;font-size:11px;font-weight:600;cursor:pointer}
+.image-topbar .lama-filter button.active-1{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.image-topbar .lama-filter button.active-4{background:#fde68a;border-color:#f59e0b;color:#78350f}
+.image-topbar .lama-filter button.active-7{background:#fecaca;border-color:#fca5a5;color:#991b1b}
+.image-topbar .export-btn{background:#dbeafe;border:1px solid #bfdbfe;color:#1e40af;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.image-table{width:100%;border-collapse:collapse;font-size:12px}
+.image-table thead th{background:#f8c9c9;color:#7f1d1d;font-weight:700;font-size:11px;text-transform:none;letter-spacing:0;padding:8px 6px;border:1px solid #fecaca;white-space:nowrap;text-align:center;vertical-align:middle}
+.image-table thead th:first-child{width:32px}
+.image-table tbody td{padding:7px 6px;border:1px solid #f3f4f6;vertical-align:middle;text-align:center;font-size:12px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.image-table tbody td:nth-child(6), .image-table tbody td:nth-child(7), .image-table tbody td:nth-child(9){text-align:left}
+.image-table tbody tr:nth-child(even){background:#fff}
+.image-table tbody tr:nth-child(odd){background:#fcfcfc}
+.image-table tbody tr:hover{background:#fffbeb}
+.image-table .no-servis{color:#2563eb;font-weight:600;display:flex;gap:4px;align-items:center;justify-content:center}
+.image-table .nama-barang{font-weight:600;color:#111}
+.image-table .kerusakan{color:#0ea5e9;font-weight:500}
+.image-table .dp-icon{color:#10b981;font-size:11px}
+.image-table .chat-icon{background:#dcfce7;color:#16a34a;width:22px;height:22px;border-radius:4px;display:grid;place-items:center;font-size:12px;margin:0 auto}
+.image-table .status-badge{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;display:inline-block;white-space:nowrap}
+.image-table .status-sedang{background:#e5e7eb;color:#374151;border:1px solid #d1d5db}
+.image-table .status-belum{background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
+.image-table .lama-badge{background:#fecaca;color:#991b1b;padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700;border:1px solid #fca5a5}
+.image-table .ubah-select{padding:4px 6px;border-radius:6px;border:1px solid #e5e7eb;font-size:11px;min-width:90px;background:#fff}
+.image-table .star{color:#f59e0b;font-size:12px}
+.image-table .cb{width:14px;height:14px;border:1px solid #d1d5db;border-radius:3px;display:inline-block;vertical-align:middle}
+.pagination-image{display:flex;gap:6px;align-items:center;font-size:12px}
+.pagination-image button{padding:4px 8px;border:1px solid #e5e7eb;background:#fff;border-radius:6px;cursor:pointer}
+
+
+/* COMPACT FIT - previous look but smaller */
+.compact-card{padding:12px}
+.table.compact{font-size:11.5px}
+.table.compact th{padding:6px 6px;font-size:10px}
+.table.compact td{padding:6px 6px;font-size:11.5px}
+.table.compact .badge-status{padding:3px 7px;font-size:10px}
+.table.compact select{padding:5px 6px;font-size:11px}
+.table.compact .meta-pill{padding:3px 6px;font-size:10.5px}
+.table.compact .btn.small{padding:5px 8px;font-size:11px}
 
 /* RESPONSIVE */
 @media(max-width:1100px){

@@ -28,6 +28,6 @@ def technician_stats(tech_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan")
     total = db.query(models.Service).filter(models.Service.technician_id==tech_id).count()
     selesai = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status=="Selesai").count()
-    proses = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status.in_(["Antri","Dikerjakan","Menunggu Sparepart"])).count()
+    proses = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
     persen = round((selesai/total*100) if total else 0)
     return {"id": tech.id, "nama": tech.nama, "total": total, "selesai": selesai, "proses": proses, "persen": persen}

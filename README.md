@@ -10,6 +10,14 @@ POS & tracking service HP untuk konter B_gadget. Frontend elegan + Backend FastA
 
 ```
 PRAKTEK/
+├── docs/                     # ← Semua dokumentasi penting (rapi)
+│   ├── README.md             # Index docs
+│   ├── REVO.md               # 🔐 Database Login Revo (superadmin, admin, teknisi)
+│   ├── ERD_REVO.md           # ERD visual Revo
+│   ├── DOKUMENTASI.md        # Dokumentasi API & Model lengkap
+│   ├── AUDIT.md              # Audit Revo
+│   ├── RECRUITMENT.md        # Teks rekrutmen
+│   └── REKRUTMEN.txt         # Versi txt pendek
 ├── frontend/                 # ← Asset code & image terpisah rapi
 │   ├── index.html            # Dashboard utama (canonical)
 │   ├── login.html            # Login superadmin
@@ -42,10 +50,7 @@ PRAKTEK/
 │   ├── tasks.json            # Task: Run FastAPI, Seed, Test Login
 │   └── launch.json           # Debug FastAPI
 ├── index.html                # (legacy root, tetap jalan - redirect ke frontend)
-├── style.css / script.js     # (legacy root, mirror frontend/assets)
-├── DOKUMENTASI.md
-├── RECRUITMENT.md
-└── AUDIT.md
+└── style.css / script.js     # (legacy root, mirror frontend/assets)
 ```
 
 **Aturan:**
@@ -136,14 +141,19 @@ Login page: `frontend/login.html` sudah ada form siap pakai, token disimpan di `
 
 ## 🛡️ Audit
 
-Dulu localStorage → sekarang SQLite + JWT + superadmin. Lihat `AUDIT.md:line 1`.
+Dulu localStorage → sekarang SQLite + JWT + superadmin. Lihat `docs/AUDIT.md:line 1`.
 
 ---
 
 ## 📄 Docs
 
-- `DOKUMENTASI.md:line 1` — model, endpoint, cara seed
-- `RECRUITMENT.md:line 1` — teks rekrutmen
+Semua docs sekarang di `docs/` — lihat `docs/README.md:line 1` untuk index.
+
+- `docs/REVO.md:line 1` — **Revo** Database Login (superadmin, admin, teknisi) ⭐
+- `docs/ERD_REVO.md:line 1` — ERD visual Revo
+- `docs/DOKUMENTASI.md:line 1` — model, endpoint, cara seed
+- `docs/RECRUITMENT.md:line 1` — teks rekrutmen
+- `docs/AUDIT.md:line 1` — audit migrasi
 - `.vscode/tasks.json:line 1` — task VS Code
 
 ---

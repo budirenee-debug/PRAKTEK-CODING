@@ -52,18 +52,56 @@ def compute_deadline(base_date: date, dtype: str, explicit: date = None):
         base_date = date.today()
     return base_date + datetime.timedelta(days=days)
 
+def compute_deadline_from_estimasi(estimasi: date = None, base_date: date = None, dtype: str = None, explicit: date = None):
+    """Deadline berbasis estimasi_selesai: jika estimasi ada, deadline=estimasi (jatuh tempo = estimasi). Jika tidak, fallback ke today+3/7."""
+    if explicit:
+        return explicit, (dtype or "harian").lower()
+    if estimasi:
+        # infer dtype jika tidak dikirim: gap <=3 hari => harian, else mingguan
+        if not dtype:
+            try:
+                gap = (estimasi - (base_date or date.today())).days
+            except:
+                gap = 3
+            dtype = "harian" if gap <= 3 else "mingguan"
+        else:
+            dtype = dtype.lower()
+        return estimasi, dtype
+    # tidak ada estimasi -> pakai today + dtype
+    dtype = (dtype or "harian").lower()
+    base = base_date or date.today()
+    return compute_deadline(base, dtype, None), dtype
+
 def enrich_service(svc):
-    """Tambah sisa_hari dan is_overdue dinamis untuk response"""
+    """Tambah sisa_hari dan is_overdue dinamis untuk response. Deadline sekarang berbasis estimasi_selesai jika ada."""
     if not svc:
         return svc
     try:
         dl = svc.deadline
-        # fallback hitung jika deadline kosong (data lama)
-        if not dl and hasattr(svc, 'date') and svc.date:
-            dl = compute_deadline(svc.date, getattr(svc, 'deadline_type', 'harian'))
+        # jika deadline kosong tapi estimasi ada -> pakai estimasi sebagai deadline
+        if not dl and getattr(svc, 'estimasi_selesai', None):
+            dl, dtype = compute_deadline_from_estimasi(svc.estimasi_selesai, getattr(svc, 'date', None), getattr(svc, 'deadline_type', None))
             svc.deadline = dl
-            if not getattr(svc, 'deadline_type', None):
-                svc.deadline_type = "harian"
+            svc.deadline_type = dtype
+        elif not dl and hasattr(svc, 'date') and svc.date:
+            dl, dtype = compute_deadline_from_estimasi(None, svc.date, getattr(svc, 'deadline_type', 'harian'))
+            svc.deadline = dl
+            svc.deadline_type = dtype
+        # sinkronkan deadline jika estimasi berubah tapi deadline masih mengikuti estimasi lama
+        # (jika estimasi ada dan deadline != estimasi, anggap deadline mengikuti estimasi terbaru)
+        if getattr(svc, 'estimasi_selesai', None) and dl != svc.estimasi_selesai and svc.deadline_type in (None, "harian", "mingguan"):
+            # jika estimasi lebih baru, update deadline agar jatuh tempo = estimasi
+            # hanya jika deadline sebelumnya berasal dari estimasi (bukan manual)
+            try:
+                if svc.estimasi_selesai != dl:
+                    # update ke estimasi agar proses service deadline = estimasi
+                    svc.deadline = svc.estimasi_selesai
+                    dl = svc.deadline
+                    # infer ulang dtype
+                    gap = (dl - (svc.date or date.today())).days
+                    svc.deadline_type = "harian" if gap <= 3 else "mingguan"
+            except:
+                pass
         if dl:
             delta = (dl - date.today()).days
             svc.sisa_hari = delta
@@ -135,8 +173,8 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
         if tech:
             tech_id = tech.id
 
-    dtype = (payload.deadline_type or "harian").lower()
-    dl = compute_deadline(date.today(), dtype, payload.deadline)
+    # deadline berbasis estimasi_selesai: jika estimasi ada, deadline = estimasi
+    dl, dtype = compute_deadline_from_estimasi(payload.estimasi_selesai, date.today(), payload.deadline_type, payload.deadline)
 
     svc = models.Service(
         invoice=invoice,
@@ -150,6 +188,7 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
         kelengkapan=kelengkapan_to_str(payload.kelengkapan),
         biaya=payload.biaya,
         teknisi=payload.teknisi,
+        penerima=payload.penerima,
         status=payload.status or "Antri",
         date=date.today(),
         estimasi_selesai=payload.estimasi_selesai,
@@ -172,19 +211,28 @@ def update_service(db: Session, invoice: str, payload: schemas.ServiceUpdate):
         tech = db.query(models.Technician).filter(models.Technician.nama == data["teknisi"]).first()
         if tech:
             data["technician_id"] = tech.id
-    # handle deadline_type change: recompute deadline jika tidak explicit
-    if "deadline_type" in data or "deadline" in data:
-        new_dtype = data.get("deadline_type", svc.deadline_type or "harian")
-        if new_dtype:
-            new_dtype = new_dtype.lower()
+    # handle perubahan estimasi_selesai / deadline berbasis estimasi
+    if "estimasi_selesai" in data or "deadline_type" in data or "deadline" in data:
+        # jika estimasi diubah, deadline mengikuti estimasi (jatuh tempo = estimasi)
+        new_estimasi = data.get("estimasi_selesai", svc.estimasi_selesai)
+        new_dtype = data.get("deadline_type", svc.deadline_type)
         new_dl_explicit = data.get("deadline", None)
-        # jika ganti type tapi tidak kasih deadline explicit, hitung ulang dari svc.date
-        if "deadline" not in data or new_dl_explicit is None:
-            base = svc.date or date.today()
-            data["deadline"] = compute_deadline(base, new_dtype, None)
-            data["deadline_type"] = new_dtype
+        # jika ada explicit deadline dikirim, pakai itu
+        if new_dl_explicit is not None:
+            data["deadline"] = new_dl_explicit
+            if new_dtype:
+                data["deadline_type"] = new_dtype.lower()
         else:
-            data["deadline_type"] = new_dtype
+            # hitung dari estimasi
+            computed_dl, computed_dtype = compute_deadline_from_estimasi(new_estimasi, svc.date or date.today(), new_dtype, None)
+            data["deadline"] = computed_dl
+            data["deadline_type"] = computed_dtype
+            # jika estimasi tidak dikirim tapi ada di payload, pastikan terset
+            if "estimasi_selesai" in data:
+                pass  # sudah ada
+        # normalisasi dtype
+        if "deadline_type" in data and data["deadline_type"]:
+            data["deadline_type"] = data["deadline_type"].lower()
     for k, v in data.items():
         setattr(svc, k, v)
     db.commit()
@@ -201,7 +249,7 @@ def delete_service(db: Session, invoice: str):
 
 def get_stats(db: Session):
     total = db.query(models.Service).count()
-    dalam_proses = db.query(models.Service).filter(models.Service.status.in_(["Antri","Dikerjakan","Menunggu Sparepart"])).count()
+    dalam_proses = db.query(models.Service).filter(models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
     selesai_hari = db.query(models.Service).filter(models.Service.status=="Selesai", models.Service.date==date.today()).count()
     pendapatan = db.query(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.date==date.today()).scalar() or 0
     antri = db.query(models.Service).filter(models.Service.status=="Antri").count()
