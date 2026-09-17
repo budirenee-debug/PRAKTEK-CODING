@@ -66,9 +66,13 @@ class ServiceBase(BaseModel):
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):
-        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
+        # 'Selesai' legacy tetap diterima, tapi FE sekarang pakai 'Service Sukses'
+        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Service Sukses", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
+        # normalisasi: simpan sebagai 'Service Sukses' agar konsisten
+        if v == "Selesai":
+            return "Service Sukses"
         return v
 
     @field_validator('deadline_type')
@@ -105,9 +109,11 @@ class ServiceUpdate(BaseModel):
     def validate_status(cls, v):
         if v is None:
             return v
-        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
+        allowed = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Selesai", "Service Sukses", "Dibatalkan", "Bisa Diambil", "Sudah Diambil", "Service Failed", "Garansi"]
         if v not in allowed:
             raise ValueError(f'Status harus salah satu: {allowed}')
+        if v == "Selesai":
+            return "Service Sukses"
         return v
 
     @field_validator('deadline_type')

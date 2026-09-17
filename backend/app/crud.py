@@ -105,8 +105,8 @@ def enrich_service(svc):
         if dl:
             delta = (dl - date.today()).days
             svc.sisa_hari = delta
-            # overdue hanya jika belum selesai dan deadline lewat
-            svc.is_overdue = delta < 0 and svc.status not in ["Selesai", "Sudah Diambil", "Dibatalkan", "Service Failed"]
+            # overdue hanya jika belum selesai dan deadline lewat - Service Sukses = Selesai (legacy)
+            svc.is_overdue = delta < 0 and svc.status not in ["Selesai", "Service Sukses", "Sudah Diambil", "Dibatalkan", "Service Failed"]
         else:
             svc.sisa_hari = None
             svc.is_overdue = False
@@ -250,12 +250,12 @@ def delete_service(db: Session, invoice: str):
 def get_stats(db: Session):
     total = db.query(models.Service).count()
     dalam_proses = db.query(models.Service).filter(models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
-    selesai_hari = db.query(models.Service).filter(models.Service.status=="Selesai", models.Service.date==date.today()).count()
+    selesai_hari = db.query(models.Service).filter(models.Service.status.in_(["Selesai","Service Sukses"]), models.Service.date==date.today()).count()
     pendapatan = db.query(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.date==date.today()).scalar() or 0
     antri = db.query(models.Service).filter(models.Service.status=="Antri").count()
     dikerjakan = db.query(models.Service).filter(models.Service.status=="Dikerjakan").count()
     sparepart = db.query(models.Service).filter(models.Service.status=="Menunggu Sparepart").count()
-    selesai = db.query(models.Service).filter(models.Service.status=="Selesai").count()
+    selesai = db.query(models.Service).filter(models.Service.status.in_(["Selesai","Service Sukses"])).count()
     # deadline stats
     all_svc = db.query(models.Service).all()
     overdue = 0

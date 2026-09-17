@@ -87,6 +87,11 @@
                         <span class="mi">📊</span> Laporan Penjualan
                     </button>
 
+                    <div class="menu-category">AKUN</div>
+                    <button class="menu-item" data-view="profil">
+                        <span class="mi">👤</span> Atur Profil
+                    </button>
+
                     <div class="menu-category" id="cat-superadmin" style="display:none">SUPERADMIN</div>
                     <button class="menu-item" data-view="approval-akun" id="menu-approval" style="display:none">
                         <span class="mi">🛡️</span> Persetujuan Akun
@@ -96,13 +101,13 @@
             </div>
 
             <div class="sidebar-bottom">
-                <div class="user-card">
-                    <img src="https://i.pravatar.cc/100?img=33" alt="user">
+                <div class="user-card" onclick="switchView('profil')" style="cursor:pointer" title="Atur Profil">
+                    <img src="https://i.pravatar.cc/100?img=33" alt="user" id="sidebar-avatar">
                     <div>
                         <strong id="sidebar-username">Admin Toko</strong>
                         <span id="sidebar-role">Kasir • Shift Pagi</span>
                     </div>
-                    <button class="icon-btn">⋯</button>
+                    <button class="icon-btn" onclick="event.stopPropagation(); switchView('profil')" title="Atur Profil">⋯</button>
                 </div>
                 <button class="btn-logout" onclick="handleLogout()" title="Keluar dari akun">
                     <span class="logout-icon">⎋</span> Logout
@@ -126,11 +131,12 @@
                     </div>
                 </div>
                 <div class="topbar-right">
+                    <div id="realtimeClock" style="font-size:11px;color:#4b5563;background:#fff;border:1px solid #ececec;padding:7px 10px;border-radius:10px;white-space:nowrap;font-weight:600">—</div>
                     <div class="search-box">
                         <span>⌕</span>
                         <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, invoice...">
                     </div>
-                    <button class="btn btn-dark" onclick="switchView('service-masuk')">+ Service Baru</button>
+                    <button class="btn btn-dark" id="btnServiceBaru" onclick="switchView('service-masuk')" style="display:none">+ Service Baru</button>
                     <button class="notif" id="notifBell" onclick="handleNotifClick()" title="Notifikasi persetujuan akun">◐<span class="dot" id="notifDot"></span><span class="notif-count" id="notifCount">0</span></button>
                 </div>
             </header>
@@ -148,48 +154,48 @@
                     <button class="btn btn-dark small" style="white-space:nowrap" onclick="event.stopPropagation(); switchView('approval-akun')">Lihat →</button>
                 </div>
                 <div class="stats">
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="statGoMasuk()" style="cursor:pointer" title="Lihat Semua Service →">
                         <div class="stat-head"><span>Service Masuk</span><span class="stat-icon blue">＋</span></div>
                         <h3 id="stat-masuk">12</h3>
-                        <p class="trend up">▲ +3 dari kemarin</p>
+                        <p class="trend up">▲ +3 dari kemarin • klik →</p>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="statGoProses()" style="cursor:pointer" title="Lihat Proses Service →">
                         <div class="stat-head"><span>Dalam Proses</span><span class="stat-icon amber">◷</span></div>
                         <h3 id="stat-proses">7</h3>
-                        <p class="trend">5 antri • 2 dikerjakan</p>
+                        <p class="trend">5 antri • 2 dikerjakan • klik →</p>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-head"><span>Selesai Hari Ini</span><span class="stat-icon green">✓</span></div>
+                    <div class="stat-card" onclick="statGoSukses()" style="cursor:pointer" title="Lihat Service Sukses →">
+                        <div class="stat-head"><span>Service Sukses Hari Ini</span><span class="stat-icon green">✓</span></div>
                         <h3 id="stat-selesai">5</h3>
-                        <p class="trend up">▲ Selesai tepat waktu 92%</p>
+                        <p class="trend up">▲ Service sukses tepat waktu 92% • klik →</p>
                     </div>
-                    <div class="stat-card dark">
+                    <div class="stat-card dark" onclick="statGoPendapatan()" style="cursor:pointer" title="Lihat Laporan Penjualan →">
                         <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
                         <h3>Rp 2.850.000</h3>
-                        <p>Hari ini • belum termasuk sparepart</p>
+                        <p>Hari ini • belum termasuk sparepart • klik →</p>
                     </div>
                 </div>
                 <!-- DEADLINE BANNER STATS -->
                 <div class="stats" style="margin-top:-6px">
-                    <div class="stat-card" style="border-left:4px solid #ef4444">
+                    <div class="stat-card" style="border-left:4px solid #ef4444;cursor:pointer" onclick="statGoOverdue()" title="Lihat Overdue di Proses Service →">
                         <div class="stat-head"><span>Overdue</span><span class="stat-icon" style="background:#fef2f2;color:#ef4444">⚠</span></div>
                         <h3 id="stat-overdue" style="color:#ef4444">0</h3>
-                        <p class="trend" style="color:#ef4444">Lewat deadline</p>
+                        <p class="trend" style="color:#ef4444">Lewat deadline • klik →</p>
                     </div>
-                    <div class="stat-card" style="border-left:4px solid #f59e0b">
+                    <div class="stat-card" style="border-left:4px solid #f59e0b;cursor:pointer" onclick="statGoToday()" title="Lihat Deadline Hari Ini →">
                         <div class="stat-head"><span>Deadline Hari Ini</span><span class="stat-icon" style="background:#fffbeb;color:#f59e0b">⏰</span></div>
                         <h3 id="stat-deadline-today">0</h3>
-                        <p class="trend">Jatuh tempo hari ini</p>
+                        <p class="trend">Jatuh tempo hari ini • klik →</p>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" style="cursor:pointer" onclick="statGoHarian()" title="Lihat Harian 3h →">
                         <div class="stat-head"><span>Harian (3 hari)</span><span class="stat-icon blue">3h</span></div>
                         <h3 id="stat-harian">0</h3>
-                        <p class="trend">Deadline 3 hari</p>
+                        <p class="trend">Deadline 3 hari • klik →</p>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" style="cursor:pointer" onclick="statGoMingguan()" title="Lihat Mingguan 7h →">
                         <div class="stat-head"><span>Mingguan (7 hari)</span><span class="stat-icon amber">7h</span></div>
                         <h3 id="stat-mingguan">0</h3>
-                        <p class="trend">Deadline 7 hari</p>
+                        <p class="trend">Deadline 7 hari • klik →</p>
                     </div>
                 </div>
 
@@ -219,6 +225,19 @@
                                 <img src="https://i.pravatar.cc/100?img=8"><div><strong>Budi</strong><span>5 device • 1 selesai</span></div><div class="progress"><div style="width:45%"></div></div><span>45%</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <!-- INDIKATOR HITS: MERK & KELUHAN -->
+                <div class="grid-2" style="margin-top:16px">
+                    <div class="card">
+                        <div class="card-head"><h3>📱 Merk HP Hits</h3><span class="muted">Top brand paling sering masuk</span></div>
+                        <div id="brandHitsList" style="display:flex;flex-direction:column;gap:10px"></div>
+                        <p id="brandHitsEmpty" style="display:none;font-size:12px;color:#8a8f98;text-align:center;padding:12px">Belum ada data</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>🛠️ Keluhan Hits</h3><span class="muted">Kasus paling sering</span></div>
+                        <div id="keluhanHitsList" style="display:flex;flex-direction:column;gap:10px"></div>
+                        <p id="keluhanHitsEmpty" style="display:none;font-size:12px;color:#8a8f98;text-align:center;padding:12px">Belum ada data</p>
                     </div>
                 </div>
             </section>
@@ -327,13 +346,24 @@
 
             <!-- SERVICE: SEMUA SERVICE -->
             <section class="view" id="view-semua-service">
+                <!-- BLOK KHUSUS: MENUNGGU TEKNISI -->
+                <div id="menungguTeknisiBlock" style="display:none;margin-bottom:16px">
+                    <div class="card" style="border-left:4px solid #f59e0b;background:#fffbeb;border-color:#fde68a">
+                        <div class="card-head">
+                            <h3 style="display:flex;align-items:center;gap:8px">⏳ Menunggu Teknisi <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:20px;font-size:11px" id="menungguCount">0 device</span></h3>
+                            <button class="btn btn-ghost small" style="font-size:11px" onclick="document.getElementById('filterStatusSemua').value='';document.getElementById('searchSemua').value='';renderSemuaService();document.getElementById('menungguTeknisiBlock').scrollIntoView({behavior:'smooth'})">↻ Refresh</button>
+                        </div>
+                        <p style="font-size:12px;color:#92400e;margin-bottom:12px">HP yang belum di-assign ke teknisi — segera pilih teknisi agar tidak mengantre lama. Klik <strong>Assign</strong> langsung di kartu.</p>
+                        <div id="menungguList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px"></div>
+                    </div>
+                </div>
                 <div class="card compact-card">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>Semua Service</h3><span class="count-pill" id="semuaCount">0 service</span></div>
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchSemua" placeholder="Cari invoice, pelanggan..."></div>
-                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Menunggu Konfirmasi</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Selesai</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select></div>
+                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Menunggu Konfirmasi</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Service Sukses</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select></div>
                     </div>
-                    <div class="table-wrap"><table class="table compact" id="tableSemua"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Teknisi</th><th>Penerima</th><th>WA</th><th>Biaya</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-wrap"><table class="table compact" id="tableSemua"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Teknisi</th><th>Penerima</th><th title="WhatsApp" style="text-align:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle"><path d="M19.05 4.94A9.88 9.88 0 0012 2C6.48 2 2 6.48 2 12c0 1.76.46 3.48 1.32 4.99L2 22l5.09-1.33A9.88 9.88 0 0012 22c5.52 0 10-4.48 10-10 0-2.64-1.03-5.12-2.95-6.94v-.12z" fill="#25D366"/><path d="M17.1 14.3c-.23-.12-1.35-.67-1.56-.75-.21-.08-.36-.12-.51.12-.15.23-.58.75-.71.9-.13.15-.25.17-.47.06-.22-.12-.94-.35-1.79-1.11-.66-.59-1.1-1.32-1.23-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.25.33-.38.11-.12.15-.22.22-.37.07-.15.04-.27-.02-.38-.06-.11-.51-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43c-.15 0-.38.06-.58.27-.2.22-.77.75-.77 1.84s.79 2.13.9 2.28c.11.15 1.55 2.37 3.76 3.32.53.22.94.36 1.26.46.53.17 1.01.14 1.39.09.42-.06 1.35-.55 1.54-1.08.19-.53.19-.98.13-1.08-.06-.1-.21-.16-.43-.27z" fill="white"/></svg></th><th>Biaya</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
                 </div>
             </section>
 
@@ -370,25 +400,118 @@
                 </form></div>
             </section>
 
-            <!-- INVENTORY: SPAREPART -->
+            <!-- INVENTORY: SPAREPART — editable Masuk/Keluar/Stok Akhir/Harga -->
             <section class="view" id="view-inventory-sparepart">
-                <div class="card"><div class="card-head"><h3>Sparepart</h3><button class="btn btn-dark small" onclick="switchView('inventory-tambah')">+ Tambah Item</button></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Nama Part</th><th>Kategori</th><th>Stok</th><th>Harga</th><th></th></tr></thead><tbody><tr><td>LCD iPhone 11</td><td>Display</td><td><span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px">2</span></td><td>Rp 550.000</td><td><button class="btn btn-ghost small">Edit</button></td></tr><tr><td>Baterai Samsung A54</td><td>Baterai</td><td><span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px">12</span></td><td>Rp 280.000</td><td><button class="btn btn-ghost small">Edit</button></td></tr></tbody></table></div></div>
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>Sparepart</h3><span class="count-pill" id="sparepartCount">0 item</span><span id="sparepartWarning" style="display:none;background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Stok tipis</span></div>
+                        <div class="toolbar-right">
+                            <div class="search-box small"><span>⌕</span><input id="searchSparepart" placeholder="Cari part, kategori, merk..."></div>
+                            <select id="filterMerkSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select>
+                            <select id="filterKategoriSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select>
+                            <button class="btn btn-dark small" onclick="switchView('inventory-tambah')">+ Tambah Item</button>
+                        </div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">✏️ <strong>Merk</strong> hits: IPHONE • SAMSUNG • XIAOMI • OPPO • VIVO • INFINIX • <span style="background:#f3f4f6;padding:2px 6px;border-radius:8px">LAIN</span> untuk merk jarang. Tabel bisa langsung diubah: <strong>Masuk</strong> / <strong>Keluar</strong> / <strong>Stok Akhir</strong> / <strong>Harga</strong> lalu <strong>Simpan</strong>.</p>
+                    <div class="table-wrap">
+                        <table class="table compact" id="tableSparepart">
+                            <thead><tr><th style="min-width:140px">Nama Part</th><th style="min-width:90px">Merk</th><th>Kategori</th><th style="text-align:center;min-width:80px">Masuk</th><th style="text-align:center;min-width:80px">Keluar</th><th style="text-align:center;min-width:90px">Stok</th><th style="min-width:90px">Tgl</th><th style="text-align:right;min-width:110px">Harga</th><th style="text-align:center;min-width:150px">Aksi</th></tr></thead>
+                            <tbody id="tbodySparepart"><tr><td colspan="9" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:#8a8f98">
+                        <span id="sparepartSummary">0 item • Total nilai stok: Rp 0</span>
+                        <button class="btn btn-ghost small" onclick="resetSparepartDummy()">↻ Reset dummy</button>
+                    </div>
+                </div>
+                <!-- Modal Edit Sparepart -->
+                <div class="modal" id="spEditModal">
+                    <div class="modal-box" style="max-width:460px">
+                        <button class="modal-close" onclick="closeSpEditModal()">×</button>
+                        <h3 style="margin-bottom:12px">✎ Edit Sparepart</h3>
+                        <form id="spEditForm" onsubmit="submitSpEdit(event)">
+                            <input type="hidden" id="spEditId">
+                            <div class="field" style="margin-bottom:10px"><label>Nama Part *</label><input id="spEditNama" required placeholder="LCD iPhone 11"></div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                                <div class="field"><label>Merk *</label><select id="spEditMerk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
+                                <div class="field"><label>Kategori</label><select id="spEditKategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                                <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
+                                <div class="field"><label>Keluar</label><input id="spEditKeluar" type="number" min="0"></div>
+                                <div class="field"><label>Stok Akhir</label><input id="spEditStok" type="number" min="0"></div>
+                                <div class="field"><label>Harga (Rp)</label><input id="spEditHarga" type="number" min="0"></div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:14px">
+                                <button type="button" class="btn btn-ghost" style="flex:1" onclick="closeSpEditModal()">Batal</button>
+                                <button type="submit" class="btn btn-dark" style="flex:1">Simpan Perubahan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </section>
+            <!-- INVENTORY: ALAT — editable per baris seperti Sparepart -->
             <section class="view" id="view-inventory-alat">
-                <div class="card"><div class="card-head"><h3>Alat</h3><span class="muted">Peralatan teknisi</span></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Nama Alat</th><th>Kondisi</th><th>Peminjam</th><th></th></tr></thead><tbody><tr><td>Blower</td><td><span class="badge-status Selesai">Baik</span></td><td>Andi</td><td>-</td></tr><tr><td>Microscope</td><td><span class="badge-status Menunggu Sparepart">Perlu Kalibrasi</span></td><td>-</td><td>-</td></tr></tbody></table></div></div>
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>Alat</h3><span class="count-pill" id="alatCount">0 alat</span><span id="alatWarning" style="display:none;background:#fffbeb;color:#b45309;padding:4px 8px;border-radius:20px;font-size:11px">Perlu perhatian</span></div>
+                        <div class="toolbar-right">
+                            <div class="search-box small"><span>⌕</span><input id="searchAlat" placeholder="Cari alat, peminjam..."></div>
+                            <select id="filterKondisiAlat" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kondisi</option><option>Baik</option><option>Perlu Kalibrasi</option><option>Rusak</option><option>Dipinjam</option></select>
+                            <button class="btn btn-dark small" onclick="openAlatAddModal()">+ Tambah Alat</button>
+                        </div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">✏️ Seperti Sparepart — tiap baris bisa diedit: <strong>Kondisi</strong> & <strong>Peminjam</strong> (dropdown), <strong>Masuk / Keluar / Stok / Harga</strong> (angka) lalu <strong>Simpan</strong>.</p>
+                    <div class="table-wrap">
+                        <table class="table compact" id="tableAlat">
+                            <thead><tr><th style="min-width:140px">Nama Alat</th><th style="min-width:120px">Kondisi</th><th style="min-width:120px">Peminjam</th><th style="text-align:center;min-width:75px">Masuk</th><th style="text-align:center;min-width:75px">Keluar</th><th style="text-align:center;min-width:85px">Stok</th><th style="text-align:right;min-width:110px">Harga</th><th style="text-align:center;min-width:150px">Aksi</th></tr></thead>
+                            <tbody id="tbodyAlat"><tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:#8a8f98">
+                        <span id="alatSummary">0 alat • Total nilai: Rp 0</span>
+                        <button class="btn btn-ghost small" onclick="resetAlatDummy()">↻ Reset dummy</button>
+                    </div>
+                </div>
+                <!-- Modal Edit/Tambah Alat -->
+                <div class="modal" id="alatEditModal">
+                    <div class="modal-box" style="max-width:480px">
+                        <button class="modal-close" onclick="closeAlatModal()">×</button>
+                        <h3 id="alatModalTitle" style="margin-bottom:12px">✎ Edit Alat</h3>
+                        <form id="alatEditForm" onsubmit="submitAlatEdit(event)">
+                            <input type="hidden" id="alatEditId">
+                            <div class="field" style="margin-bottom:10px"><label>Nama Alat *</label><input id="alatEditNama" required placeholder="Blower, Microscope..."></div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                                <div class="field"><label>Kondisi</label><select id="alatEditKondisi" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Baik</option><option>Perlu Kalibrasi</option><option>Rusak</option><option>Dipinjam</option></select></div>
+                                <div class="field"><label>Peminjam</label><select id="alatEditPeminjam" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="-">- (tidak dipinjam)</option></select></div>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                                <div class="field"><label>Masuk</label><input id="alatEditMasuk" type="number" min="0"></div>
+                                <div class="field"><label>Keluar</label><input id="alatEditKeluar" type="number" min="0"></div>
+                                <div class="field"><label>Stok</label><input id="alatEditStok" type="number" min="0"></div>
+                                <div class="field"><label>Harga (Rp)</label><input id="alatEditHarga" type="number" min="0"></div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:14px">
+                                <button type="button" class="btn btn-ghost" style="flex:1" onclick="closeAlatModal()">Batal</button>
+                                <button type="submit" class="btn btn-dark" style="flex:1">Simpan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </section>
             <section class="view" id="view-inventory-tambah">
-                <div class="card form-card"><div class="card-head"><h3>Tambah Item Inventory</h3></div>
-                <form onsubmit="event.preventDefault(); showToast('Item ditambahkan (dummy)'); switchView('inventory-sparepart')">
+                <div class="card form-card"><div class="card-head"><h3>Tambah Item Inventory</h3><span class="muted">Sparepart — Masuk, Harga, Stok Akhir</span></div>
+                <form id="spAddForm" onsubmit="handleSparepartAdd(event)">
                     <div class="form-grid">
-                        <div class="field"><label>Nama Item *</label><input required placeholder="LCD, Baterai, Obeng Set..."></div>
-                        <div class="field"><label>Kategori</label><select><option>Sparepart</option><option>Alat</option><option>Konsumsi</option></select></div>
-                        <div class="field"><label>Stok</label><input type="number" placeholder="0"></div>
-                        <div class="field"><label>Harga</label><input type="number" placeholder="Rp 0"></div>
+                        <div class="field"><label>Nama Part *</label><input id="sp-nama" required placeholder="LCD iPhone 11, Baterai Samsung..."></div>
+                        <div class="field"><label>Merk *</label><select id="sp-merk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
+                        <div class="field"><label>Kategori *</label><select id="sp-kategori" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                        <div class="field"><label>Barang Masuk *</label><input id="sp-masuk" type="number" min="0" required placeholder="0"><span style="font-size:11px;color:#8a8f98">Stok awal / barang baru masuk</span></div>
+                        <div class="field"><label>Harga Satuan (Rp) *</label><input id="sp-harga" type="number" min="0" required placeholder="550000"><span style="font-size:11px;color:#8a8f98">Harga per unit</span></div>
+                        <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"><span style="font-size:11px;color:#8a8f98">Terpakai / terjual — default 0</span></div>
+                        <div class="field"><label>Stok Akhir (auto)</label><input id="sp-stok" type="number" min="0" placeholder="auto = Masuk - Keluar"><span style="font-size:11px;color:#059669">Kosongkan = otomatis Masuk - Keluar</span></div>
                     </div>
-                    <div class="form-actions"><button class="btn btn-dark" type="submit">Simpan Item →</button></div>
+                    <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="switchView('inventory-sparepart')">← Batal</button><button type="submit" class="btn btn-dark">Simpan Sparepart →</button></div>
                 </form></div>
             </section>
 
@@ -408,12 +531,48 @@
                 <div class="table-wrap"><table class="table"><thead><tr><th>Periode</th><th>Masuk</th><th>Selesai</th><th>Failed</th><th>Garansi</th></tr></thead><tbody><tr><td>September 2026</td><td>12</td><td>5</td><td>1</td><td>2</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-laporan-teknisi">
-                <div class="card"><div class="card-head"><h3>Laporan Teknisi</h3><span class="muted">Performa bulan ini</span></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Teknisi</th><th>Handle</th><th>Selesai</th><th>Failed</th><th>Rating</th></tr></thead><tbody><tr><td>Andi</td><td>4</td><td>2</td><td>0</td><td>4.8 ★</td></tr><tr><td>Sinta</td><td>3</td><td>3</td><td>0</td><td>5.0 ★</td></tr><tr><td>Budi</td><td>5</td><td>1</td><td>1</td><td>4.2 ★</td></tr></tbody></table></div></div>
+                <div class="card"><div class="card-head"><h3>Laporan Teknisi</h3><span class="muted">Performa bulan ini — avatar sesuai foto profil</span></div>
+                <div class="table-wrap"><table class="table"><thead><tr><th>Teknisi</th><th>Handle</th><th>Service Sukses</th><th>Failed</th><th>Rating</th></tr></thead><tbody id="tbodyLaporanTeknisi"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-laporan-penjualan">
                 <div class="card"><div class="card-head"><h3>Laporan Penjualan</h3><span class="muted">Pendapatan</span></div>
                 <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 4.2jt</h3><p class="trend up">▲ 12%</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>LCD iPhone</h3><p class="trend">8 unit</p></div></div></div>
+            </section>
+
+            <!-- AKUN: ATUR PROFIL -->
+            <section class="view" id="view-profil">
+                <div class="card" style="max-width:640px;margin:0 auto">
+                    <div class="card-head">
+                        <h3>👤 Atur Profil Pengguna</h3>
+                        <span class="muted">Kelola akun yang sedang login</span>
+                    </div>
+                    <div style="display:flex;gap:16px;align-items:center;margin-bottom:18px;padding:14px;background:#f9fafb;border:1px solid #ececec;border-radius:14px">
+                        <img id="profil-avatar" src="https://i.pravatar.cc/100?img=33" alt="avatar" style="width:64px;height:64px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.08)">
+                        <div style="flex:1">
+                            <strong id="profil-name" style="font-size:15px">-</strong>
+                            <div style="font-size:12px;color:#8a8f98"><span id="profil-role">-</span> • <span id="profil-status">-</span></div>
+                            <div style="font-size:11px;color:#6b7280;margin-top:4px">Terdaftar: <span id="profil-created">-</span> • Login terakhir: <span id="profil-lastlogin">-</span></div>
+                        </div>
+                        <button class="btn btn-ghost small" onclick="loadProfil()">↻ Refresh</button>
+                    </div>
+                    <form id="profilForm" onsubmit="handleProfilUpdate(event)">
+                        <div class="form-grid">
+                            <div class="field"><label>Username *</label><input id="p-username" required minlength="3" placeholder="username baru"></div>
+                            <div class="field"><label>Role</label><input id="p-role" disabled placeholder="-" style="background:#f3f4f6;color:#6b7280"><span style="font-size:11px;color:#8a8f98">Role hanya bisa diubah superadmin di Persetujuan Akun</span></div>
+                            <div class="field"><label>Password Baru</label><input id="p-password" type="password" placeholder="kosongkan jika tidak ganti (min 6)"></div>
+                            <div class="field"><label>Konfirmasi Password Baru</label><input id="p-confirm" type="password" placeholder="ulang password baru"></div>
+                        </div>
+                        <div style="margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:11px;color:#92400e">💡 Username minimal 3 karakter, password minimal 6 karakter. Perubahan username akan update sidebar & butuh login ulang jika token lama kedaluwarsa.</div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-ghost" onclick="loadProfil()">Reset</button>
+                            <button type="submit" class="btn btn-dark">Simpan Perubahan →</button>
+                        </div>
+                    </form>
+                    <div style="margin-top:16px;display:flex;gap:10px">
+                        <button class="btn btn-ghost small" style="flex:1;color:#dc2626;border-color:#fecaca" onclick="handleLogout()">⎋ Logout</button>
+                        <button class="btn btn-ghost small" style="flex:1" onclick="switchView('dashboard')">← Kembali Dashboard</button>
+                    </div>
+                </div>
             </section>
 
             <!-- SUPERADMIN: PERSETUJUAN AKUN -->
@@ -500,6 +659,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=proses-bisa-diambil-20260906"></script>
+    <script src="assets/js/script.js?v=b_gadget-20260917-dashboard-klik"></script>
 </body>
 </html>

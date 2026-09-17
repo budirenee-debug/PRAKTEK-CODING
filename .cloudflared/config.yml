@@ -3,7 +3,11 @@
 # File ini: .cloudflared/config.yml (project) | default global: C:\Users\%USERNAME%\.cloudflared\config.yml
 
 tunnel: b-gadget
-credentials-file: C:\Users\budirenee\.cloudflared\4482781b-c05e-4348-ae22-1739a7a80b83.json
+# PENTING: ganti path ini sesuai user Windows di PC masing-masing + nama file JSON asli
+# dari hasil `cloudflared tunnel create b-gadget` (atau `cloudflared tunnel login`).
+# Contoh PC ini (user Br): C:\Users\Br\.cloudflared\<TUNNEL_ID>.json
+credentials-file: C:\Users\Br\.cloudflared\debc4532-0e35-4364-967d-9d8f50344e3e.json
+# Legacy (PC lama, tunnel ID lama - sudah dihapus 2026-09-16): C:\Users\budirenee\.cloudflared\4482781b-c05e-4348-ae22-1739a7a80b83.json
 
 # Optional: log level
 # loglevel: info

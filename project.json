@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "project": {
+    "name": "B_gadget POS Service HP",
+    "slug": "b-gadget",
+    "version": "1.1_Rapih",
+    "description": "POS & tracking service HP — Frontend elegan + Backend FastAPI + SQLite + Cloudflare Tunnel",
+    "author": "B_gadget Team",
+    "generatedAt": "2026-09-17T00:00:00+07:00",
+    "generatedBy": "project.json — manifest portable untuk pindah PC / install ulang Windows",
+    "repository": "local",
+    "portable": true,
+    "root": "F:\\VIBE CODING\\CODING MJPRO\\PRAKTEK",
+    "note": "Semua path di file ini RELATIF terhadap root, kecuali yang ditandai %USERPROFILE% atau absolut. Aman untuk folder dengan spasi."
+  },
+  "environment": {
+    "os": "Windows 10/11 (win32)",
+    "python": {
+      "required": ">=3.10",
+      "tested": "3.12.10",
+      "launcher": ["python", "py"],
+      "path_hint": "%LocalAppData%\\Programs\\Python\\Python312\\python.exe"
+    },
+    "node": {
+      "tested": "v24.20.0",
+      "required": "optional — hanya untuk Live Server"
+    },
+    "cloudflared": {
+      "tested": "2026.9.1",
+      "install": "winget install --id Cloudflare.cloudflared -e",
+      "alt_locations": [
+        "%USERPROFILE%\\.cloudflared\\bin\\cloudflared.exe",
+        "C:\\Program Files\\cloudflared\\cloudflared.exe",
+        "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe"
+      ]
+    },
+    "git": "2.55.0.windows.3"
+  },
+  "structure": {
+    "backend": "backend/",
+    "frontend": "frontend/",
+    "frontend_assets": "frontend/assets/",
+    "docs": "docs/",
+    "vscode": ".vscode/",
+    "cloudflared_project": ".cloudflared/",
+    "cloudflared_global": "%USERPROFILE%\\.cloudflared\\",
+    "database": "backend/b_gadget.db",
+    "database_backup": "backend/b_gadget.backup-*.db"
+  },
+  "backend": {
+    "entry": "backend/app/main.py",
+    "run": "backend/run.py",
+    "host": "0.0.0.0",
+    "port": 8000,
+    "health": "/health",
+    "docs": "/docs",
+    "api_prefix": "/api",
+    "static": {
+      "/frontend": "frontend/ (html=True)",
+      "/assets": "frontend/assets/",
+      "/": "API JSON atau redirect ke /frontend/login.html jika Accept: text/html"
+    },
+    "requirements": "backend/requirements.txt",
+    "dependencies": [
+      "fastapi==0.110.2",
+      "uvicorn[standard]==0.30.1",
+      "sqlalchemy==2.0.30",
+      "pydantic==2.8.2",
+      "python-multipart==0.0.9",
+      "python-dotenv==1.0.1",
+      "passlib[bcrypt]==1.7.4",
+      "bcrypt==4.0.1",
+      "python-jose[cryptography]==3.3.0",
+      "httpx==0.28.1"
+    ],
+    "env_example": "backend/.env.example",
+    "env_vars": {
+      "DATABASE_URL": "sqlite:///./b_gadget.db",
+      "PORT": "8000",
+      "ENV": "development"
+    },
+    "seed": {
+      "endpoint": "POST /api/seed",
+      "superadmin": "POST /api/auth/seed-superadmin",
+      "default_user": "superadmin / bismillah"
+    },
+    "models": ["User", "Technician", "Customer", "Service"],
+    "migrations": "Otomatis di main.py:_migrate_deadline() — tambah kolom deadline, deadline_type, penerima jika DB lama"
+  },
+  "frontend": {
+    "canonical": "frontend/index.html",
+    "login": "frontend/login.html",
+    "assets": {
+      "css": "frontend/assets/css/style.css",
+      "js": "frontend/assets/js/script.js",
+      "images": "frontend/assets/images/"
+    },
+    "fallback": "Jika backend offline, frontend pakai localStorage, indikator Offline",
+    "legacy_root": ["index.html", "style.css", "script.js"]
+  },
+  "tunnel": {
+    "name": "b-gadget",
+    "mode": "unified — run.bat otomatis pilih named/quick/none",
+    "domains": [
+      "service.reneepsl.my.id",
+      "reneepsl.my.id",
+      "www.reneepsl.my.id"
+    ],
+    "quick_url_pattern": "https://*.trycloudflare.com",
+    "config_project": ".cloudflared/config.yml",
+    "config_global": "%USERPROFILE%\\.cloudflared\\config.yml",
+    "credentials_pattern": "%USERPROFILE%\\.cloudflared\\*.json",
+    "credentials_example": "C:\\Users\\Br\\.cloudflared\\debc4532-0e35-4364-967d-9d8f50344e3e.json",
+    "ingress": [
+      {
+        "hostname": "service.reneepsl.my.id",
+        "service": "http://localhost:8000"
+      },
+      {
+        "hostname": "reneepsl.my.id",
+        "service": "http://localhost:8000"
+      },
+      {
+        "hostname": "www.reneepsl.my.id",
+        "service": "http://localhost:8000"
+      },
+      {
+        "service": "http_status:404"
+      }
+    ],
+    "setup_named_once": [
+      "cloudflared tunnel login",
+      "cloudflared tunnel create b-gadget",
+      "cloudflared tunnel route dns b-gadget service.reneepsl.my.id",
+      "Edit .cloudflared/config.yml -> credentials-file ke %USERPROFILE%\\.cloudflared\\<TUNNEL_ID>.json"
+    ],
+    "quick_command": "cloudflared tunnel --url http://localhost:8000"
+  },
+  "runner": {
+    "unified": "run.bat",
+    "wrapper": "run-tunnel.bat (hanya call run.bat)",
+    "behavior": {
+      "python_detection": "where python / where py / %LocalAppData%\\Programs\\Python\\Python312\\python.exe",
+      "deps_check": "python -c \"import fastapi, uvicorn\" else pip install -r backend/requirements.txt",
+      "port_check": "netstat -ano | findstr :8000",
+      "cloudflared_detection": "where cloudflared + .cloudflared/bin + Program Files",
+      "mode_named": "cloudflared + config.yml + %USERPROFILE%\\.cloudflared\\*.json ada",
+      "mode_quick": "cloudflared ada tapi tanpa kredensial",
+      "mode_none": "cloudflared tidak ada",
+      "browser": "start \"\" http://localhost:8000/frontend/login.html + https://service.reneepsl.my.id/frontend/login.html (langsung, tanpa tunggu lama)",
+      "tunnel_delay": "timeout /t 1",
+      "backend": "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    },
+    "urls": {
+      "local_login": "http://localhost:8000/frontend/login.html",
+      "local_docs": "http://localhost:8000/docs",
+      "local_health": "http://localhost:8000/health",
+      "public_login": "https://service.reneepsl.my.id/frontend/login.html"
+    }
+  },
+  "vscode": {
+    "tasks": ".vscode/tasks.json",
+    "launch": ".vscode/launch.json",
+    "tasks_list": [
+      "FastAPI: Run (dev)",
+      "FastAPI: Run + Seed",
+      "FastAPI: Install deps",
+      "FastAPI: Test Login Superadmin",
+      "Frontend: Serve (Live Server)"
+    ]
+  },
+  "backup": {
+    "why": "Saat pindah PC / install ulang Windows, file penting ikut hilang jika hanya copy folder tanpa database & kredensial tunnel. File ini jadi checklist + manifest restore.",
+    "include_wajib": [
+      {
+        "path": "backend/b_gadget.db",
+        "reason": "Database SQLite utama (di-ignore git)",
+        "action_pindah": "Copy manual ke PC baru di lokasi yang sama"
+      },
+      {
+        "path": "backend/b_gadget.backup-*.db",
+        "reason": "Backup otomatis DB",
+        "action_pindah": "Copy jika ada"
+      },
+      {
+        "path": "%USERPROFILE%\\.cloudflared\\*.json",
+        "reason": "Kredensial Named Tunnel (di-ignore git, sensitif)",
+        "action_pindah": "Copy folder %USERPROFILE%\\.cloudflared\\ ke PC baru ATAU jalankan ulang setup_named_once"
+      },
+      {
+        "path": "%USERPROFILE%\\.cloudflared\\cert.pem",
+        "reason": "Cert login cloudflared",
+        "action_pindah": "Copy atau cloudflared tunnel login ulang"
+      },
+      {
+        "path": ".cloudflared/config.yml",
+        "reason": "Config ingress + tunnel name (sudah portable, credentials-file pakai %USERPROFILE%)",
+        "action_pindah": "Sudah ikut di repo, cek credentials-file path di PC baru"
+      },
+      {
+        "path": "backend/.env",
+        "reason": "Env lokal jika ada (di-ignore git)",
+        "action_pindah": "Copy atau buat dari backend/.env.example"
+      },
+      {
+        "path": "project.json",
+        "reason": "File ini sendiri — manifest restore",
+        "action_pindah": "Commit ke git"
+      }
+    ],
+    "include_opsional": [
+      "frontend/assets/images/",
+      "docs/",
+      ".vscode/",
+      "run.bat",
+      "run-tunnel.bat"
+    ],
+    "exclude_tidak_perlu": [
+      "__pycache__/",
+      "*.pyc",
+      "node_modules/",
+      ".cloudflared/*.log",
+      "backend/__pycache__/"
+    ],
+    "git_status": "File yang di-ignore (.gitignore:7) tetap harus di-backup manual: backend/*.db dan .cloudflared/*.json",
+    "cara_backup_cepat": [
+      "Opsi A — Copy folder PRAKTEK lengkap ke USB / Drive (termasuk b_gadget.db dan .cloudflared via %USERPROFILE%)",
+      "Opsi B — Git push (hanya code), lalu backup terpisah: copy backend/b_gadget.db dan %USERPROFILE%\\.cloudflared\\ ke tempat aman",
+      "Opsi C — Buat ZIP: tar -a -c -f B_gadget_backup_%date%.zip PRAKTEK backend/b_gadget.db %USERPROFILE%\\.cloudflared\\*.json .cloudflared/config.yml"
+    ]
+  },
+  "restore": {
+    "steps_pindah_pc": [
+      "1. Install Python 3.12: winget install Python.Python.3.12 --silent && python --version",
+      "2. Install cloudflared: winget install --id Cloudflare.cloudflared -e && cloudflared --version",
+      "3. Clone / copy folder PRAKTEK ke lokasi baru (bisa di F:\\VIBE CODING\\CODING MJPRO\\PRAKTEK atau path lain dengan spasi — run.bat sudah handle)",
+      "4. Restore database: copy backend/b_gadget.db dari backup ke backend/b_gadget.db (jika tidak ada, akan auto-create kosong)",
+      "5. Restore tunnel: copy %USERPROFILE%\\.cloudflared\\*.json dan cert.pem dari PC lama ke %USERPROFILE%\\.cloudflared\\ di PC baru. Jika tidak ada, jalankan: cloudflared tunnel login && cloudflared tunnel create b-gadget && cloudflared tunnel route dns b-gadget service.reneepsl.my.id, lalu sesuaikan .cloudflared/config.yml credentials-file",
+      "6. Cek config: buka .cloudflared/config.yml, pastikan credentials-file mengarah ke C:\\Users\\<user-baru>\\.cloudflared\\<TUNNEL_ID>.json",
+      "7. Install deps: pip install -r backend/requirements.txt  (atau biarkan run.bat otomatis)",
+      "8. Jalankan: double-click run.bat — akan auto deteksi Python, install deps, jalankan tunnel (named/quick), buka browser ke http://localhost:8000/frontend/login.html",
+      "9. Test: curl -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d \"{\\\"username\\\":\\\"superadmin\\\",\\\"password\\\":\\\"bismillah\\\"}\"",
+      "10. Jika pakai VS Code, buka folder PRAKTEK, Ctrl+Shift+P -> Tasks: Run Task -> FastAPI: Run (dev)"
+    ],
+    "steps_install_ulang_windows": [
+      "Backup dulu sebelum install ulang: copy backend/b_gadget.db dan %USERPROFILE%\\.cloudflared\\ ke Drive/USB",
+      "Setelah install ulang, ikuti steps_pindah_pc di atas",
+      "Jika lupa backup DB, data service/pelanggan akan hilang (hanya code yang kembali dari git). Selalu backup .db"
+    ],
+    "portable_notes": [
+      "run.bat tidak hardcode C:\\Users\\budirenee — sudah pakai %USERPROFILE% dan %LocalAppData%, jadi ganti user Windows otomatis jalan",
+      "Path dengan spasi (CODING MJPRO) sudah di-handle dengan quote di run.bat:16 dan cd /d \"%BACKEND%\"",
+      "Jika pindah drive (misal F: -> D:), tidak perlu edit — %~dp0 otomatis ikut lokasi file"
+    ],
+    "verify": [
+      "http://localhost:8000/health -> {\"status\":\"ok\",\"db\":\"sqlite\"}",
+      "http://localhost:8000/frontend/login.html -> login superadmin/bismillah",
+      "https://service.reneepsl.my.id/frontend/login.html -> sama via tunnel",
+      "Get-ChildItem %USERPROFILE%\\.cloudflared\\*.json -> ada 1 file *.json"
+    ]
+  },
+  "files_manifest": [
+    ".cloudflared/config.yml",
+    ".cloudflared/README.md",
+    ".vscode/tasks.json",
+    ".vscode/launch.json",
+    "backend/app/main.py",
+    "backend/app/database.py",
+    "backend/app/models.py",
+    "backend/app/schemas.py",
+    "backend/app/auth.py",
+    "backend/app/crud.py",
+    "backend/app/seed.py",
+    "backend/app/routers/auth.py",
+    "backend/app/routers/services.py",
+    "backend/app/routers/customers.py",
+    "backend/app/routers/technicians.py",
+    "backend/app/routers/stats.py",
+    "backend/requirements.txt",
+    "backend/run.py",
+    "backend/.env.example",
+    "frontend/index.html",
+    "frontend/login.html",
+    "frontend/assets/css/style.css",
+    "frontend/assets/js/script.js",
+    "run.bat",
+    "run-tunnel.bat",
+    "project.json",
+    "README.md",
+    "docs/README.md",
+    "docs/REVO.md",
+    "docs/ERD_REVO.md",
+    ".gitignore"
+  ],
+  "maintenance": {
+    "backup_schedule": "Tiap minggu atau sebelum pindah PC, copy b_gadget.db ke Drive",
+    "tunnel_renew": "Tidak perlu — named tunnel permanen selama domain di Cloudflare",
+    "update_deps": "pip install --upgrade -r backend/requirements.txt"
+  }
+}

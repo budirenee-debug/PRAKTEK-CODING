@@ -117,15 +117,15 @@ def available_technicians(db: Session = Depends(get_db), current = Depends(get_c
     for u in users:
         if u.username not in names:
             names.add(u.username)
-            result.append({"username": u.username, "role": u.role, "source": "user", "is_active": u.is_active})
+            result.append({"username": u.username, "role": u.role, "source": "user", "is_active": u.is_active, "foto": None})
     for t in techs:
         if t.nama not in names:
             names.add(t.nama)
-            result.append({"username": t.nama, "role": "teknisi", "source": "technician", "is_active": True})
+            result.append({"username": t.nama, "role": "teknisi", "source": "technician", "is_active": True, "foto": t.foto})
     # fallback jika kosong (DB baru) -> kembalikan legacy default
     if not result:
         for fallback in ["Andi", "Sinta", "Budi"]:
-            result.append({"username": fallback, "role": "teknisi", "source": "fallback", "is_active": True})
+            result.append({"username": fallback, "role": "teknisi", "source": "fallback", "is_active": True, "foto": None})
     return result
 
 @router.post("/approve/{user_id}", response_model=UserOut)
