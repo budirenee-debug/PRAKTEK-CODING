@@ -12,8 +12,6 @@ def list_technicians(db: Session = Depends(get_db)):
 
 @router.post("", response_model=schemas.TechnicianOut, status_code=201)
 def create_technician(payload: schemas.TechnicianCreate, db: Session = Depends(get_db)):
-    exists = db.query(crud.models.Technician).filter(crud.models.Technician.nama==payload.nama).first() if hasattr(crud, 'models') else None
-    # simpel: cek manual
     from .. import models
     exists = db.query(models.Technician).filter(models.Technician.nama==payload.nama).first()
     if exists:
@@ -27,7 +25,7 @@ def technician_stats(tech_id: int, db: Session = Depends(get_db)):
     if not tech:
         raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan")
     total = db.query(models.Service).filter(models.Service.technician_id==tech_id).count()
-    selesai = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status=="Selesai").count()
+    selesai = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status.in_(["Selesai","Service Sukses"])).count()
     proses = db.query(models.Service).filter(models.Service.technician_id==tech_id, models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
     persen = round((selesai/total*100) if total else 0)
     return {"id": tech.id, "nama": tech.nama, "total": total, "selesai": selesai, "proses": proses, "persen": persen}

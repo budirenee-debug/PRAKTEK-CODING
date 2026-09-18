@@ -3,7 +3,10 @@ const STORAGE_KEY = 'servicell_data_v1';
 const API_BASE = (() => {
   const stored = localStorage.getItem('API_BASE');
   if (stored) return stored;
+  const proto = location.protocol;
   const host = location.hostname;
+  // file:// -> fallback ke localhost:8000 (dev lokal)
+  if (proto === 'file:') return 'http://localhost:8000/api';
   if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000/api';
   return location.origin + '/api'; // service.reneepsl.my.id via tunnel
 })();
@@ -23,15 +26,7 @@ let data = [];
 const INVENTORY_KEY = 'b_gadget_inventory_v1';
 const MERK_HITS = ['IPHONE','SAMSUNG','XIAOMI','OPPO','VIVO','INFINIX'];
 const todayISO = () => new Date().toISOString().slice(0,10);
-const defaultInventory = [
-  {id:1, nama:'LCD iPhone 11', merk:'IPHONE', kategori:'Display', masuk:10, keluar:8, stok:2, harga:550000, tgl: todayISO()},
-  {id:2, nama:'Baterai Samsung A54', merk:'SAMSUNG', kategori:'Baterai', masuk:15, keluar:3, stok:12, harga:280000, tgl: todayISO()},
-  {id:3, nama:'Fleksibel Kamera Redmi Note 12', merk:'XIAOMI', kategori:'Kamera', masuk:8, keluar:2, stok:6, harga:120000, tgl: todayISO()},
-  {id:4, nama:'LCD Oppo Reno 8', merk:'OPPO', kategori:'Display', masuk:12, keluar:4, stok:8, harga:420000, tgl: todayISO()},
-  {id:5, nama:'Baterai Vivo Y12', merk:'VIVO', kategori:'Baterai', masuk:20, keluar:5, stok:15, harga:180000, tgl: todayISO()},
-  {id:6, nama:'LCD Infinix Hot 12', merk:'INFINIX', kategori:'Display', masuk:9, keluar:7, stok:2, harga:250000, tgl: todayISO()},
-  {id:7, nama:'IC Power Universal', merk:'LAIN', kategori:'Mesin', masuk:6, keluar:1, stok:5, harga:95000, tgl: todayISO()},
-];
+const defaultInventory = []; // kosong — biar tes input baru benar-benar 0 (sebelumnya dummy 7 item dihapus sesuai request)
 let inventory = [];
 function normalizeMerk(m){
   if(!m) return 'LAIN';
@@ -49,13 +44,41 @@ function inferMerkFromNama(nama){
   if(n.includes('infinix')) return 'INFINIX';
   return 'LAIN';
 }
-function loadInventory(){
+async function loadInventory(){
+  // multi-PC sync: coba API dulu, fallback localStorage
+  if(USE_API){
+    try{
+      const rows = await apiFetch('/inventory/spareparts');
+      if(Array.isArray(rows)){
+        inventory = rows.map(r=>({
+          id: r.id,
+          nama: r.nama,
+          merk: normalizeMerk(r.merk),
+          kategori: r.kategori||'Display',
+          masuk: r.masuk||0,
+          keluar: r.keluar||0,
+          stok: r.stok!=null ? r.stok : Math.max(0,(r.masuk||0)-(r.keluar||0)),
+          harga: r.harga||0,
+          tgl: (r.tgl||'').slice(0,10) || todayISO()
+        }));
+        // cache lokal juga untuk offline
+        try{ localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory)); }catch{}
+        return;
+      }
+    }catch(e){
+      console.warn('loadInventory API gagal, fallback localStorage:', e.message);
+    }
+  }
+  // fallback localStorage (offline atau API belum siap)
   try{
     const raw=localStorage.getItem(INVENTORY_KEY);
-    if(raw){ inventory=JSON.parse(raw); if(!Array.isArray(inventory)||!inventory.length) inventory=[...defaultInventory]; }
+    if(raw){
+      inventory=JSON.parse(raw);
+      if(!Array.isArray(inventory)) inventory=[...defaultInventory];
+      if(defaultInventory.length===0 && inventory.length>0 && inventory.some(i=>i.nama.includes('LCD iPhone 11'))) { inventory=[...defaultInventory]; saveInventory(); console.log('auto-clear dummy sparepart lama'); }
+    }
     else inventory=[...defaultInventory];
   }catch{ inventory=[...defaultInventory]; }
-  // migrasi: tambah merk & tgl jika belum ada (simple)
   let migrated=false;
   inventory.forEach(it=>{
     if(!it.merk){
@@ -74,6 +97,68 @@ function loadInventory(){
 }
 function saveInventory(){ localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory)); }
 function nextInventoryId(){ return inventory.length ? Math.max(...inventory.map(i=>i.id))+1 : 1; }
+
+// API helpers untuk inventory (multi-PC)
+async function apiInventoryCreate(payload){
+  if(!USE_API) throw new Error('offline');
+  return await apiFetch('/inventory/spareparts', {method:'POST', body: JSON.stringify(payload)});
+}
+async function apiInventoryUpdate(id, payload){
+  if(!USE_API) throw new Error('offline');
+  return await apiFetch(`/inventory/spareparts/${id}`, {method:'PUT', body: JSON.stringify(payload)});
+}
+async function apiInventoryDelete(id){
+  if(!USE_API) throw new Error('offline');
+  return await apiFetch(`/inventory/spareparts/${id}`, {method:'DELETE'});
+}
+async function apiInventoryPakai(id, qty){
+  if(!USE_API) throw new Error('offline');
+  return await apiFetch(`/inventory/spareparts/${id}/pakai?qty=${qty}`, {method:'POST'});
+}
+
+function formatRupiah(n){
+  const num = Number(n||0);
+  if(!num) return 'Rp 0';
+  return 'Rp ' + num.toLocaleString('id-ID');
+}
+function formatAngka(n){
+  const num = Number(n||0);
+  if(!num) return '0';
+  return num.toLocaleString('id-ID');
+}
+function parseRupiah(s){
+  if(!s) return 0;
+  const clean = String(s).replace(/\./g,'').replace(/[^0-9]/g,'');
+  return parseInt(clean)||0;
+}
+function attachRupiahLive(){
+  const pairs = [
+    ['f-biaya', 'f-biaya-preview'],
+    ['sp-harga', 'sp-harga-preview'],
+    ['spEditHarga', 'spEditHarga-preview'],
+    ['alatEditHarga', 'alatEditHarga-preview']
+  ];
+  pairs.forEach(([inputId, previewId])=>{
+    const inp=document.getElementById(inputId);
+    const prev=document.getElementById(previewId);
+    if(!inp || !prev) return;
+    const formatInput=()=>{
+      const raw = inp.value;
+      if(!raw) { prev.textContent='Rp 0'; prev.style.display='none'; return; }
+      const digits = raw.replace(/\./g,'').replace(/[^0-9]/g,'');
+      if(!digits){ inp.value=''; prev.textContent='Rp 0'; prev.style.display='none'; return; }
+      const num = parseInt(digits)||0;
+      inp.value = num ? num.toLocaleString('id-ID') : '';
+      prev.textContent = num ? formatRupiah(num) : 'Rp 0';
+      prev.style.display = num ? 'inline' : 'none';
+    };
+    inp.addEventListener('input', formatInput);
+    inp.addEventListener('change', formatInput);
+    // init jika ada value angka polos
+    if(inp.value && /^\d+$/.test(inp.value)) inp.value = parseInt(inp.value).toLocaleString('id-ID');
+    formatInput();
+  });
+}
 
 // ---------- Sparepart Usage Log (Proses Service -> Stok) ----------
 const SPAREPART_USAGE_KEY='b_gadget_sparepart_usage_v1';
@@ -288,7 +373,19 @@ async function apiCreateService(payload){
     const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(payload)});
     return normalize(created);
   }catch(e){
-    showToast('Gagal simpan ke API: '+ e.message);
+    const msg = String(e.message||'');
+    // jika API 422 (validasi) jangan fallback diam-diam, lempar jelas
+    if(msg.includes('422') || msg.toLowerCase().includes('field required')){
+      showToast('Gagal validasi API: '+ msg.slice(0,200));
+    } else {
+      // coba fallback lokal agar input tetap masuk meski API down sementara
+      console.warn('apiCreateService fallback lokal:', msg);
+      const newId='INV-2026-'+String(100+data.length+1).padStart(4,'0');
+      const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:new Date().toISOString().slice(0,10)};
+      data.unshift(obj); saveLocal();
+      showToast('⚠ API gagal, disimpan lokal (akan sync saat online)');
+      return obj;
+    }
     throw e;
   }
 }
@@ -314,9 +411,12 @@ async function loadAvailableTechs(){
     {username: 'Sinta', role: 'teknisi', source: 'fallback'},
     {username: 'Budi', role: 'teknisi', source: 'fallback'}
   ];
-  if(!USE_API){
+  // set fallback synchronously agar dropdown tidak stuck "Memuat anggota..."
+  if(!availableTechs.length){
     availableTechs = [...fallback];
     populateTeknisiSelect();
+  }
+  if(!USE_API){
     return availableTechs;
   }
   try{
@@ -877,14 +977,48 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setupChips();
   await loadData();
   await loadAvailableTechs();
-  loadInventory();
-  loadAlat();
+  await loadInventory();
+  await loadAlat();
   loadSparepartUsage();
   renderAll();
   renderSemuaService();
   renderSparepart();
   renderAlat();
   updateInvoicePreview();
+  attachRupiahLive();
+  // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron otomatis — dashboard Menunggu Konfirmasi ikut sync dengan Semua Service
+  let lastServiceLen = data.length;
+  let lastMenungguCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
+  setInterval(async()=>{
+    const prevLen=inventory.length;
+    await loadInventory();
+    if(inventory.length!==prevLen || document.getElementById('view-inventory-sparepart')?.classList.contains('active')) renderSparepart();
+    const prevAlat=alatInventory.length;
+    await loadAlat();
+    if(alatInventory.length!==prevAlat || document.getElementById('view-inventory-alat')?.classList.contains('active')) renderAlat();
+    // sync service + dashboard Menunggu Konfirmasi — selalu coba API biar offline → online langsung sync
+    try{
+      const prevDataHash = JSON.stringify(data.map(d=>d.invoice+d.status).sort());
+      // paksa coba API meskipun USE_API false (offline → online)
+      const wasOffline = !USE_API;
+      if(wasOffline) USE_API = true; // coba paksa
+      try{ await loadData(); }catch(e){ if(wasOffline) USE_API = false; throw e; }
+      // jika loadData fallback ke local (API gagal), USE_API akan jadi false di dalam loadData
+      const newHash = JSON.stringify(data.map(d=>d.invoice+d.status).sort());
+      const curMenunggu = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
+      if(newHash!==prevDataHash || curMenunggu!==lastMenungguCount || data.length!==lastServiceLen){
+        lastServiceLen = data.length;
+        lastMenungguCount = curMenunggu;
+        renderAll();
+        renderSemuaService();
+        renderKanban();
+        if(wasOffline && USE_API) showToast('✅ Online lagi — data sync');
+      }
+      // update badge online
+      const el=document.querySelector('.store-info span:first-child');
+      if(el && USE_API){ el.textContent='● Sistem Online (API)'; el.style.color='#10b981'; }
+    }catch{}
+  }, 8000);
   // listeners
   const gs = document.getElementById('globalSearch');
   if(gs) gs.addEventListener('input', e=>{
@@ -1049,6 +1183,13 @@ function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilte
 function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
 function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
 function statGoMingguan(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('mingguan'),80); }
+function statGoMenungguKonfirmasi(){
+  switchView('proses');
+  // set status filter Menunggu Konfirmasi di Proses Service
+  statusFilter='Menunggu Konfirmasi';
+  document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='Menunggu Konfirmasi'));
+  renderKanban();
+}
 function setupChips(){
   document.querySelectorAll('.chip').forEach(c=>{
     c.addEventListener('click', ()=>{
@@ -1079,10 +1220,11 @@ function updateStats(){
   const todayDl = data.filter(d=>d.deadline===new Date().toISOString().slice(0,10) && !['Selesai','Service Sukses','Sudah Diambil','Dibatalkan'].includes(d.status)).length;
   const hCount = data.filter(d=>d.deadline_type==='harian').length;
   const mCount = data.filter(d=>d.deadline_type==='mingguan').length;
+  const menungguKonfirmasiCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
   const elO = document.getElementById('stat-overdue'); if(elO) elO.textContent = overdueCount;
   const elT = document.getElementById('stat-deadline-today'); if(elT) elT.textContent = todayDl;
   const elH = document.getElementById('stat-harian'); if(elH) elH.textContent = hCount;
-  const elM = document.getElementById('stat-mingguan'); if(elM) elM.textContent = mCount;
+  const elM = document.getElementById('stat-menunggu-konfirmasi'); if(elM) elM.textContent = menungguKonfirmasiCount;
   const cO = document.getElementById('countOverdue'); if(cO) cO.textContent = overdueCount;
   const cT = document.getElementById('countToday'); if(cT) cT.textContent = todayDl;
   const cH = document.getElementById('countHarian'); if(cH) cH.textContent = hCount;
@@ -1098,11 +1240,11 @@ function updateStats(){
       if(elO) elO.textContent = s.overdue ?? overdueCount;
       if(elT) elT.textContent = s.deadline_hari_ini ?? todayDl;
       if(elH) elH.textContent = s.harian ?? hCount;
-      if(elM) elM.textContent = s.mingguan ?? mCount;
+      if(elM) elM.textContent = menungguKonfirmasiCount;
       if(cO) cO.textContent = s.overdue ?? overdueCount;
       if(cT) cT.textContent = s.deadline_hari_ini ?? todayDl;
       if(cH) cH.textContent = s.harian ?? hCount;
-      if(cM) cM.textContent = s.mingguan ?? mCount;
+      const cM2=document.getElementById('countMingguan'); if(cM2) cM2.textContent = s.mingguan ?? mCount;
     }).catch(()=>{});
   }
   // render hits setelah stats — data sudah tersedia
@@ -1285,7 +1427,7 @@ function renderSparepart(){
         <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="sp-keluar-${it.id}" style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateSparepartField(${it.id},'keluar',this.value)"><div style="font-size:9px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${it.lastUsedBy? `<span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#2563eb;text-decoration:underline" title="Klik lihat riwayat pakai ${escapeHtml(it.nama)}">👷 ${escapeHtml(it.lastUsedBy)}</span> • <span onclick="openDetail('${escapeHtml(it.lastUsedInvoice)}')" style="cursor:pointer;color:#059669;text-decoration:underline" title="Buka service ${escapeHtml(it.lastUsedInvoice)}">${escapeHtml(it.lastUsedInvoice||'')}</span>` : '<span style="color:#9ca3af">belum dipakai</span>'}${it.log && it.log.length? ` • <span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#6b7280;text-decoration:underline" title="Lihat ${it.log.length} riwayat pakai">${it.log.length}x</span>` : ''}</div></td>
         <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="sp-stok-${it.id}" style="width:80px;padding:6px 8px;border:1px solid ${it.stok<=2?'#fecaca':'#ececec'};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${it.stok<=2?'#dc2626':it.stok<=5?'#b45309':'#059669'}" onchange="updateSparepartField(${it.id},'stok',this.value)"></td>
         <td style="font-size:11px;color:#4b5563;white-space:nowrap;text-align:center">${escapeHtml(formatTanggal(it.tgl))}</td>
-        <td style="text-align:right"><input type="number" min="0" step="1000" value="${it.harga}" id="sp-harga-${it.id}" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">Rp ${Number(it.harga).toLocaleString('id-ID')}</div></td>
+        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="sp-harga-${it.id}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
         <td style="text-align:center">
           <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveSparepartRow(${it.id})">💾 Simpan</button>
@@ -1302,20 +1444,30 @@ function renderSparepart(){
   if(warnEl) warnEl.textContent= lowCount ? `⚠ ${lowCount} stok tipis` : '';
   if(sumEl){
     const totalVal=inventory.reduce((s,i)=> s + (i.stok * i.harga),0);
-    sumEl.textContent= `${inventory.length} item • Total nilai stok: Rp ${Number(totalVal).toLocaleString('id-ID')} • Menampilkan ${filtered.length}`;
+    sumEl.textContent= `${inventory.length} item • Total nilai stok: ${formatRupiah(totalVal)} • Menampilkan ${filtered.length}`;
   }
 }
 function updateSparepartField(id, field, val){
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
-  const n=parseInt(val)||0;
+  const n=(field==='harga') ? parseRupiah(val) : (parseInt(val)||0);
   if(field==='masuk') it.masuk=n;
   else if(field==='keluar') it.keluar=n;
   else if(field==='stok') it.stok=n;
   else if(field==='harga') it.harga=n;
+  // auto stok = masuk - keluar jika ubah masuk/keluar (sinkron tab stok)
+  if(field==='masuk' || field==='keluar'){
+    it.stok = Math.max(0, (parseInt(it.masuk)||0) - (parseInt(it.keluar)||0));
+    const stokInput=document.getElementById(`sp-stok-${id}`);
+    if(stokInput) stokInput.value = it.stok;
+  }
   it.tgl=todayISO();
   saveInventory();
-  // update warna stok cell secara live
+  // sync ke backend (multi-PC) — fire and forget, stok sudah auto di atas
+  if(USE_API){
+    apiInventoryUpdate(id, {masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga, tgl: it.tgl}).catch(e=>console.warn('sync sparepart field gagal', e.message));
+  }
+  // update warna stok cell secara live + summary stok
   if(field==='stok' || field==='masuk' || field==='keluar'){
     const stokInput=document.getElementById(`sp-stok-${id}`);
     if(stokInput){
@@ -1324,9 +1476,17 @@ function updateSparepartField(id, field, val){
       stokInput.style.color = v<=2 ? '#dc2626' : v<=5 ? '#b45309' : '#059669';
       stokInput.style.borderColor = v<=2 ? '#fecaca' : '#ececec';
     }
+    // update summary total nilai stok live tanpa full re-render
+    const sumEl=document.getElementById('sparepartSummary');
+    if(sumEl){
+      const totalVal=inventory.reduce((s,i)=> s + (i.stok * i.harga),0);
+      sumEl.textContent= `${inventory.length} item • Total nilai stok: Rp ${Number(totalVal).toLocaleString('id-ID')}`;
+    }
+    const countEl=document.getElementById('sparepartCount');
+    if(countEl) countEl.textContent=inventory.length+' item';
   }
 }
-function saveSparepartRow(id){
+async function saveSparepartRow(id){
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
   // baca ulang dari input untuk pastikan
@@ -1337,22 +1497,36 @@ function saveSparepartRow(id){
   if(masukEl) it.masuk=parseInt(masukEl.value)||0;
   if(keluarEl) it.keluar=parseInt(keluarEl.value)||0;
   if(stokEl) it.stok=parseInt(stokEl.value)||0;
-  if(hargaEl) it.harga=parseInt(hargaEl.value)||0;
+  if(hargaEl) it.harga=parseRupiah(hargaEl.value);
   it.tgl=todayISO();
-  saveInventory();
+  if(USE_API){
+    try{
+      await apiInventoryUpdate(id, {masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga, tgl: it.tgl});
+      await loadInventory();
+    }catch(e){ console.warn('save row API gagal', e.message); saveInventory(); }
+  } else {
+    saveInventory();
+  }
   renderSparepart();
-  showToast(`✅ ${it.nama} disimpan — Masuk ${it.masuk}, Keluar ${it.keluar}, Stok ${it.stok}, Rp ${Number(it.harga).toLocaleString('id-ID')}`);
+  showToast(`✅ ${it.nama} disimpan — Masuk ${it.masuk}, Keluar ${it.keluar}, Stok ${it.stok}, ${formatRupiah(it.harga)}`);
 }
-function deleteSparepart(id){
+async function deleteSparepart(id){
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
   if(!confirm(`Hapus "${it.nama}"?`)) return;
-  inventory=inventory.filter(x=>x.id!==id);
-  saveInventory();
+  if(USE_API){
+    try{
+      await apiInventoryDelete(id);
+      await loadInventory();
+    }catch(e){ showToast('Gagal hapus API: '+e.message); return; }
+  } else {
+    inventory=inventory.filter(x=>x.id!==id);
+    saveInventory();
+  }
   renderSparepart();
   showToast(`🗑 ${it.nama} dihapus`);
 }
-function handleSparepartAdd(e){
+async function handleSparepartAdd(e){
   e.preventDefault();
   const nama=document.getElementById('sp-nama').value.trim();
   const merkRaw=document.getElementById('sp-merk')?.value||'LAIN';
@@ -1361,7 +1535,7 @@ function handleSparepartAdd(e){
   const masuk=parseInt(document.getElementById('sp-masuk').value)||0;
   const keluar=parseInt(document.getElementById('sp-keluar').value)||0;
   let stokRaw=document.getElementById('sp-stok').value;
-  const harga=parseInt(document.getElementById('sp-harga').value)||0;
+  const harga=parseRupiah(document.getElementById('sp-harga').value);
   if(!nama) return showToast('Nama part wajib');
   if(!merk) return showToast('Merk wajib');
   if(!kategori) return showToast('Kategori wajib');
@@ -1370,6 +1544,21 @@ function handleSparepartAdd(e){
   if(stok<0) stok=0;
   // cek duplikat nama
   if(inventory.some(i=>i.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama part sudah ada — pakai Edit');
+  if(USE_API){
+    try{
+      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, tgl: todayISO()});
+      showToast(`✅ ${created.nama} ditambahkan — Stok ${created.stok} (sync multi-PC)`);
+      e.target.reset();
+      // reset preview
+      const prev=document.getElementById('sp-harga-preview'); if(prev) prev.style.display='none';
+      await loadInventory();
+      switchView('inventory-sparepart');
+      renderSparepart();
+      return;
+    }catch(err){
+      showToast('Gagal API, fallback lokal: '+err.message);
+    }
+  }
   const newItem={id:nextInventoryId(), nama, merk, kategori, masuk, keluar, stok, harga, tgl: todayISO()};
   inventory.unshift(newItem);
   saveInventory();
@@ -1388,11 +1577,13 @@ function openSpEditModal(id){
   document.getElementById('spEditMasuk').value=it.masuk;
   document.getElementById('spEditKeluar').value=it.keluar;
   document.getElementById('spEditStok').value=it.stok;
-  document.getElementById('spEditHarga').value=it.harga;
+  document.getElementById('spEditHarga').value=it.harga ? Number(it.harga).toLocaleString('id-ID') : '';
+  // update preview
+  const prev=document.getElementById('spEditHarga-preview'); if(prev){ prev.textContent=it.harga?formatRupiah(it.harga):'Rp 0'; prev.style.display=it.harga?'inline':'none'; }
   document.getElementById('spEditModal').classList.add('show');
 }
 function closeSpEditModal(){ document.getElementById('spEditModal').classList.remove('show'); }
-function submitSpEdit(e){
+async function submitSpEdit(e){
   e.preventDefault();
   const id=parseInt(document.getElementById('spEditId').value);
   const it=inventory.find(x=>x.id===id);
@@ -1403,10 +1594,20 @@ function submitSpEdit(e){
   const masuk=parseInt(document.getElementById('spEditMasuk').value)||0;
   const keluar=parseInt(document.getElementById('spEditKeluar').value)||0;
   const stok=parseInt(document.getElementById('spEditStok').value)||0;
-  const harga=parseInt(document.getElementById('spEditHarga').value)||0;
+  const harga=parseRupiah(document.getElementById('spEditHarga').value);
   if(!nama) return showToast('Nama wajib');
   // cek duplikat kecuali diri sendiri
   if(inventory.some(x=>x.id!==id && x.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama sudah dipakai item lain');
+  if(USE_API){
+    try{
+      await apiInventoryUpdate(id, {nama, merk, kategori, masuk, keluar, stok, harga, tgl: todayISO()});
+      await loadInventory();
+      closeSpEditModal();
+      renderSparepart();
+      showToast(`✎ ${nama} diperbarui (sync)`);
+      return;
+    }catch(err){ showToast('Gagal API: '+err.message); return; }
+  }
   it.nama=nama; it.merk=merk; it.kategori=kategori; it.masuk=masuk; it.keluar=keluar; it.stok=stok; it.harga=harga; it.tgl=todayISO();
   saveInventory();
   closeSpEditModal();
@@ -1577,14 +1778,13 @@ function renderUsedSpareparts(invoice){
   if(!arr.length) return '';
   return `<div style="margin-top:6px;padding:6px 8px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;font-size:11px"><strong>🔧 Terpakai (${arr.length}):</strong> ${arr.map(u=>`${escapeHtml(u.merk)} ${escapeHtml(u.nama)} x${u.qty} oleh ${escapeHtml(u.teknisi)}`).join(', ')}</div>`;
 }
-function pakaiSparepart(invoice){
+async function pakaiSparepart(invoice){
   const sel=document.getElementById(`spare-select-${invoice}`);
   if(!sel || !sel.value) return showToast('Pilih sparepart dulu');
   if(sel.value==='none'){
     showToast('ℹ️ Tidak Ada sparepart dipilih — stok tidak berubah');
     const input=document.getElementById(`spare-search-${invoice}`);
     const dropdown=document.getElementById(`spare-dropdown-${invoice}`);
-    // biarkan input tampil "Tidak Ada" sebentar lalu kosongkan
     if(input) input.value='— Tidak Ada —';
     setTimeout(()=>{
       if(input) input.value='';
@@ -1606,7 +1806,23 @@ function pakaiSparepart(invoice){
   let qty= qtyEl ? parseInt(qtyEl.value)||1 : 1;
   if(qty<1) qty=1;
   if(qty>sp.stok) return showToast(`Stok tidak cukup (sisa ${sp.stok}) — kurangi qty`);
-  // update inventory
+  if(USE_API){
+    try{
+      const updated = await apiInventoryPakai(spId, qty);
+      // sync local dari backend
+      await loadInventory();
+      // log per service (tetap lokal untuk riwayat pakai)
+      if(!serviceSpareparts[invoice]) serviceSpareparts[invoice]=[];
+      serviceSpareparts[invoice].push({sparepartId: sp.id, nama: sp.nama, merk: normalizeMerk(sp.merk), qty, harga: sp.harga, teknisi, date: todayISO()});
+      saveSparepartUsage();
+      renderSparepart();
+      renderKanban();
+      renderMenungguTeknisiBlock();
+      showToast(`🔧 ${normalizeMerk(updated.merk)} ${updated.nama} x${qty} dipakai ${teknisi} untuk ${invoice} — stok sisa ${updated.stok} (sync)`);
+      return;
+    }catch(e){ showToast('Gagal pakai API: '+e.message); return; }
+  }
+  // fallback lokal
   sp.keluar += qty;
   sp.stok = Math.max(0, sp.stok - qty);
   sp.tgl = todayISO();
@@ -1616,7 +1832,6 @@ function pakaiSparepart(invoice){
   if(!sp.log) sp.log=[];
   sp.log.unshift({invoice, teknisi, qty, date: sp.lastUsedDate});
   if(sp.log.length>20) sp.log=sp.log.slice(0,20);
-  // log per service
   if(!serviceSpareparts[invoice]) serviceSpareparts[invoice]=[];
   serviceSpareparts[invoice].push({sparepartId: sp.id, nama: sp.nama, merk: normalizeMerk(sp.merk), qty, harga: sp.harga, teknisi, date: sp.lastUsedDate});
   saveInventory();
@@ -1627,24 +1842,49 @@ function pakaiSparepart(invoice){
   showToast(`🔧 ${normalizeMerk(sp.merk)} ${sp.nama} x${qty} dipakai ${teknisi} untuk ${invoice} — stok sisa ${sp.stok}`);
 }
 
-// ---------- Alat Inventory (editable per baris seperti Sparepart) ----------
+// ---------- Alat Inventory (multi-PC sync via API) ----------
 const ALAT_KEY='b_gadget_alat_v1';
-const defaultAlat = [
-  {id:1, nama:'Blower', kondisi:'Baik', peminjam:'-', masuk:2, keluar:0, stok:2, harga:350000},
-  {id:2, nama:'Microscope', kondisi:'Perlu Kalibrasi', peminjam:'-', masuk:1, keluar:0, stok:1, harga:2500000},
-  {id:3, nama:'Solder Station', kondisi:'Baik', peminjam:'Andi', masuk:3, keluar:1, stok:2, harga:800000},
-  {id:4, nama:'Power Supply', kondisi:'Baik', peminjam:'-', masuk:2, keluar:0, stok:2, harga:600000},
-];
+const defaultAlat = []; // kosong biar tes input baru 0 (sebelumnya dummy 4)
 let alatInventory=[];
-function loadAlat(){
+async function loadAlat(){
+  if(USE_API){
+    try{
+      const rows = await apiFetch('/inventory/alats');
+      if(Array.isArray(rows)){
+        alatInventory = rows.map(r=>({
+          id: r.id,
+          nama: r.nama,
+          kondisi: r.kondisi||'Baik',
+          peminjam: r.peminjam||'-',
+          masuk: r.masuk||0,
+          keluar: r.keluar||0,
+          stok: r.stok!=null ? r.stok : Math.max(0,(r.masuk||0)-(r.keluar||0)),
+          harga: r.harga||0
+        }));
+        try{ localStorage.setItem(ALAT_KEY, JSON.stringify(alatInventory)); }catch{}
+        // auto-clear dummy lama jika masih ada Blower di cache
+        if(defaultAlat.length===0 && alatInventory.some(a=>a.nama==='Blower')) { /* already from API, ignore */ }
+        return;
+      }
+    }catch(e){ console.warn('loadAlat API gagal, fallback', e.message); }
+  }
   try{
     const raw=localStorage.getItem(ALAT_KEY);
-    if(raw){ alatInventory=JSON.parse(raw); if(!Array.isArray(alatInventory)||!alatInventory.length) alatInventory=[...defaultAlat]; }
+    if(raw){
+      alatInventory=JSON.parse(raw);
+      if(!Array.isArray(alatInventory)) alatInventory=[...defaultAlat];
+      if(defaultAlat.length===0 && alatInventory.length>0 && alatInventory.some(a=>a.nama==='Blower')){ alatInventory=[...defaultAlat]; saveAlat(); console.log('auto-clear dummy alat lama'); }
+    }
     else alatInventory=[...defaultAlat];
   }catch{ alatInventory=[...defaultAlat]; }
 }
 function saveAlat(){ localStorage.setItem(ALAT_KEY, JSON.stringify(alatInventory)); }
 function nextAlatId(){ return alatInventory.length ? Math.max(...alatInventory.map(a=>a.id))+1 : 1; }
+
+// API helpers Alat
+async function apiAlatCreate(payload){ return await apiFetch('/inventory/alats', {method:'POST', body: JSON.stringify(payload)}); }
+async function apiAlatUpdate(id, payload){ return await apiFetch(`/inventory/alats/${id}`, {method:'PUT', body: JSON.stringify(payload)}); }
+async function apiAlatDelete(id){ return await apiFetch(`/inventory/alats/${id}`, {method:'DELETE'}); }
 function kondisiBadge(k){
   if(k==='Baik') return 'background:#ecfdf5;color:#059669;border-color:#a7f3d0';
   if(k==='Perlu Kalibrasi') return 'background:#fffbeb;color:#b45309;border-color:#fde68a';
@@ -1693,7 +1933,7 @@ function renderAlat(){
         <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" id="alat-masuk-${it.id}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'masuk',this.value)"></td>
         <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="alat-keluar-${it.id}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'keluar',this.value)"></td>
         <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="alat-stok-${it.id}" style="width:70px;padding:6px 8px;border:1px solid ${stokBorder};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${stokColor}" onchange="updateAlatField(${it.id},'stok',this.value)"></td>
-        <td style="text-align:right"><input type="number" min="0" step="1000" value="${it.harga}" id="alat-harga-${it.id}" style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" onchange="updateAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">Rp ${Number(it.harga).toLocaleString('id-ID')}</div></td>
+        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="alat-harga-${it.id}" placeholder="0" style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
         <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openAlatEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteAlat(${it.id})">🗑</button></div></td>
       </tr>`;
     }).join('');
@@ -1704,7 +1944,7 @@ function renderAlat(){
   if(warnEl) warnEl.textContent= needCount? `⚠ ${needCount} perlu perhatian`:'';
   if(sumEl){
     const totalVal=alatInventory.reduce((s,a)=> s + (a.stok*a.harga),0);
-    sumEl.textContent=`${alatInventory.length} alat • Total nilai: Rp ${Number(totalVal).toLocaleString('id-ID')} • Menampilkan ${filtered.length}`;
+    sumEl.textContent=`${alatInventory.length} alat • Total nilai: ${formatRupiah(totalVal)} • Menampilkan ${filtered.length}`;
   }
 }
 function updateAlatField(id, field, val){
@@ -1713,20 +1953,33 @@ function updateAlatField(id, field, val){
   if(field==='kondisi') it.kondisi=val;
   else if(field==='peminjam') it.peminjam=val;
   else {
-    const n=parseInt(val)||0;
+    const n=(field==='harga') ? parseRupiah(val) : (parseInt(val)||0);
     if(field==='masuk') it.masuk=n;
     else if(field==='keluar') it.keluar=n;
     else if(field==='stok') it.stok=n;
     else if(field==='harga') it.harga=n;
   }
-  // auto set kondisi Dipinjam jika peminjam != -
+  if(field==='masuk' || field==='keluar'){
+    it.stok = Math.max(0, (parseInt(it.masuk)||0) - (parseInt(it.keluar)||0));
+    const stokEl=document.getElementById(`alat-stok-${id}`);
+    if(stokEl) stokEl.value = it.stok;
+  }
   if(field==='peminjam'){
     if(val!=='-' && it.kondisi==='Baik') it.kondisi='Dipinjam';
     if(val==='-' && it.kondisi==='Dipinjam') it.kondisi='Baik';
   }
   saveAlat();
-  // live warna stok
-  if(field==='stok'){
+  if(USE_API){
+    const payload={};
+    if(field==='kondisi') payload.kondisi=it.kondisi;
+    else if(field==='peminjam') payload.peminjam=it.peminjam;
+    else if(field==='masuk') { payload.masuk=it.masuk; payload.stok=it.stok; }
+    else if(field==='keluar') { payload.keluar=it.keluar; payload.stok=it.stok; }
+    else if(field==='stok') payload.stok=it.stok;
+    else if(field==='harga') payload.harga=it.harga;
+    apiAlatUpdate(id, payload).catch(e=>console.warn('sync alat field gagal', e.message));
+  }
+  if(field==='stok' || field==='masuk' || field==='keluar'){
     const el=document.getElementById(`alat-stok-${id}`);
     if(el){
       const v=parseInt(el.value)||0;
@@ -1734,13 +1987,18 @@ function updateAlatField(id, field, val){
       el.style.color = v<=1 ? '#dc2626' : '#059669';
       el.style.borderColor = v<=1 ? '#fecaca' : '#ececec';
     }
+    const sumEl=document.getElementById('alatSummary');
+    if(sumEl){
+      const totalVal=alatInventory.reduce((s,a)=> s + (a.stok*a.harga),0);
+      sumEl.textContent=`${alatInventory.length} alat • Total nilai: ${formatRupiah(totalVal)}`;
+    }
   }
   if(field==='kondisi'){
     const sel=document.getElementById(`alat-kondisi-${id}`);
     if(sel) sel.style.cssText=`padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${kondisiBadge(val)}`;
   }
 }
-function saveAlatRow(id){
+async function saveAlatRow(id){
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return;
   const kEl=document.getElementById(`alat-kondisi-${id}`);
@@ -1754,17 +2012,29 @@ function saveAlatRow(id){
   if(mEl) it.masuk=parseInt(mEl.value)||0;
   if(klEl) it.keluar=parseInt(klEl.value)||0;
   if(sEl) it.stok=parseInt(sEl.value)||0;
-  if(hEl) it.harga=parseInt(hEl.value)||0;
-  saveAlat();
+  if(hEl) it.harga=parseRupiah(hEl.value);
+  if(USE_API){
+    try{
+      await apiAlatUpdate(id, {kondisi: it.kondisi, peminjam: it.peminjam, masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga});
+      await loadAlat();
+    }catch(e){ showToast('Gagal simpan API: '+e.message); return; }
+  } else {
+    saveAlat();
+  }
   renderAlat();
-  showToast(`✅ ${it.nama} disimpan — ${it.kondisi} • ${it.peminjam} • Stok ${it.stok}`);
+  showToast(`✅ ${it.nama} disimpan — ${it.kondisi} • ${it.peminjam} • Stok ${it.stok} • ${formatRupiah(it.harga)}`);
 }
-function deleteAlat(id){
+async function deleteAlat(id){
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return;
   if(!confirm(`Hapus alat "${it.nama}"?`)) return;
-  alatInventory=alatInventory.filter(x=>x.id!==id);
-  saveAlat();
+  if(USE_API){
+    try{ await apiAlatDelete(id); await loadAlat(); }
+    catch(e){ showToast('Gagal hapus API: '+e.message); return; }
+  } else {
+    alatInventory=alatInventory.filter(x=>x.id!==id);
+    saveAlat();
+  }
   renderAlat();
   showToast(`🗑 ${it.nama} dihapus`);
 }
@@ -1793,11 +2063,12 @@ function openAlatEditModal(id){
   document.getElementById('alatEditMasuk').value=it.masuk;
   document.getElementById('alatEditKeluar').value=it.keluar;
   document.getElementById('alatEditStok').value=it.stok;
-  document.getElementById('alatEditHarga').value=it.harga;
+  document.getElementById('alatEditHarga').value=it.harga ? Number(it.harga).toLocaleString('id-ID') : '';
+  const prevA=document.getElementById('alatEditHarga-preview'); if(prevA){ prevA.textContent=it.harga?formatRupiah(it.harga):'Rp 0'; prevA.style.display=it.harga?'inline':'none'; }
   document.getElementById('alatEditModal').classList.add('show');
 }
 function closeAlatModal(){ document.getElementById('alatEditModal').classList.remove('show'); }
-function submitAlatEdit(e){
+async function submitAlatEdit(e){
   e.preventDefault();
   const idRaw=document.getElementById('alatEditId').value;
   const nama=document.getElementById('alatEditNama').value.trim();
@@ -1806,12 +2077,21 @@ function submitAlatEdit(e){
   const masuk=parseInt(document.getElementById('alatEditMasuk').value)||0;
   const keluar=parseInt(document.getElementById('alatEditKeluar').value)||0;
   const stok=parseInt(document.getElementById('alatEditStok').value)||0;
-  const harga=parseInt(document.getElementById('alatEditHarga').value)||0;
+  const harga=parseRupiah(document.getElementById('alatEditHarga').value);
   if(!nama) return showToast('Nama alat wajib');
   if(harga<0) return showToast('Harga tidak valid');
   if(idRaw===''){
-    // tambah baru
     if(alatInventory.some(a=>a.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama alat sudah ada');
+    if(USE_API){
+      try{
+        const created=await apiAlatCreate({nama, kondisi, peminjam, masuk, keluar, stok, harga});
+        await loadAlat();
+        closeAlatModal();
+        renderAlat();
+        showToast(`✅ ${created.nama} ditambahkan (sync)`);
+        return;
+      }catch(err){ showToast('Gagal API: '+err.message); return; }
+    }
     const newItem={id:nextAlatId(), nama, kondisi, peminjam, masuk, keluar, stok, harga};
     alatInventory.unshift(newItem);
     saveAlat();
@@ -1823,6 +2103,16 @@ function submitAlatEdit(e){
     const it=alatInventory.find(x=>x.id===id);
     if(!it) return;
     if(alatInventory.some(a=>a.id!==id && a.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama sudah dipakai alat lain');
+    if(USE_API){
+      try{
+        await apiAlatUpdate(id, {nama, kondisi, peminjam, masuk, keluar, stok, harga});
+        await loadAlat();
+        closeAlatModal();
+        renderAlat();
+        showToast(`✎ ${nama} diperbarui (sync)`);
+        return;
+      }catch(err){ showToast('Gagal API: '+err.message); return; }
+    }
     it.nama=nama; it.kondisi=kondisi; it.peminjam=peminjam; it.masuk=masuk; it.keluar=keluar; it.stok=stok; it.harga=harga;
     saveAlat();
     closeAlatModal();
@@ -2165,14 +2455,18 @@ async function handleCustomerSubmit(e){
 }
 
 async function updateStatus(id, newStatus){
+  // instant sync dashboard Menunggu Konfirmasi + Semua Service — optimistik dulu biar kotak kuning langsung berubah
+  const item0=data.find(d=>d.id===id);
+  const oldStatus=item0?item0.status:null;
+  if(item0){ item0.status=newStatus; updateStats(); renderSemuaService(); renderKanban(); }
   try{
     await apiUpdateStatus(id, newStatus);
-    const item=data.find(d=>d.id===id);
-    if(item) item.status=newStatus;
     if(!USE_API) saveLocal();
     else await loadData();
     renderAll(); renderSemuaService(); showToast(`Status ${id} → ${newStatus}`);
   }catch(e){
+    // rollback jika gagal
+    if(item0 && oldStatus) { item0.status=oldStatus; updateStats(); renderSemuaService(); }
     showToast('Gagal update: '+ e.message);
   }
 }
@@ -2201,7 +2495,7 @@ async function handleServiceSubmit(e){
   const device=document.getElementById('f-device').value.trim();
   const imei=document.getElementById('f-imei').value.trim();
   const keluhan=document.getElementById('f-keluhan').value.trim();
-  const biaya=parseInt(document.getElementById('f-biaya').value)||0;
+  const biaya=parseRupiah(document.getElementById('f-biaya').value);
   const teknisi=document.getElementById('f-teknisi').value;
   const estimasi=document.getElementById('f-estimasi').value || null;
   const penerima=document.getElementById('f-penerima')?.value || null;
@@ -2376,4 +2670,5 @@ window.loadProfil=loadProfil; window.handleProfilUpdate=handleProfilUpdate; wind
 window.loadInventory=loadInventory; window.saveInventory=saveInventory; window.renderSparepart=renderSparepart; window.updateSparepartField=updateSparepartField; window.saveSparepartRow=saveSparepartRow; window.deleteSparepart=deleteSparepart; window.handleSparepartAdd=handleSparepartAdd; window.openSpEditModal=openSpEditModal; window.closeSpEditModal=closeSpEditModal; window.submitSpEdit=submitSpEdit; window.resetSparepartDummy=resetSparepartDummy;
 window.loadAlat=loadAlat; window.saveAlat=saveAlat; window.renderAlat=renderAlat; window.updateAlatField=updateAlatField; window.saveAlatRow=saveAlatRow; window.deleteAlat=deleteAlat; window.openAlatAddModal=openAlatAddModal; window.openAlatEditModal=openAlatEditModal; window.closeAlatModal=closeAlatModal; window.submitAlatEdit=submitAlatEdit; window.resetAlatDummy=resetAlatDummy; window.kondisiBadge=kondisiBadge;
 window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.openSparepartLog=openSparepartLog; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;
-window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoPendapatan=statGoPendapatan; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan;
+window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoPendapatan=statGoPendapatan; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan; window.statGoMenungguKonfirmasi=statGoMenungguKonfirmasi;
+window.formatRupiah=formatRupiah; window.formatAngka=formatAngka; window.parseRupiah=parseRupiah; window.attachRupiahLive=attachRupiahLive;

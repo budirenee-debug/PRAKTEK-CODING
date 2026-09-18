@@ -163,6 +163,86 @@ class ServiceOut(BaseModel):
     class Config:
         from_attributes = True
 
+# ---------- Sparepart (multi-PC sync) ----------
+class SparepartBase(BaseModel):
+    nama: str = Field(..., min_length=2, max_length=120)
+    merk: str = Field(default="LAIN", max_length=20)
+    kategori: str = Field(default="Display", max_length=30)
+    masuk: int = Field(default=0, ge=0)
+    keluar: int = Field(default=0, ge=0)
+    stok: Optional[int] = Field(default=None, ge=0)  # jika None auto = masuk - keluar
+    harga: int = Field(default=0, ge=0)
+    tgl: Optional[datetime.date] = None
+
+    @field_validator('merk')
+    @classmethod
+    def validate_merk(cls, v):
+        if v is None:
+            return "LAIN"
+        up = v.upper().strip()
+        allowed = ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]
+        return up if up in allowed else "LAIN"
+
+class SparepartCreate(SparepartBase):
+    pass
+
+class SparepartUpdate(BaseModel):
+    nama: Optional[str] = None
+    merk: Optional[str] = None
+    kategori: Optional[str] = None
+    masuk: Optional[int] = Field(None, ge=0)
+    keluar: Optional[int] = Field(None, ge=0)
+    stok: Optional[int] = Field(None, ge=0)
+    harga: Optional[int] = Field(None, ge=0)
+    tgl: Optional[datetime.date] = None
+
+class SparepartOut(SparepartBase):
+    id: int
+    stok: int
+    tgl: Optional[datetime.date] = None
+    created_at: Optional[dt] = None
+    updated_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+# ---------- Alat (multi-PC sync) ----------
+class AlatBase(BaseModel):
+    nama: str = Field(..., min_length=2, max_length=120)
+    kondisi: str = Field(default="Baik", max_length=30)
+    peminjam: str = Field(default="-", max_length=100)
+    masuk: int = Field(default=0, ge=0)
+    keluar: int = Field(default=0, ge=0)
+    stok: Optional[int] = Field(default=None, ge=0)
+    harga: int = Field(default=0, ge=0)
+
+    @field_validator('kondisi')
+    @classmethod
+    def validate_kondisi(cls, v):
+        if v is None:
+            return "Baik"
+        allowed = ["Baik","Perlu Kalibrasi","Rusak","Dipinjam"]
+        return v if v in allowed else "Baik"
+
+class AlatCreate(AlatBase):
+    pass
+
+class AlatUpdate(BaseModel):
+    nama: Optional[str] = None
+    kondisi: Optional[str] = None
+    peminjam: Optional[str] = None
+    masuk: Optional[int] = Field(None, ge=0)
+    keluar: Optional[int] = Field(None, ge=0)
+    stok: Optional[int] = Field(None, ge=0)
+    harga: Optional[int] = Field(None, ge=0)
+
+class AlatOut(AlatBase):
+    id: int
+    stok: int
+    created_at: Optional[dt] = None
+    updated_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
 # ---------- Stats ----------
 class StatsOut(BaseModel):
     total_masuk: int

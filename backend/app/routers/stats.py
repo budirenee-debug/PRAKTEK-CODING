@@ -19,7 +19,7 @@ def dashboard(db: Session = Depends(get_db)):
     perf = []
     for t in techs:
         total = db.query(models.Service).filter(models.Service.technician_id==t.id).count()
-        selesai = db.query(models.Service).filter(models.Service.technician_id==t.id, models.Service.status=="Selesai").count()
+        selesai = db.query(models.Service).filter(models.Service.technician_id==t.id, models.Service.status.in_(["Selesai","Service Sukses"])).count()
         persen = round((selesai/total*100) if total else 0)
         perf.append({"id": t.id, "nama": t.nama, "foto": t.foto, "total": total, "selesai": selesai, "persen": persen})
     return {"stats": stats, "recent": recent, "technicians": perf}

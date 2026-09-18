@@ -19,6 +19,9 @@ node_modules/
 .cloudflared/*.pem
 .cloudflared/*.log
 C:\Temp\tunnel*.log
+tunnel*.log
+*.bak
+Browser/
 
 # VSCode
 .vscode/settings.json

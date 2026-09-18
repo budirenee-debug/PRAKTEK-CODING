@@ -4,7 +4,7 @@
     {
       "label": "FastAPI: Run (dev)",
       "type": "shell",
-      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0",
+      "command": "python -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -25,7 +25,7 @@
     {
       "label": "FastAPI: Run + Seed",
       "type": "shell",
-      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0 & timeout /t 3 & curl -X POST http://localhost:8000/api/seed",
+      "command": "python -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0 & timeout /t 3 & curl -X POST http://localhost:8000/api/seed",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -39,7 +39,7 @@
     {
       "label": "FastAPI: Install deps",
       "type": "shell",
-      "command": "C:\\Users\\budirenee\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\pip.exe install -r requirements.txt",
+      "command": "python -m pip install -r requirements.txt",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },

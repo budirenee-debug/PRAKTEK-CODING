@@ -40,10 +40,13 @@ def update_service(invoice: str, payload: schemas.ServiceUpdate, db: Session = D
     return svc
 
 @router.put("/{invoice}/status", response_model=schemas.ServiceOut)
-def update_status(invoice: str, status: str = Query(..., description="Antri|Menunggu Konfirmasi|Dikerjakan|Menunggu Sparepart|Selesai|Dibatalkan|Bisa Diambil|Sudah Diambil|Service Failed|Garansi"), db: Session = Depends(get_db)):
-    allowed = ["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart","Selesai","Dibatalkan","Bisa Diambil","Sudah Diambil","Service Failed","Garansi"]
+def update_status(invoice: str, status: str = Query(..., description="Antri|Menunggu Konfirmasi|Dikerjakan|Menunggu Sparepart|Selesai|Service Sukses|Dibatalkan|Bisa Diambil|Sudah Diambil|Service Failed|Garansi"), db: Session = Depends(get_db)):
+    allowed = ["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart","Selesai","Service Sukses","Dibatalkan","Bisa Diambil","Sudah Diambil","Service Failed","Garansi"]
     if status not in allowed:
         raise HTTPException(status_code=400, detail=f"Status harus {allowed}")
+    # normalisasi legacy Selesai -> Service Sukses agar konsisten dengan schemas.py
+    if status == "Selesai":
+        status = "Service Sukses"
     svc = db.query(crud.models.Service).filter(crud.models.Service.invoice == invoice).first()
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")

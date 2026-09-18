@@ -192,10 +192,10 @@
                         <h3 id="stat-harian">0</h3>
                         <p class="trend">Deadline 3 hari • klik →</p>
                     </div>
-                    <div class="stat-card" style="cursor:pointer" onclick="statGoMingguan()" title="Lihat Mingguan 7h →">
-                        <div class="stat-head"><span>Mingguan (7 hari)</span><span class="stat-icon amber">7h</span></div>
-                        <h3 id="stat-mingguan">0</h3>
-                        <p class="trend">Deadline 7 hari • klik →</p>
+                    <div class="stat-card" style="border-left:4px solid #f59e0b;background:#fffbeb;cursor:pointer" onclick="statGoMenungguKonfirmasi()" title="Lihat Menunggu Konfirmasi →">
+                        <div class="stat-head"><span>Menunggu Konfirmasi</span><span class="stat-icon" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">⋯</span></div>
+                        <h3 id="stat-menunggu-konfirmasi" style="color:#b45309">0</h3>
+                        <p class="trend" style="color:#92400e">Butuh konfirmasi segera • klik →</p>
                     </div>
                 </div>
 
@@ -265,7 +265,7 @@
                                         <button type="button" class="chip" data-value="+ Kartu SIM">+ Kartu SIM</button>
                                     </div>
                                 </div>
-                                <div class="field"><label>Estimasi Biaya</label><input id="f-biaya" type="number" placeholder="Rp 0"></div>
+                                <div class="field"><label>Estimasi Biaya</label><input id="f-biaya" type="text" inputmode="numeric" placeholder="Rp 0" autocomplete="off"><span id="f-biaya-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
                                 <div class="field"><label>Teknisi</label>
                                     <select id="f-teknisi"><option selected>Menunggu Teknisi</option><option>Andi</option><option>Sinta</option><option>Budi</option></select>
                                 </div>
@@ -440,7 +440,7 @@
                                 <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
                                 <div class="field"><label>Keluar</label><input id="spEditKeluar" type="number" min="0"></div>
                                 <div class="field"><label>Stok Akhir</label><input id="spEditStok" type="number" min="0"></div>
-                                <div class="field"><label>Harga (Rp)</label><input id="spEditHarga" type="number" min="0"></div>
+                                <div class="field"><label>Harga (Rp)</label><input id="spEditHarga" type="text" inputmode="numeric"><span id="spEditHarga-preview" style="font-size:11px;color:#059669;display:none">Rp 0</span></div>
                             </div>
                             <div style="display:flex;gap:10px;margin-top:14px">
                                 <button type="button" class="btn btn-ghost" style="flex:1" onclick="closeSpEditModal()">Batal</button>
@@ -489,7 +489,7 @@
                                 <div class="field"><label>Masuk</label><input id="alatEditMasuk" type="number" min="0"></div>
                                 <div class="field"><label>Keluar</label><input id="alatEditKeluar" type="number" min="0"></div>
                                 <div class="field"><label>Stok</label><input id="alatEditStok" type="number" min="0"></div>
-                                <div class="field"><label>Harga (Rp)</label><input id="alatEditHarga" type="number" min="0"></div>
+                                <div class="field"><label>Harga (Rp)</label><input id="alatEditHarga" type="text" inputmode="numeric"><span id="alatEditHarga-preview" style="font-size:11px;color:#059669;display:none">Rp 0</span></div>
                             </div>
                             <div style="display:flex;gap:10px;margin-top:14px">
                                 <button type="button" class="btn btn-ghost" style="flex:1" onclick="closeAlatModal()">Batal</button>
@@ -507,7 +507,7 @@
                         <div class="field"><label>Merk *</label><select id="sp-merk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
                         <div class="field"><label>Kategori *</label><select id="sp-kategori" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
                         <div class="field"><label>Barang Masuk *</label><input id="sp-masuk" type="number" min="0" required placeholder="0"><span style="font-size:11px;color:#8a8f98">Stok awal / barang baru masuk</span></div>
-                        <div class="field"><label>Harga Satuan (Rp) *</label><input id="sp-harga" type="number" min="0" required placeholder="550000"><span style="font-size:11px;color:#8a8f98">Harga per unit</span></div>
+                        <div class="field"><label>Harga Satuan (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="550.000"><span style="font-size:11px;color:#8a8f98">Harga per unit</span><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
                         <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"><span style="font-size:11px;color:#8a8f98">Terpakai / terjual — default 0</span></div>
                         <div class="field"><label>Stok Akhir (auto)</label><input id="sp-stok" type="number" min="0" placeholder="auto = Masuk - Keluar"><span style="font-size:11px;color:#059669">Kosongkan = otomatis Masuk - Keluar</span></div>
                     </div>
@@ -517,18 +517,18 @@
 
             <!-- TRANSAKSI -->
             <section class="view" id="view-transaksi-penjualan">
-                <div class="card"><div class="card-head"><h3>Penjualan</h3><span class="count-pill">Hari ini</span></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Status Bayar</th></tr></thead><tbody><tr><td>INV-2026-0118</td><td>Renee Budiman</td><td>iPhone 11 LCD</td><td>Rp 850.000</td><td><span class="badge-status Selesai">Lunas</span></td></tr><tr><td>INV-2026-0122</td><td>Fajar Pratama</td><td>Face ID Repair</td><td>Rp 650.000</td><td><span class="badge-status Antri">Belum Lunas</span></td></tr></tbody></table></div></div>
+                <div class="card"><div class="card-head"><h3>Penjualan</h3><span class="count-pill">Hari ini • 0 transaksi</span></div>
+                <div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Status Bayar</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;padding:24px;color:#8a8f98">Belum ada transaksi — data akan muncul setelah ada penjualan</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-transaksi-pembayaran">
                 <div class="card"><div class="card-head"><h3>Pembayaran</h3><span class="muted">Metode & konfirmasi</span></div>
-                <div class="grid-2"><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Tunai</h3><p style="font-size:12px;color:#8a8f98">Rp 1.500.000</p><div class="progress" style="margin-top:8px"><div style="width:65%"></div></div></div><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Transfer / QRIS</h3><p style="font-size:12px;color:#8a8f98">Rp 800.000</p><div class="progress" style="margin-top:8px"><div style="width:35%"></div></div></div></div></div>
+                <div class="grid-2"><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Tunai</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Transfer / QRIS</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div></div><p style="text-align:center;padding:12px;color:#8a8f98;font-size:12px">Belum ada pembayaran</p></div>
             </section>
 
             <!-- LAPORAN -->
             <section class="view" id="view-laporan-service">
                 <div class="card"><div class="card-head"><h3>Laporan Service</h3><button class="btn btn-dark small">Export PDF</button></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Periode</th><th>Masuk</th><th>Selesai</th><th>Failed</th><th>Garansi</th></tr></thead><tbody><tr><td>September 2026</td><td>12</td><td>5</td><td>1</td><td>2</td></tr></tbody></table></div></div>
+                <div class="table-wrap"><table class="table"><thead><tr><th>Periode</th><th>Masuk</th><th>Selesai</th><th>Failed</th><th>Garansi</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;padding:24px;color:#8a8f98">Belum ada data — laporan akan terisi setelah ada service</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-laporan-teknisi">
                 <div class="card"><div class="card-head"><h3>Laporan Teknisi</h3><span class="muted">Performa bulan ini — avatar sesuai foto profil</span></div>
@@ -536,7 +536,7 @@
             </section>
             <section class="view" id="view-laporan-penjualan">
                 <div class="card"><div class="card-head"><h3>Laporan Penjualan</h3><span class="muted">Pendapatan</span></div>
-                <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 4.2jt</h3><p class="trend up">▲ 12%</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>LCD iPhone</h3><p class="trend">8 unit</p></div></div></div>
+                <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 0</h3><p class="trend">Belum ada penjualan</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>-</h3><p class="trend">Belum ada data</p></div></div></div>
             </section>
 
             <!-- AKUN: ATUR PROFIL -->
@@ -659,6 +659,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=b_gadget-20260917-dashboard-klik"></script>
+    <script src="assets/js/script.js?v=20260918-fix-menu"></script>
 </body>
 </html>

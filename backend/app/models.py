@@ -74,3 +74,34 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     last_login = Column(DateTime, nullable=True)
+
+
+class Sparepart(Base):
+    __tablename__ = "spareparts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(120), nullable=False, index=True)
+    merk = Column(String(20), nullable=False, default="LAIN", index=True)  # IPHONE/SAMSUNG/XIAOMI/OPPO/VIVO/INFINIX/LAIN
+    kategori = Column(String(30), nullable=False, default="Display")
+    masuk = Column(Integer, default=0)
+    keluar = Column(Integer, default=0)
+    stok = Column(Integer, default=0)
+    harga = Column(Integer, default=0)
+    tgl = Column(Date, default=datetime.date.today)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class Alat(Base):
+    __tablename__ = "alats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(120), nullable=False, index=True)
+    kondisi = Column(String(30), nullable=False, default="Baik")  # Baik/Perlu Kalibrasi/Rusak/Dipinjam
+    peminjam = Column(String(100), nullable=False, default="-")
+    masuk = Column(Integer, default=0)
+    keluar = Column(Integer, default=0)
+    stok = Column(Integer, default=0)
+    harga = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

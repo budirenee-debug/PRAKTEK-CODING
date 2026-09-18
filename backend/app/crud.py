@@ -318,3 +318,144 @@ def get_customer_detail(db: Session, customer_id: int):
     total = db.query(models.Service).filter(models.Service.customer_id==c.id).count()
     last = db.query(models.Service).filter(models.Service.customer_id==c.id).order_by(desc(models.Service.date)).first()
     return c, total, last
+
+# ----- Sparepart (multi-PC sync) -----
+def get_spareparts(db: Session, search: str = None, merk: str = None, kategori: str = None):
+    q = db.query(models.Sparepart)
+    if search:
+        like = f"%{search}%"
+        q = q.filter((models.Sparepart.nama.ilike(like)) | (models.Sparepart.merk.ilike(like)) | (models.Sparepart.kategori.ilike(like)))
+    if merk and merk != "all":
+        q = q.filter(models.Sparepart.merk == merk.upper())
+    if kategori and kategori != "all":
+        q = q.filter(models.Sparepart.kategori == kategori)
+    return q.order_by(models.Sparepart.updated_at.desc(), models.Sparepart.id.desc()).all()
+
+def create_sparepart(db: Session, payload: schemas.SparepartCreate):
+    # stok auto = masuk - keluar jika tidak dikirim
+    stok = payload.stok
+    if stok is None:
+        stok = max(0, (payload.masuk or 0) - (payload.keluar or 0))
+    # merk normalisasi
+    merk = (payload.merk or "LAIN").upper()
+    if merk not in ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]:
+        merk = "LAIN"
+    sp = models.Sparepart(
+        nama=payload.nama.strip(),
+        merk=merk,
+        kategori=payload.kategori or "Display",
+        masuk=payload.masuk or 0,
+        keluar=payload.keluar or 0,
+        stok=stok,
+        harga=payload.harga or 0,
+        tgl=payload.tgl or date.today()
+    )
+    db.add(sp)
+    db.commit()
+    db.refresh(sp)
+    return sp
+
+def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate):
+    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+    if not sp:
+        return None
+    data = payload.model_dump(exclude_unset=True)
+    # merk upper
+    if "merk" in data and data["merk"]:
+        data["merk"] = data["merk"].upper()
+        if data["merk"] not in ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]:
+            data["merk"] = "LAIN"
+    for k,v in data.items():
+        setattr(sp, k, v)
+    # jika masuk/keluar berubah dan stok tidak di-set manual, auto
+    if ("masuk" in data or "keluar" in data) and "stok" not in data:
+        sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    # jika stok dikirim, pastikan konsisten
+    if sp.stok is None:
+        sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    db.commit()
+    db.refresh(sp)
+    return sp
+
+def delete_sparepart(db: Session, sp_id: int):
+    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+    if not sp:
+        return False
+    db.delete(sp)
+    db.commit()
+    return True
+
+def pakai_sparepart(db: Session, sp_id: int, qty: int = 1):
+    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+    if not sp:
+        return None, "Sparepart tidak ditemukan"
+    if sp.stok is None:
+        sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    if sp.stok < qty:
+        return None, f"Stok tidak cukup (sisa {sp.stok})"
+    sp.keluar = (sp.keluar or 0) + qty
+    sp.stok = max(0, sp.stok - qty)
+    sp.tgl = date.today()
+    db.commit()
+    db.refresh(sp)
+    return sp, None
+
+# ----- Alat (multi-PC sync) -----
+def get_alats(db: Session, search: str = None, kondisi: str = None):
+    q = db.query(models.Alat)
+    if search:
+        like = f"%{search}%"
+        q = q.filter((models.Alat.nama.ilike(like)) | (models.Alat.kondisi.ilike(like)) | (models.Alat.peminjam.ilike(like)))
+    if kondisi and kondisi != "all":
+        q = q.filter(models.Alat.kondisi == kondisi)
+    return q.order_by(models.Alat.updated_at.desc(), models.Alat.id.desc()).all()
+
+def create_alat(db: Session, payload: schemas.AlatCreate):
+    stok = payload.stok
+    if stok is None:
+        stok = max(0, (payload.masuk or 0) - (payload.keluar or 0))
+    alat = models.Alat(
+        nama=payload.nama.strip(),
+        kondisi=payload.kondisi or "Baik",
+        peminjam=payload.peminjam or "-",
+        masuk=payload.masuk or 0,
+        keluar=payload.keluar or 0,
+        stok=stok,
+        harga=payload.harga or 0
+    )
+    # auto kondisi Dipinjam jika peminjam != -
+    if alat.peminjam != "-" and alat.kondisi == "Baik":
+        alat.kondisi = "Dipinjam"
+    db.add(alat)
+    db.commit()
+    db.refresh(alat)
+    return alat
+
+def update_alat(db: Session, alat_id: int, payload: schemas.AlatUpdate):
+    alat = db.query(models.Alat).filter(models.Alat.id == alat_id).first()
+    if not alat:
+        return None
+    data = payload.model_dump(exclude_unset=True)
+    for k,v in data.items():
+        setattr(alat, k, v)
+    if ("masuk" in data or "keluar" in data) and "stok" not in data:
+        alat.stok = max(0, (alat.masuk or 0) - (alat.keluar or 0))
+    if alat.stok is None:
+        alat.stok = max(0, (alat.masuk or 0) - (alat.keluar or 0))
+    # auto kondisi
+    if "peminjam" in data:
+        if alat.peminjam != "-" and alat.kondisi == "Baik":
+            alat.kondisi = "Dipinjam"
+        elif alat.peminjam == "-" and alat.kondisi == "Dipinjam":
+            alat.kondisi = "Baik"
+    db.commit()
+    db.refresh(alat)
+    return alat
+
+def delete_alat(db: Session, alat_id: int):
+    alat = db.query(models.Alat).filter(models.Alat.id == alat_id).first()
+    if not alat:
+        return False
+    db.delete(alat)
+    db.commit()
+    return True

@@ -10,11 +10,10 @@ from sqlalchemy.orm import Session
 import os
 
 from .database import Base, engine, get_db
-from .routers import services, customers, technicians, stats, auth
+from .routers import services, customers, technicians, stats, auth, inventory
 from . import models
 from .seed import seed
 from .auth import ensure_superadmin
-from sqlalchemy.orm import Session
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -88,10 +87,11 @@ app = FastAPI(
 )
 
 # CORS - izinkan frontend akses (Vite, file://, live-server)
+# Note: allow_credentials=True tidak kompatibel dengan allow_origins=["*"] di spec CORS, jadi dimatikan
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -102,6 +102,7 @@ app.include_router(services.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(technicians.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api")
 
 # Serve frontend static (rapi: frontend/assets/*) + root fallback untuk upload static
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
