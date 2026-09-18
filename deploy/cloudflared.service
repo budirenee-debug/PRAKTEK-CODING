@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloudflare Tunnel - b-gadget
+After=network-online.target b-gadget.service
+Wants=network-online.target
+Requires=b-gadget.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cloudflared tunnel --config /opt/PRAKTEK/.cloudflared/config.yml run b-gadget
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

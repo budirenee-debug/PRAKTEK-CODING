@@ -1,0 +1,19 @@
+[Unit]
+Description=B_gadget POS Service HP - FastAPI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/PRAKTEK/backend
+EnvironmentFile=/opt/PRAKTEK/backend/.env
+ExecStart=/opt/PRAKTEK/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

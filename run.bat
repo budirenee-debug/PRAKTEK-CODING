@@ -66,12 +66,12 @@ if not exist "%BACKEND%\requirements.txt" (
 echo [INFO] Cek dependencies fastapi+uvicorn ...
 "%PYTHON_EXE%" -c "import fastapi, uvicorn" >nul 2>nul
 if errorlevel 1 (
-  echo [WARN] fastapi/uvicorn belum terimport â€” coba install butuh internet...
+  echo [WARN] fastapi/uvicorn belum terimport GÇö coba install butuh internet...
   echo        Jika gagal, akan tetap coba jalan, cek manual: %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt
   "%PYTHON_EXE%" -m pip install --upgrade pip >nul 2>nul
   "%PYTHON_EXE%" -m pip install -r "%BACKEND%\requirements.txt"
   if errorlevel 1 (
-    echo [WARN] pip install gagal â€” cek internet / proxy. Coba manual:
+    echo [WARN] pip install gagal GÇö cek internet / proxy. Coba manual:
     echo        %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
     echo        Atau jika sudah pernah install, lanjut coba jalan...
   )
@@ -134,9 +134,9 @@ if "%MODE%"=="named" (
 echo.
 
 :: ---------- 7. Jalankan tunnel di window baru (auto-restart jika pindah jaringan) ----------
-:: Jika port busy (pindah jaringan), tunnel lama kemungkinan putus â€” kill & restart agar publik kembali online
+:: Jika port busy (pindah jaringan), tunnel lama kemungkinan putus GÇö kill & restart agar publik kembali online
 if "%PORT_BUSY%"=="1" if not "%MODE%"=="none" (
-  echo [INFO] Port busy + pindah jaringan terdeteksi â€” restart tunnel lama...
+  echo [INFO] Port busy + pindah jaringan terdeteksi GÇö restart tunnel lama...
   taskkill /IM cloudflared.exe /F >nul 2>nul
   timeout /t 2 >nul
 )
