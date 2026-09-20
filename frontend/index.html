@@ -28,25 +28,30 @@
                     <div class="menu-category">SERVICE</div>
                     <button class="menu-item" data-view="semua-service">
                         <span class="mi">☰</span> Semua Service
+                        <span class="badge">8</span>
                     </button>
                     <button class="menu-item" data-view="service-masuk">
                         <span class="mi">＋</span> Service Masuk
-                        <span class="badge">12</span>
                     </button>
                     <button class="menu-item" data-view="proses">
                         <span class="mi">⚙</span> Proses Service
+                        <span class="badge" id="badge-proses">0</span>
                     </button>
                     <button class="menu-item" data-view="bisa-diambil">
                         <span class="mi">✓</span> Bisa Diambil
+                        <span class="badge" id="badge-bisa-diambil">0</span>
                     </button>
                     <button class="menu-item" data-view="sudah-diambil">
                         <span class="mi">✔</span> Sudah Diambil
+                        <span class="badge" id="badge-sudah-diambil">0</span>
                     </button>
                     <button class="menu-item" data-view="service-failed">
                         <span class="mi">✕</span> Service Failed
+                        <span class="badge" id="badge-service-failed">0</span>
                     </button>
                     <button class="menu-item" data-view="status-garansi">
                         <span class="mi">♡</span> Status Garansi
+                        <span class="badge" id="badge-status-garansi">0</span>
                     </button>
 
                     <div class="menu-category">CUSTOMER</div>
@@ -74,6 +79,10 @@
                     </button>
                     <button class="menu-item" data-view="transaksi-pembayaran">
                         <span class="mi">💳</span> Pembayaran
+                    </button>
+                    <button class="menu-item" data-view="transaksi-pendapatan">
+                        <span class="mi">💰</span> Pendapatan Sukses
+                        <span class="badge" id="badge-pendapatan">0</span>
                     </button>
 
                     <div class="menu-category">LAPORAN</div>
@@ -369,22 +378,22 @@
 
             <!-- SERVICE: BISA DIAMBIL -->
             <section class="view" id="view-bisa-diambil">
-                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="badge-status Selesai">Siap diambil pelanggan</span></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
+                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
             </section>
 
             <!-- SERVICE: SUDAH DIAMBIL -->
             <section class="view" id="view-sudah-diambil">
-                <div class="card"><div class="card-head"><h3>Sudah Diambil</h3><span class="muted">Riwayat device yang sudah diambil</span></div><div class="kanban" id="kanbanSudahDiambil"></div></div>
+                <div class="card"><div class="card-head toolbar"><div class="toolbar-left"><h3>Sudah Diambil</h3><span class="count-pill" id="sudahCount">0 selesai</span><span class="muted">Terurut dari Bisa Diambil terbaru</span></div></div><div class="kanban" id="kanbanSudahDiambil"></div></div>
             </section>
 
             <!-- SERVICE: FAILED -->
             <section class="view" id="view-service-failed">
-                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span></div><div class="kanban" id="kanbanFailed"></div></div>
+                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="count-pill" id="failedCount">0 failed</span><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span></div><div class="kanban" id="kanbanFailed"></div></div>
             </section>
 
             <!-- SERVICE: GARANSI -->
             <section class="view" id="view-status-garansi">
-                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="muted">Service dalam masa garansi</span></div><div class="kanban" id="kanbanGaransi"></div></div>
+                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="count-pill" id="garansiCount">0 garansi</span><span class="muted">Service dalam masa garansi</span></div><div class="kanban" id="kanbanGaransi"></div></div>
             </section>
 
             <!-- CUSTOMER: TAMBAH PELANGGAN -->
@@ -523,6 +532,78 @@
             <section class="view" id="view-transaksi-pembayaran">
                 <div class="card"><div class="card-head"><h3>Pembayaran</h3><span class="muted">Metode & konfirmasi</span></div>
                 <div class="grid-2"><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Tunai</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Transfer / QRIS</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div></div><p style="text-align:center;padding:12px;color:#8a8f98;font-size:12px">Belum ada pembayaran</p></div>
+            </section>
+            <!-- TRANSAKSI: PENDAPATAN SUKSES (Bisa Diambil + Service Sukses) -->
+            <section class="view" id="view-transaksi-pendapatan">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>💰 Pendapatan Sukses</h3><span class="count-pill" id="pendapatanCount">0 service</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="pendapatanTotal">Rp 0</span></div>
+                        <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchPendapatan" placeholder="Cari invoice, pelanggan, device..."></div><button class="btn btn-dark small" onclick="exportPendapatanCSV()">⬇ Export CSV</button></div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>harga tercatat</strong> untuk HP <strong>Bisa Diambil / Service Sukses / Selesai</strong> — otomatis sinkron saat Harga diubah di tab Bisa Diambil/Sudah Diambil. Total = sum `biaya`.</p>
+                    <div class="table-wrap"><table class="table compact" id="tablePendapatan"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Status</th><th>Sparepart Dipakai</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyPendapatan"><tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px">
+                        <span id="pendapatanSummary" style="color:#8a8f98">0 service • Rp 0</span>
+                        <span style="font-size:11px;color:#059669">💡 Harga editable di Bisa Diambil/Sudah Diambil → otomatis update di sini</span>
+                    </div>
+                </div>
+                <div class="stats" style="margin-top:12px">
+                    <div class="stat-card" style="border-left:4px solid #059669">
+                        <div class="stat-head"><span>Pendapatan Hari Ini</span><span class="stat-icon" style="background:#ecfdf5;color:#059669">💰</span></div>
+                        <h3 id="pendapatanHariIni">Rp 0</h3>
+                        <p class="trend" id="pendapatanHariIniCount">0 service • hari ini</p>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid #2563eb">
+                        <div class="stat-head"><span>Total 7 Hari</span><span class="stat-icon" style="background:#eff6ff;color:#2563eb">📅</span></div>
+                        <h3 id="pendapatan7Hari">Rp 0</h3>
+                        <p class="trend" id="pendapatan7HariCount">0 service • 7 hari terakhir</p>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid #f59e0b">
+                        <div class="stat-head"><span>Profit Nett 7 Hari</span><span class="stat-icon" style="background:#fffbeb;color:#b45309">📈</span></div>
+                        <h3 id="profit7Hari">Rp 0</h3>
+                        <p class="trend" id="profit7HariCount">biaya − sparepart • 7 hari</p>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>Rekap 7 Hari Terakhir (per hari)</h3><span class="muted" id="rekap7HariRange">-</span></div>
+                    <div class="table-wrap"><table class="table" id="tableRekap7Hari"><thead><tr><th>Tanggal</th><th>Jumlah</th><th style="text-align:right">Total</th><th style="text-align:right">Sparepart</th><th style="text-align:right">Profit</th><th style="text-align:right">Avg</th></tr></thead><tbody id="tbodyRekap7Hari"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                <!-- Tabs Sparepart & Profit -->
+                <div class="tabs" style="margin-top:12px">
+                    <button class="tab active" data-pendapatan-tab="rekap" onclick="switchPendapatanTab('rekap')">Rekap</button>
+                    <button class="tab" data-pendapatan-tab="sparepart" onclick="switchPendapatanTab('sparepart')">🔧 Sparepart Dipakai</button>
+                    <button class="tab" data-pendapatan-tab="profit" onclick="switchPendapatanTab('profit')">📈 Profit Nett (biaya−sparepart)</button>
+                </div>
+                <div id="pendapatan-tab-rekap">
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>Ringkasan per Teknisi</h3><span class="muted">Pendapatan Sukses group teknisi (all time)</span></div>
+                    <div class="table-wrap"><table class="table" id="tablePendapatanTeknisi"><thead><tr><th>Teknisi</th><th>Jumlah</th><th style="text-align:right">Total</th><th>Rata-rata</th></tr></thead><tbody id="tbodyPendapatanTeknisi"><tr><td colspan="4" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>📅 Laporan Harian per Teknisi</h3><span class="muted" id="laporanHarianRange">Hari ini & 7 hari terakhir</span></div>
+                    <div class="table-wrap"><table class="table" id="tableHarianTeknisi"><thead><tr><th>Teknisi</th><th>Kategori</th><th style="text-align:center">Hari Ini<br><span style="font-weight:400;font-size:10px">jml • total</span></th><th style="text-align:center">7 Hari<br><span style="font-weight:400;font-size:10px">jml • total</span></th><th style="text-align:right">Profit Hari Ini</th><th style="text-align:right">Profit 7 Hari</th></tr></thead><tbody id="tbodyHarianTeknisi"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                </div>
+                <div id="pendapatan-tab-sparepart" style="display:none">
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>🔧 Sparepart Dipakai (Sukses)</h3><span class="count-pill" id="sparepartPendapatanCount">0 item</span></div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">List sparepart yang terpakai untuk service <strong>Sukses/Bisa Diambil</strong> — dari fitur Pakai di Proses Service. Total sparepart = sum(harga×qty).</p>
+                    <div class="table-wrap"><table class="table compact" id="tableSparepartPendapatan"><thead><tr><th>Invoice / Device</th><th>Sparepart</th><th style="text-align:center">Qty</th><th style="text-align:right">Harga Satuan</th><th style="text-align:right">Total</th><th>Teknisi</th></tr></thead><tbody id="tbodySparepartPendapatan"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Belum ada sparepart dipakai — pakai di Proses Service → Pakai</td></tr></tbody></table></div>
+                    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span id="sparepartPendapatanSummary" style="color:#8a8f98">0 item • Rp 0</span><span style="font-size:11px;color:#6b7280">Sumber: serviceSpareparts localStorage</span></div>
+                </div>
+                </div>
+                <div id="pendapatan-tab-profit" style="display:none">
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>📈 Profit Nett (Otomatis)</h3><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="profitTotal">Rp 0</span><span class="count-pill" id="profitCount">0 service</span></div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px"><strong>Profit = Biaya − Sparepart</strong> otomatis per invoice. Jika tanpa sparepart, profit = biaya full.</p>
+                    <div class="table-wrap"><table class="table compact" id="tableProfit"><thead><tr><th>Invoice</th><th>Device / Pelanggan</th><th style="text-align:right">Biaya</th><th style="text-align:right">Sparepart</th><th style="text-align:right">Profit</th><th>Teknisi</th></tr></thead><tbody id="tbodyProfit"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span id="profitSummary" style="color:#8a8f98">0 service • profit Rp 0</span><button class="btn btn-dark small" onclick="exportProfitCSV()">⬇ Export Profit CSV</button></div>
+                </div>
+                <div class="card" style="margin-top:12px">
+                    <div class="card-head"><h3>Profit per Teknisi</h3><span class="muted">Biaya − sparepart group teknisi</span></div>
+                    <div class="table-wrap"><table class="table" id="tableProfitTeknisi"><thead><tr><th>Teknisi</th><th>Jumlah</th><th style="text-align:right">Biaya Total</th><th style="text-align:right">Sparepart</th><th style="text-align:right">Profit</th></tr></thead><tbody id="tbodyProfitTeknisi"><tr><td colspan="5" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                </div>
             </section>
 
             <!-- LAPORAN -->
