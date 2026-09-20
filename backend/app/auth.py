@@ -7,12 +7,17 @@ from typing import Optional
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 from . import models
 
-# Config
+load_dotenv()
+
+# Config — load dari .env, fail jika prod masih pakai default
 SECRET_KEY = os.getenv("SECRET_KEY", "b_gadget_secret_key_2026_ganti_di_prod")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 jam
+if os.getenv("ENV") == "production" and SECRET_KEY == "b_gadget_secret_key_2026_ganti_di_prod":
+    raise RuntimeError("SECRET_KEY masih default di production — set di backend/.env")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))  # 2 jam default, dulu 1440
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

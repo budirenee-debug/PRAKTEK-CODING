@@ -69,12 +69,15 @@
     </div>
   </div>
   <script>
-    // Dynamic API: localhost -> http://localhost:8000/api, online (service.reneepsl.my.id) -> https://service.reneepsl.my.id/api
+    // Dynamic API: file:// -> localhost:8000, localhost -> localhost:8000, online -> origin/api (fix P0-3)
     const API = (() => {
       const stored = localStorage.getItem('API_BASE');
       if (stored) return stored;
+      const proto = location.protocol;
       const host = location.hostname;
+      if (proto === 'file:') return 'http://localhost:8000/api';
       if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000/api';
+      if (!host || host === 'null') return 'http://localhost:8000/api';
       return location.origin + '/api';
     })();
 

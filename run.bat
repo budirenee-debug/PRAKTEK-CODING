@@ -62,16 +62,15 @@ if not exist "%BACKEND%\requirements.txt" (
   exit /b 1
 )
 
-:: ---------- 3. Dependencies ----------
+:: ---------- 3. Dependencies (fast check, tanpa upgrade pip tiap run) ----------
 echo [INFO] Cek dependencies fastapi+uvicorn ...
 "%PYTHON_EXE%" -c "import fastapi, uvicorn" >nul 2>nul
 if errorlevel 1 (
-  echo [WARN] fastapi/uvicorn belum terimport GÇö coba install butuh internet...
+  echo [WARN] fastapi/uvicorn belum terimport â€” coba install butuh internet...
   echo        Jika gagal, akan tetap coba jalan, cek manual: %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt
-  "%PYTHON_EXE%" -m pip install --upgrade pip >nul 2>nul
-  "%PYTHON_EXE%" -m pip install -r "%BACKEND%\requirements.txt"
+  "%PYTHON_EXE%" -m pip install -r "%BACKEND%\requirements.txt" --quiet
   if errorlevel 1 (
-    echo [WARN] pip install gagal GÇö cek internet / proxy. Coba manual:
+    echo [WARN] pip install gagal â€” cek internet / proxy. Coba manual:
     echo        %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
     echo        Atau jika sudah pernah install, lanjut coba jalan...
   )
@@ -134,9 +133,9 @@ if "%MODE%"=="named" (
 echo.
 
 :: ---------- 7. Jalankan tunnel di window baru (auto-restart jika pindah jaringan) ----------
-:: Jika port busy (pindah jaringan), tunnel lama kemungkinan putus GÇö kill & restart agar publik kembali online
+:: Jika port busy (pindah jaringan), tunnel lama kemungkinan putus â€” kill & restart agar publik kembali online
 if "%PORT_BUSY%"=="1" if not "%MODE%"=="none" (
-  echo [INFO] Port busy + pindah jaringan terdeteksi GÇö restart tunnel lama...
+  echo [INFO] Port busy + pindah jaringan terdeteksi â€” restart tunnel lama...
   taskkill /IM cloudflared.exe /F >nul 2>nul
   timeout /t 2 >nul
 )
@@ -174,20 +173,20 @@ echo.
 echo [TIPS] Biarkan window ini + window Tunnel terbuka. Ctrl+C untuk stop.
 echo.
 
-:: ---------- 8b. Buka browser FAST (poll 0.4s, max 5 detik, tidak blok backend) ----------
+:: ---------- 8b. Buka browser FAST (poll 0.2s, max 6 detik, tidak blok backend) ----------
 if "%PORT_BUSY%"=="1" goto BROWSER_BUSY
 
-:: Port belum busy -> backend akan start di bawah (blocking). Buka browser via background poll cepat agar tidak "refused" tapi tetap cepat
-echo [INFO] Browser akan dibuka otomatis (fast poll ~4 detik, buka begitu health 200)...
+:: Port belum busy -> backend akan start di bawah (blocking). Buka browser via background poll cepat
+echo [INFO] Browser akan dibuka otomatis (fast poll ~3 detik, buka begitu health 200)...
 if "%MODE%"=="named" goto BROWSER_NAMED_FAST
 goto BROWSER_QUICK_FAST
 
 :BROWSER_NAMED_FAST
-start "" powershell -NoProfile -Command "$t=0; while($t -lt 12){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 400; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'"
+start "" powershell -NoProfile -Command "$t=0; while($t -lt 20){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 200; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'"
 goto BROWSER_DONE
 
 :BROWSER_QUICK_FAST
-start "" powershell -NoProfile -Command "$t=0; while($t -lt 12){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 400; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'"
+start "" powershell -NoProfile -Command "$t=0; while($t -lt 20){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 200; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'"
 goto BROWSER_DONE
 
 :BROWSER_BUSY
@@ -215,7 +214,13 @@ if "%PORT_BUSY%"=="1" (
   exit /b 0
 )
 cd /d "%BACKEND%"
-"%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port %PORT% --reload
+:: Host 127.0.0.1 lebih cepat untuk localhost (hindari 0.0.0.0 scan firewall); tunnel tetap bisa via 127.0.0.1:8000
+:: --reload hanya untuk dev, tanpa reload lebih cepat 1-2 detik. Gunakan ENV=production untuk tanpa reload.
+if "%ENV%"=="production" (
+  "%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT%
+) else (
+  "%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT% --reload
+)
 
 echo.
 echo [INFO] Server berhenti.

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..database import get_db
 from .. import schemas, crud
+from .auth import require_superadmin, get_current_user
 
 router = APIRouter(prefix="/services", tags=["Services"])
 
@@ -28,19 +29,25 @@ def get_service(invoice: str, db: Session = Depends(get_db)):
     return svc
 
 @router.post("", response_model=schemas.ServiceOut, status_code=201)
-def create_service(payload: schemas.ServiceCreate, db: Session = Depends(get_db)):
+def create_service(payload: schemas.ServiceCreate, db: Session = Depends(get_db), current = Depends(get_current_user)):
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login — token required")
     svc = crud.create_service(db, payload)
     return svc
 
 @router.patch("/{invoice}", response_model=schemas.ServiceOut)
-def update_service(invoice: str, payload: schemas.ServiceUpdate, db: Session = Depends(get_db)):
+def update_service(invoice: str, payload: schemas.ServiceUpdate, db: Session = Depends(get_db), current = Depends(get_current_user)):
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login — token required")
     svc = crud.update_service(db, invoice, payload)
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     return svc
 
 @router.put("/{invoice}/status", response_model=schemas.ServiceOut)
-def update_status(invoice: str, status: str = Query(..., description="Antri|Menunggu Konfirmasi|Dikerjakan|Menunggu Sparepart|Selesai|Service Sukses|Dibatalkan|Bisa Diambil|Sudah Diambil|Service Failed|Garansi"), db: Session = Depends(get_db)):
+def update_status(invoice: str, status: str = Query(..., description="Antri|Menunggu Konfirmasi|Dikerjakan|Menunggu Sparepart|Selesai|Service Sukses|Dibatalkan|Bisa Diambil|Sudah Diambil|Service Failed|Garansi"), db: Session = Depends(get_db), current = Depends(get_current_user)):
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
     allowed = ["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart","Selesai","Service Sukses","Dibatalkan","Bisa Diambil","Sudah Diambil","Service Failed","Garansi"]
     if status not in allowed:
         raise HTTPException(status_code=400, detail=f"Status harus {allowed}")
@@ -56,7 +63,7 @@ def update_status(invoice: str, status: str = Query(..., description="Antri|Menu
     return crud.enrich_service(svc)
 
 @router.delete("/{invoice}")
-def delete_service(invoice: str, db: Session = Depends(get_db)):
+def delete_service(invoice: str, db: Session = Depends(get_db), current = Depends(require_superadmin)):
     ok = crud.delete_service(db, invoice)
     if not ok:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")

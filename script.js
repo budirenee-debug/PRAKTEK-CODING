@@ -327,7 +327,12 @@ function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 // ---------- API helpers ----------
 async function apiFetch(path, opts={}){
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {headers:{'Content-Type':'application/json'}, ...opts});
+  const token = localStorage.getItem('access_token');
+  const baseHeaders = {'Content-Type':'application/json'};
+  if(token) baseHeaders['Authorization'] = `Bearer ${token}`;
+  // merge headers: opts.headers overrides base if provided
+  const headers = {...baseHeaders, ...(opts.headers||{})};
+  const res = await fetch(url, {...opts, headers});
   if(!res.ok){
     const txt = await res.text();
     throw new Error(txt || res.statusText);
@@ -335,7 +340,8 @@ async function apiFetch(path, opts={}){
   return res.json();
 }
 
-async function loadData(){
+let _offlineToastShown = false;
+async function loadData(silent){
   if(!USE_API){
     data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData;
     return;
@@ -343,23 +349,27 @@ async function loadData(){
   try{
     const params = new URLSearchParams();
     if(pelangganFilter) params.set('search', pelangganFilter);
-    // statusFilter handled in renderKanban fetch separation? simplified: fetch all then filter front
     const q = params.toString() ? `?${params}` : '';
     const rows = await apiFetch(`/services${q}`);
     data = rows.map(normalize);
-    // simpan cache lokal juga
     saveLocal();
-    // update indicator online
     const el = document.querySelector('.store-info span:first-child');
     if(el) el.textContent = '● Sistem Online (API)';
     if(el) el.style.color = '#10b981';
+    _offlineToastShown = false;
   }catch(e){
-    console.warn('API gagal, fallback localStorage:', e.message);
+    // hanya warn di console, toast sekali saja (hindari spam tiap 8 detik)
+    if(!_offlineToastShown && !silent) {
+      console.warn('API gagal, fallback localStorage:', e.message);
+      showToast('API offline - pakai data lokal');
+      _offlineToastShown = true;
+    } else {
+      console.warn('API gagal (silent):', e.message);
+    }
     USE_API = false;
     data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData;
     const el = document.querySelector('.store-info span:first-child');
     if(el) { el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
-    showToast('API offline - pakai data lokal');
   }
 }
 
@@ -986,25 +996,35 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   renderAlat();
   updateInvoicePreview();
   attachRupiahLive();
-  // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron otomatis — dashboard Menunggu Konfirmasi ikut sync dengan Semua Service
+  // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron — hash compare, silent, anti-spam (fix P1-8)
   let lastServiceLen = data.length;
   let lastMenungguCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
+  let lastInventoryHash = JSON.stringify(inventory.map(i=>i.id+':'+i.stok+':'+i.masuk+':'+i.keluar).sort());
+  let lastAlatHash = '';
+  // init alat hash setelah loadAlat selesai
+  setTimeout(()=>{ try{ lastAlatHash = JSON.stringify(alatInventory.map(a=>a.id+':'+a.stok+':'+a.kondisi).sort()); }catch{} }, 500);
   setInterval(async()=>{
-    const prevLen=inventory.length;
+    const prevInventoryHash = JSON.stringify(inventory.map(i=>i.id+':'+i.stok+':'+i.masuk+':'+i.keluar).sort());
     await loadInventory();
-    if(inventory.length!==prevLen || document.getElementById('view-inventory-sparepart')?.classList.contains('active')) renderSparepart();
-    const prevAlat=alatInventory.length;
+    const newInventoryHash = JSON.stringify(inventory.map(i=>i.id+':'+i.stok+':'+i.masuk+':'+i.keluar).sort());
+    if(newInventoryHash!==prevInventoryHash || newInventoryHash!==lastInventoryHash || document.getElementById('view-inventory-sparepart')?.classList.contains('active')){
+      if(newInventoryHash!==prevInventoryHash) lastInventoryHash = newInventoryHash;
+      renderSparepart();
+    }
+    const prevAlatHash = JSON.stringify(alatInventory.map(a=>a.id+':'+a.stok+':'+a.kondisi).sort());
     await loadAlat();
-    if(alatInventory.length!==prevAlat || document.getElementById('view-inventory-alat')?.classList.contains('active')) renderAlat();
-    // sync service + dashboard Menunggu Konfirmasi — selalu coba API biar offline → online langsung sync
+    const newAlatHash = JSON.stringify(alatInventory.map(a=>a.id+':'+a.stok+':'+a.kondisi).sort());
+    if(newAlatHash!==prevAlatHash || newAlatHash!==lastAlatHash || document.getElementById('view-inventory-alat')?.classList.contains('active')){
+      if(newAlatHash!==prevAlatHash) lastAlatHash = newAlatHash;
+      renderAlat();
+    }
+    // sync service — paksa coba API meskipun offline, silent agar tidak spam toast
     try{
-      const prevDataHash = JSON.stringify(data.map(d=>d.invoice+d.status).sort());
-      // paksa coba API meskipun USE_API false (offline → online)
+      const prevDataHash = JSON.stringify(data.map(d=>d.invoice+d.status+d.estimasi_selesai).sort());
       const wasOffline = !USE_API;
-      if(wasOffline) USE_API = true; // coba paksa
-      try{ await loadData(); }catch(e){ if(wasOffline) USE_API = false; throw e; }
-      // jika loadData fallback ke local (API gagal), USE_API akan jadi false di dalam loadData
-      const newHash = JSON.stringify(data.map(d=>d.invoice+d.status).sort());
+      if(wasOffline) USE_API = true;
+      try{ await loadData(true); }catch(e){ if(wasOffline) USE_API = false; throw e; }
+      const newHash = JSON.stringify(data.map(d=>d.invoice+d.status+d.estimasi_selesai).sort());
       const curMenunggu = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
       if(newHash!==prevDataHash || curMenunggu!==lastMenungguCount || data.length!==lastServiceLen){
         lastServiceLen = data.length;
@@ -1014,7 +1034,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         renderKanban();
         if(wasOffline && USE_API) showToast('✅ Online lagi — data sync');
       }
-      // update badge online
       const el=document.querySelector('.store-info span:first-child');
       if(el && USE_API){ el.textContent='● Sistem Online (API)'; el.style.color='#10b981'; }
     }catch{}
@@ -1108,7 +1127,7 @@ async function checkHealth(){
     const res = await fetch(API_BASE.replace('/api','') + '/health');
     if(res.ok){
       const j = await res.json();
-      console.log('Health:', j);
+      if(location.hostname==='localhost' || location.hostname==='127.0.0.1') console.log('Health:', j);
     }
   }catch{}
 }
@@ -1124,7 +1143,7 @@ function switchView(view){
   const el=document.getElementById('view-'+view);
   if(el) el.classList.add('active');
   const titles={
-    dashboard:['Dashboard Overview','Ringkasan service hari ini — Selasa, 2 September 2026'],
+    dashboard:['Dashboard Overview','Ringkasan service hari ini'],
     'semua-service':['Semua Service','Daftar lengkap semua service — filter & cari'],
     'service-masuk':['Service Masuk','Input device baru & kelola antrian masuk'],
     pelanggan:['Data Pelanggan','Kelola pelanggan loyal & riwayat service'],

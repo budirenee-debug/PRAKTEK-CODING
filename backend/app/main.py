@@ -2,12 +2,15 @@
 Main FastAPI - B_gadget POS Service HP
 Root + Models + SQLite
 """
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from .database import Base, engine, get_db
 from .routers import services, customers, technicians, stats, auth, inventory
@@ -86,11 +89,13 @@ app = FastAPI(
     contact={"name": "B_gadget Team"},
 )
 
-# CORS - izinkan frontend akses (Vite, file://, live-server)
-# Note: allow_credentials=True tidak kompatibel dengan allow_origins=["*"] di spec CORS, jadi dimatikan
+# CORS - lock ke domain prod + localhost (fix P0-1 K2)
+# P0: jangan "*" jika nanti butuh auth cookie; batasi origin
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://service.reneepsl.my.id,https://reneepsl.my.id,https://www.reneepsl.my.id,http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500,http://127.0.0.1:8000").split(",")
+ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,23 +109,17 @@ app.include_router(technicians.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 
-# Serve frontend static (rapi: frontend/assets/*) + root fallback untuk upload static
+# Serve frontend static (rapi: frontend/assets/*) — single source, hapus mount /root ambigu (fix P0-2)
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if os.path.exists(FRONTEND_DIR):
     app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-    # juga serve assets langsung (prioritas frontend/assets)
     ASSETS_DIR = os.path.join(FRONTEND_DIR, "assets")
     if os.path.exists(ASSETS_DIR):
         app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
-    # fallback: jika ada assets di root (untuk upload manual cPanel), mount juga jika belum
-    ROOT_ASSETS = os.path.join(ROOT_DIR, "assets")
-    if os.path.exists(ROOT_ASSETS) and ROOT_ASSETS != ASSETS_DIR:
-        # mount di /assets-root sebagai cadangan, tapi /assets utama tetap dari frontend
-        pass
-    # serve root index.html/login.html sebagai static juga (untuk akses /index.html langsung)
-    if os.path.exists(os.path.join(ROOT_DIR, "index.html")):
-        app.mount("/root", StaticFiles(directory=ROOT_DIR, html=True), name="root")
+    # /root mount dihapus — duplikat root (index.html/style.css/script.js) adalah legacy,
+    # akses canonical sekarang hanya via /frontend/* dan /assets/* (hindari drift)
+    # legacy /index.html tetap di-serve via redirect di root() jika dibutuhkan
 
 @app.get("/", tags=["Root"])
 def root(request: Request):
@@ -154,8 +153,8 @@ def health():
     return {"status": "ok", "db": "sqlite", "engine": str(engine.url)}
 
 @app.post("/api/seed", tags=["Root"])
-def seed_db(db: Session = Depends(get_db)):
-    """Seed data awal dummy (idempotent)"""
+def seed_db(db: Session = Depends(get_db), current = Depends(auth.require_superadmin)):
+    """Seed data awal dummy (idempotent) — butuh superadmin (fix P0-1)"""
     result = seed(db)
     return result
 

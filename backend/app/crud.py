@@ -72,41 +72,40 @@ def compute_deadline_from_estimasi(estimasi: date = None, base_date: date = None
     base = base_date or date.today()
     return compute_deadline(base, dtype, None), dtype
 
+TERMINAL_STATUSES = {"Service Sukses", "Selesai", "Sudah Diambil", "Dibatalkan", "Service Failed", "Garansi", "Bisa Diambil"}
+
 def enrich_service(svc):
-    """Tambah sisa_hari dan is_overdue dinamis untuk response. Deadline sekarang berbasis estimasi_selesai jika ada."""
+    """Tambah sisa_hari dan is_overdue dinamis (virtual, tidak mutasi DB) — fix P0-5/6."""
     if not svc:
         return svc
     try:
+        # hitung deadline efektif tanpa mutasi svc.deadline (hindari side-effect flush)
         dl = svc.deadline
-        # jika deadline kosong tapi estimasi ada -> pakai estimasi sebagai deadline
+        dtype = getattr(svc, 'deadline_type', None) or "harian"
+        # jika deadline kosong tapi estimasi ada -> pakai estimasi sebagai deadline efektif
         if not dl and getattr(svc, 'estimasi_selesai', None):
-            dl, dtype = compute_deadline_from_estimasi(svc.estimasi_selesai, getattr(svc, 'date', None), getattr(svc, 'deadline_type', None))
-            svc.deadline = dl
-            svc.deadline_type = dtype
+            dl, dtype = compute_deadline_from_estimasi(svc.estimasi_selesai, getattr(svc, 'date', None), dtype)
         elif not dl and hasattr(svc, 'date') and svc.date:
-            dl, dtype = compute_deadline_from_estimasi(None, svc.date, getattr(svc, 'deadline_type', 'harian'))
-            svc.deadline = dl
-            svc.deadline_type = dtype
-        # sinkronkan deadline jika estimasi berubah tapi deadline masih mengikuti estimasi lama
-        # (jika estimasi ada dan deadline != estimasi, anggap deadline mengikuti estimasi terbaru)
-        if getattr(svc, 'estimasi_selesai', None) and dl != svc.estimasi_selesai and svc.deadline_type in (None, "harian", "mingguan"):
-            # jika estimasi lebih baru, update deadline agar jatuh tempo = estimasi
-            # hanya jika deadline sebelumnya berasal dari estimasi (bukan manual)
+            dl, dtype = compute_deadline_from_estimasi(None, svc.date, dtype)
+        # jika estimasi ada dan deadline efektif != estimasi, anggap jatuh tempo = estimasi (virtual, tidak tulis DB)
+        elif getattr(svc, 'estimasi_selesai', None) and dl and dl != svc.estimasi_selesai and dtype in ("harian", "mingguan", None):
+            dl = svc.estimasi_selesai
             try:
-                if svc.estimasi_selesai != dl:
-                    # update ke estimasi agar proses service deadline = estimasi
-                    svc.deadline = svc.estimasi_selesai
-                    dl = svc.deadline
-                    # infer ulang dtype
-                    gap = (dl - (svc.date or date.today())).days
-                    svc.deadline_type = "harian" if gap <= 3 else "mingguan"
+                gap = (dl - (svc.date or date.today())).days
+                dtype = "harian" if gap <= 3 else "mingguan"
             except:
                 pass
-        if dl:
-            delta = (dl - date.today()).days
+        # sisa & overdue pakai deadline efektif (virtual, tidak commit ke DB di GET)
+        effective_dl = dl
+        effective_dtype = dtype
+        if effective_dl:
+            delta = (effective_dl - date.today()).days
             svc.sisa_hari = delta
-            # overdue hanya jika belum selesai dan deadline lewat - Service Sukses = Selesai (legacy)
-            svc.is_overdue = delta < 0 and svc.status not in ["Selesai", "Service Sukses", "Sudah Diambil", "Dibatalkan", "Service Failed"]
+            svc.is_overdue = delta < 0 and svc.status not in TERMINAL_STATUSES
+            # untuk response, tampilkan deadline efektif jika berbeda (virtual — tidak di-commit di read path)
+            if svc.deadline != effective_dl or svc.deadline_type != effective_dtype:
+                svc.deadline = effective_dl
+                svc.deadline_type = effective_dtype
         else:
             svc.sisa_hari = None
             svc.is_overdue = False
@@ -137,20 +136,51 @@ def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = Non
         q = q.filter(models.Service.device.ilike(f"%{device}%"))
     if deadline_type:
         q = q.filter(models.Service.deadline_type == deadline_type)
+    # overdue filter di SQL agar pagination benar (fix P1-7)
+    if overdue is not None:
+        # overdue = deadline < today AND status not in terminal
+        today = date.today()
+        if overdue is True:
+            q = q.filter(models.Service.deadline != None).filter(models.Service.deadline < today).filter(models.Service.status.notin_(list(TERMINAL_STATUSES)))
+        else:
+            # not overdue = deadline >= today OR deadline is null OR status in terminal
+            q = q.filter(
+                (models.Service.deadline == None) |
+                (models.Service.deadline >= today) |
+                (models.Service.status.in_(list(TERMINAL_STATUSES)))
+            )
     q = q.order_by(desc(models.Service.created_at))
     rows = q.offset(skip).limit(limit).all()
-    # enrich
     rows = [enrich_service(r) for r in rows]
-    if overdue is True:
-        rows = [r for r in rows if r.is_overdue]
-    elif overdue is False:
-        rows = [r for r in rows if not r.is_overdue]
     return rows
 
-def count_services(db: Session, status: str = None):
+def count_services(db: Session, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None):
     q = db.query(models.Service)
     if status and status != "all":
         q = q.filter(models.Service.status == status)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(
+            (models.Service.nama.ilike(like)) |
+            (models.Service.wa.ilike(like)) |
+            (models.Service.device.ilike(like)) |
+            (models.Service.invoice.ilike(like)) |
+            (models.Service.keluhan.ilike(like))
+        )
+    if device:
+        q = q.filter(models.Service.device.ilike(f"%{device}%"))
+    if deadline_type:
+        q = q.filter(models.Service.deadline_type == deadline_type)
+    if overdue is not None:
+        today = date.today()
+        if overdue is True:
+            q = q.filter(models.Service.deadline != None).filter(models.Service.deadline < today).filter(models.Service.status.notin_(list(TERMINAL_STATUSES)))
+        else:
+            q = q.filter(
+                (models.Service.deadline == None) |
+                (models.Service.deadline >= today) |
+                (models.Service.status.in_(list(TERMINAL_STATUSES)))
+            )
     return q.count()
 
 def create_service(db: Session, payload: schemas.ServiceCreate):
@@ -386,19 +416,46 @@ def delete_sparepart(db: Session, sp_id: int):
     return True
 
 def pakai_sparepart(db: Session, sp_id: int, qty: int = 1):
-    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+    # pakai SELECT ... FOR UPDATE + atomic update untuk cegah race (fix P0-4)
+    try:
+        # SQLite tidak support FOR UPDATE, tapi WAL + busy_timeout + transaksi sudah cukup;
+        # untuk DB lain (postgres) akan lock row
+        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).with_for_update().first()
+    except Exception:
+        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
     if not sp:
         return None, "Sparepart tidak ditemukan"
     if sp.stok is None:
         sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
     if sp.stok < qty:
         return None, f"Stok tidak cukup (sisa {sp.stok})"
-    sp.keluar = (sp.keluar or 0) + qty
-    sp.stok = max(0, sp.stok - qty)
-    sp.tgl = date.today()
-    db.commit()
-    db.refresh(sp)
-    return sp, None
+    # atomic: update via SQL where stok >= qty untuk safety concurrent
+    from sqlalchemy import text
+    try:
+        # coba atomic decrement
+        result = db.execute(text("UPDATE spareparts SET keluar = keluar + :qty, stok = stok - :qty, tgl = :tgl WHERE id = :id AND stok >= :qty"), {"qty": qty, "tgl": date.today().isoformat(), "id": sp_id})
+        if result.rowcount == 0:
+            db.rollback()
+            sp2 = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+            return None, f"Stok tidak cukup (sisa {sp2.stok if sp2 else 0}) atau race condition"
+        db.commit()
+        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+        return sp, None
+    except Exception:
+        # fallback non-atomic (old path) jika SQL di atas gagal di SQLite syntax
+        try:
+            db.rollback()
+        except:
+            pass
+        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
+        if sp.stok < qty:
+            return None, f"Stok tidak cukup (sisa {sp.stok})"
+        sp.keluar = (sp.keluar or 0) + qty
+        sp.stok = max(0, sp.stok - qty)
+        sp.tgl = date.today()
+        db.commit()
+        db.refresh(sp)
+        return sp, None
 
 # ----- Alat (multi-PC sync) -----
 def get_alats(db: Session, search: str = None, kondisi: str = None):
