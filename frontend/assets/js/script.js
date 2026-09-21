@@ -1860,10 +1860,45 @@ function suggestSparepart(invoice){
     showToast(`💡 Suggest: ${candidates.length} sparepart untuk ${merk}/${kategori} (stok tipis)`);
   }
 }
+function showStokSparepart(invoice){
+  const dropdown=document.getElementById(`spare-dropdown-${invoice}`);
+  const input=document.getElementById(`spare-search-${invoice}`);
+  const hidden=document.getElementById(`spare-select-${invoice}`);
+  if(!dropdown) return;
+  // toggle jika sudah mode stok dan terbuka
+  if(dropdown.style.display==='block' && dropdown.dataset.mode==='stok'){
+    dropdown.style.display='none';
+    dropdown.dataset.mode='';
+    return;
+  }
+  if(!inventory.length){
+    dropdown.innerHTML=`<div style="padding:12px;text-align:center;color:#8a8f98;font-size:11px">Stok kosong — tambah di menu Sparepart</div>`;
+    dropdown.style.display='block';
+    dropdown.dataset.mode='stok';
+    return;
+  }
+  // list stok terurut: tersedia dulu, lalu habis
+  const sorted=[...inventory].sort((a,b)=> (b.stok - a.stok) || a.nama.localeCompare(b.nama));
+  let html=`<div style="padding:6px 10px;font-size:10px;font-weight:700;color:#0f172a;background:#f1f5f9;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center"><span>📦 Stok Sparepart (${inventory.length})</span><span style="font-weight:400;color:#64748b;cursor:pointer" onclick="document.getElementById('spare-dropdown-${escapeHtml(invoice)}').style.display='none'">✕ tutup</span></div>`;
+  html+=`<div data-value="none" onclick="selectSparepart('${escapeHtml(invoice)}','none','— Tidak Ada —')" style="padding:7px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid #f3f4f6;background:#f9fafb"><strong>— Tidak Ada —</strong> <span style="color:#6b7280">(tidak potong stok)</span></div>`;
+  html+= sorted.slice(0,30).map(it=>{
+    const merk=normalizeMerk(it.merk);
+    const stokTxt= it.stok<=0 ? 'HABIS' : `stok ${it.stok}`;
+    const bg= it.stok===0 ? '#fef2f2;color:#dc2626;border-color:#fecaca' : it.stok<=2 ? '#fffbeb;color:#b45309;border-color:#fde68a' : '#ecfdf5;color:#059669;border-color:#a7f3d0';
+    const dis= it.stok<=0 ? 'opacity:.6' : '';
+    const label=`${merk} ${it.nama}`;
+    return `<div data-value="${it.id}" onclick="selectSparepart('${escapeHtml(invoice)}','${it.id}','${escapeHtml(label)}')" style="padding:7px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;border-bottom:1px solid #f9fafb;${dis}"><div style="flex:1;min-width:0"><strong>${escapeHtml(merk)}</strong> ${escapeHtml(it.nama)}<br><span style="font-size:10px;color:#6b7280">${escapeHtml(it.kategori)} • Rp ${Number(it.harga).toLocaleString('id-ID')} • ${escapeHtml(it.tgl||'')}</span></div><span style="font-size:10px;padding:3px 7px;border-radius:20px;border:1px solid ${bg.split(';')[2]||'#a7f3d0'};background:${bg.split(';')[0]};color:${bg.split(';')[1].split(':')[1]};white-space:nowrap">${stokTxt}</span></div>`;
+  }).join('');
+  if(sorted.length>30) html+=`<div style="padding:6px;text-align:center;font-size:10px;color:#6b7280">+ ${sorted.length-30} lainnya — ketik di input untuk filter</div>`;
+  dropdown.innerHTML=html;
+  dropdown.style.display='block';
+  dropdown.dataset.mode='stok';
+  if(input) input.placeholder='Pilih dari stok di bawah...';
+}
 function renderUsedSpareparts(invoice){
   const arr=serviceSpareparts[invoice]||[];
   if(!arr.length) return '';
-  return `<div style="margin-top:6px;padding:6px 8px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;font-size:11px"><strong>🔧 Terpakai (${arr.length}):</strong> ${arr.map(u=>`${escapeHtml(u.merk)} ${escapeHtml(u.nama)} x${u.qty} oleh ${escapeHtml(u.teknisi)}`).join(', ')}</div>`;
+  return `<div style="margin-top:6px;padding:6px 8px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;font-size:11px;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;white-space:normal"><strong>🔧 Terpakai (${arr.length}):</strong> ${arr.map(u=>`${escapeHtml(u.merk)} ${escapeHtml(u.nama)} x${u.qty} oleh ${escapeHtml(u.teknisi)}`).join(', ')}</div>`;
 }
 async function pakaiSparepart(invoice){
   const sel=document.getElementById(`spare-select-${invoice}`);
@@ -2478,29 +2513,27 @@ function renderKanban(){
         <div><h4 style="margin:0">${escapeHtml(d.device)}</h4>${d.imei ? `<div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px;letter-spacing:0.3px">📱 IMEI: ${escapeHtml(d.imei)}</div>` : ''}<p style="font-size:11px;color:#6b7280;margin-top:3px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>
       </div>
-      <p>📝 ${escapeHtml(d.keluhan)} ${d.keterangan ? `<span style="font-size:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:2px 6px;border-radius:8px;margin-left:6px">📋 ada keterangan</span>` : ''}</p>
-      <div class="service-meta" style="margin-top:8px">
-        <span class="meta-pill" style="display:flex;align-items:center;gap:4px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" style="padding:4px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;min-width:130px;background:${d.teknisi==='Menunggu Teknisi'?'#fffbeb':'#fff'};color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'#374151'}">${teknisiOptionsHtml(d.teknisi)}</select> <span style="font-size:10px;color:#8a8f98">oper→</span></span>
-        <span class="meta-pill">📦 ${escapeHtml((d.kelengkapan||[]).join(', '))}</span>
-        ${deadlineBadge(d)}
-      </div>
-      <div style="margin-top:8px;padding:10px;background:#f9fafb;border:1px solid #ececec;border-radius:10px">
-        <div style="font-size:11px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><span>🔧 Sparepart Dipakai</span><span style="font-size:10px;color:#8a8f98">suggest → pilih → Pakai</span></div>
-        <div style="display:flex;gap:6px;align-items:flex-start">
-          <div style="position:relative;flex:1">
-            <input type="text" id="spare-search-${escapeHtml(d.id)}" placeholder="Pilih sparepart..." style="width:100%;padding:7px 8px;border:1px solid #ececec;border-radius:8px;font-size:11px" oninput="filterSparepartInput('${escapeHtml(d.id)}')" onfocus="showSparepartDropdown('${escapeHtml(d.id)}')" autocomplete="off">
-            <input type="hidden" id="spare-select-${escapeHtml(d.id)}" value="">
-            <div id="spare-dropdown-${escapeHtml(d.id)}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ececec;border-radius:8px;max-height:160px;overflow:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-top:4px"></div>
+      <p style="margin:2px 0 0;font-size:11px;line-height:1.35">📝 ${escapeHtml(d.keluhan)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
+       <div class="service-meta" style="margin-top:4px;gap:5px">
+         <span class="meta-pill" style="display:flex;align-items:center;gap:3px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" style="padding:3px 5px;border-radius:7px;border:1px solid #ececec;font-size:10px;font-weight:600;min-width:110px;background:${d.teknisi==='Menunggu Teknisi'?'#fffbeb':'#fff'};color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'#374151'}">${teknisiOptionsHtml(d.teknisi)}</select></span>
+         <span class="meta-pill">📦 ${escapeHtml((d.kelengkapan||[]).join(', '))}</span>
+         ${deadlineBadge(d)}
+       </div>
+        <div style="margin-top:5px;padding:7px 8px;background:#f9fafb;border:1px solid #ececec;border-radius:8px">
+          <div style="font-size:10px;font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px"><span>🔧 Sparepart</span><div style="display:flex;gap:4px;align-items:center"><button class="btn btn-ghost small" style="padding:4px 6px;font-size:9px;white-space:nowrap;background:#fff;border-color:#ececec" onclick="showStokSparepart('${escapeHtml(d.id)}')" title="Klik untuk lihat stok sparepart">📦 Stok</button><button class="btn btn-ghost small" style="padding:4px 6px;font-size:9px;white-space:nowrap" onclick="suggestSparepart('${escapeHtml(d.id)}')" title="Suggest sesuai merk & keluhan">💡 Suggest</button></div></div>
+          <div style="display:flex;gap:5px;align-items:flex-start">
+            <div style="position:relative;flex:1">
+              <input type="text" id="spare-search-${escapeHtml(d.id)}" placeholder="Ketik nama part / merk... klik 📦 untuk lihat stok" style="width:100%;padding:5px 7px;border:1px solid #ececec;border-radius:7px;font-size:10px" oninput="filterSparepartInput('${escapeHtml(d.id)}')" onfocus="showSparepartDropdown('${escapeHtml(d.id)}')" autocomplete="off">
+              <input type="hidden" id="spare-select-${escapeHtml(d.id)}" value="">
+              <div id="spare-dropdown-${escapeHtml(d.id)}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ececec;border-radius:7px;max-height:160px;overflow:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-top:3px"></div>
+            </div>
+            <input type="number" id="spare-qty-${escapeHtml(d.id)}" value="1" min="1" style="width:48px;padding:5px 6px;border:1px solid #ececec;border-radius:7px;font-size:10px;text-align:center" title="Qty">
+            <button class="btn btn-dark small" style="padding:5px 8px;font-size:10px;white-space:nowrap" onclick="pakaiSparepart('${escapeHtml(d.id)}')">Pakai</button>
           </div>
-          <button class="btn btn-ghost small" style="padding:7px 10px;font-size:11px;white-space:nowrap" onclick="suggestSparepart('${escapeHtml(d.id)}')" title="Suggest sesuai merk & keluhan">💡</button>
-          <input type="number" id="spare-qty-${escapeHtml(d.id)}" value="1" min="1" style="width:60px;padding:7px 8px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:center" title="Qty">
-          <button class="btn btn-dark small" style="padding:7px 10px;font-size:11px;white-space:nowrap" onclick="pakaiSparepart('${escapeHtml(d.id)}')">Pakai</button>
-        </div>
-        ${renderUsedSpareparts(d.id)}
-        ${(()=>{ const s=inventory.find(x=>x.stok<=2 && x.stok>0); return s? `<div style="font-size:10px;color:#dc2626;margin-top:4px">⚠ Stok tipis: ${escapeHtml(s.merk)} ${escapeHtml(s.nama)} sisa ${s.stok}</div>` : inventory.find(x=>x.stok===0)? `<div style="font-size:10px;color:#dc2626;margin-top:4px">⚠ Ada sparepart habis — cek Sparepart</div>` : ''; })()}
-      </div>
-      <div class="card-actions">
-        <select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px">
+         ${renderUsedSpareparts(d.id)}
+       </div>
+       <div class="card-actions" style="margin-top:2px">
+         <select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px">
           <option disabled selected>Ubah status</option>
           ${opts}
         </select>
@@ -3247,6 +3280,6 @@ window.renderHitsIndicators=renderHitsIndicators; window.getBrandFromDevice=getB
 window.loadProfil=loadProfil; window.handleProfilUpdate=handleProfilUpdate; window.renderLaporanTeknisi=renderLaporanTeknisi; window.avatarUrlFor=avatarUrlFor;
 window.loadInventory=loadInventory; window.saveInventory=saveInventory; window.renderSparepart=renderSparepart; window.updateSparepartField=updateSparepartField; window.saveSparepartRow=saveSparepartRow; window.deleteSparepart=deleteSparepart; window.handleSparepartAdd=handleSparepartAdd; window.openSpEditModal=openSpEditModal; window.closeSpEditModal=closeSpEditModal; window.submitSpEdit=submitSpEdit; window.resetSparepartDummy=resetSparepartDummy;
 window.loadAlat=loadAlat; window.saveAlat=saveAlat; window.renderAlat=renderAlat; window.updateAlatField=updateAlatField; window.saveAlatRow=saveAlatRow; window.deleteAlat=deleteAlat; window.openAlatAddModal=openAlatAddModal; window.openAlatEditModal=openAlatEditModal; window.closeAlatModal=closeAlatModal; window.submitAlatEdit=submitAlatEdit; window.resetAlatDummy=resetAlatDummy; window.kondisiBadge=kondisiBadge;
-window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.openSparepartLog=openSparepartLog; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;
+window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.showStokSparepart=showStokSparepart; window.openSparepartLog=openSparepartLog; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;
 window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoPendapatan=statGoPendapatan; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan; window.statGoMenungguKonfirmasi=statGoMenungguKonfirmasi;
 window.formatRupiah=formatRupiah; window.formatAngka=formatAngka; window.parseRupiah=parseRupiah; window.attachRupiahLive=attachRupiahLive;
