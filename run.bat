@@ -62,29 +62,17 @@ if not exist "%BACKEND%\requirements.txt" (
   exit /b 1
 )
 
-:: ---------- 3. Dependencies (fast check, tanpa upgrade pip tiap run) ----------
+:: ---------- 3. Dependencies (FAST - skip pip auto install biar tidak lama) ----------
 echo [INFO] Cek dependencies fastapi+uvicorn ...
 "%PYTHON_EXE%" -c "import fastapi, uvicorn" >nul 2>nul
 if errorlevel 1 (
-  echo [WARN] fastapi/uvicorn belum terimport — coba install butuh internet...
-  echo        Jika gagal, akan tetap coba jalan, cek manual: %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt
-  "%PYTHON_EXE%" -m pip install -r "%BACKEND%\requirements.txt" --quiet
-  if errorlevel 1 (
-    echo [WARN] pip install gagal — cek internet / proxy. Coba manual:
-    echo        %PYTHON_EXE% -m pip install -r %BACKEND%\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
-    echo        Atau jika sudah pernah install, lanjut coba jalan...
-  )
-  "%PYTHON_EXE%" -c "import fastapi, uvicorn" >nul 2>nul
-  if errorlevel 1 (
-    echo [ERROR] fastapi/uvicorn masih belum bisa diimport setelah install.
-    echo        Coba manual: %PYTHON_EXE% -m pip install fastapi uvicorn sqlalchemy pydantic python-multipart passlib bcrypt python-jose httpx
-    pause
-    exit /b 1
-  ) else (
-    echo [INFO] Dependencies OK setelah install.
-  )
+  echo [ERROR] fastapi/uvicorn belum terinstall.
+  echo         Jalankan manual: %PYTHON_EXE% -m pip install -r backend\requirements.txt
+  echo         Atau task VSCode: FastAPI Install deps
+  pause
+  exit /b 1
 ) else (
-  echo [INFO] Dependencies OK.
+  echo [INFO] Dependencies OK - skip pip install.
 )
 
 :: ---------- 4. Cek port ----------
@@ -93,9 +81,9 @@ netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>nul
 if not errorlevel 1 (
   set "PORT_BUSY=1"
   echo [WARN] Port %PORT% sudah LISTENING ^(server mungkin sudah jalan^).
-  echo        Cek: http://localhost:%PORT%/health
-  echo        -> Browser akan tetap dibuka, backend tidak di-start ulang untuk hindari Address already in use.
-  echo(
+  echo        Cek: http://127.0.0.1:%PORT%/health
+  echo        -^> Browser akan tetap dibuka, backend tidak di-start ulang untuk hindari Address already in use.
+  echo.
 )
 
 :: ---------- 5. Cari cloudflared ----------
@@ -153,46 +141,45 @@ goto TUNNEL_DONE
 :TUNNEL_QUICK
 echo [INFO] Menjalankan Quick Tunnel - trycloudflare.com - di window baru...
 echo        URL akan muncul di window tunnel, tunggu 5-10 detik.
-start "B_gadget Tunnel - QUICK" "%CLOUDFLARED_EXE%" tunnel --url http://localhost:%PORT%
-echo [INFO] Lokal tetap: http://localhost:%PORT%%LOGIN_PATH%
+start "B_gadget Tunnel - QUICK" "%CLOUDFLARED_EXE%" tunnel --url http://127.0.0.1:%PORT%
+echo [INFO] Lokal tetap: http://127.0.0.1:%PORT%%LOGIN_PATH%
 timeout /t 1 >nul
 goto TUNNEL_DONE
 
 :TUNNEL_NONE
-echo [INFO] Tunnel dilewati. Akses lokal: http://localhost:%PORT%%LOGIN_PATH%
+echo [INFO] Tunnel dilewati. Akses lokal: http://127.0.0.1:%PORT%%LOGIN_PATH%
 
 :TUNNEL_DONE
 echo.
 
 :: ---------- 8. Auto-buka browser (tunggu backend siap) ----------
-echo [INFO] Menjalankan backend di http://localhost:%PORT%
-echo        Docs  : http://localhost:%PORT%/docs
-echo        Health: http://localhost:%PORT%/health
+echo [INFO] Menjalankan backend di http://127.0.0.1:%PORT%
+echo        Docs  : http://127.0.0.1:%PORT%/docs
+echo        Health: http://127.0.0.1:%PORT%/health
 if "%MODE%"=="named" echo        Publik: https://service.reneepsl.my.id%LOGIN_PATH%
 echo.
 echo [TIPS] Biarkan window ini + window Tunnel terbuka. Ctrl+C untuk stop.
+echo       Jika localhost tidak bisa, pakai 127.0.0.1 - normal IPv6 Windows
 echo.
 
-:: ---------- 8b. Buka browser FAST (poll 0.2s, max 6 detik, tidak blok backend) ----------
+:: ---------- 8b. Buka browser FAST (poll 0.3s x 40 = 12 detik, tidak blok backend) ----------
 if "%PORT_BUSY%"=="1" goto BROWSER_BUSY
-
-:: Port belum busy -> backend akan start di bawah (blocking). Buka browser via background poll cepat
-echo [INFO] Browser akan dibuka otomatis (fast poll ~3 detik, buka begitu health 200)...
+echo [INFO] Browser akan dibuka otomatis (poll 0.3s x 40 = 12 detik, buka begitu health 200)...
 if "%MODE%"=="named" goto BROWSER_NAMED_FAST
 goto BROWSER_QUICK_FAST
 
 :BROWSER_NAMED_FAST
-start "" powershell -NoProfile -Command "$t=0; while($t -lt 20){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 200; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; Start-Process 'https://service.reneepsl.my.id%LOGIN_PATH%'"
+start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\open-browser.ps1" -Port %PORT% -LoginPath "%LOGIN_PATH%" -Mode named
 goto BROWSER_DONE
 
 :BROWSER_QUICK_FAST
-start "" powershell -NoProfile -Command "$t=0; while($t -lt 20){ try{ $r=Invoke-WebRequest -Uri 'http://localhost:%PORT%/health' -TimeoutSec 1 -UseBasicParsing; if($r.StatusCode -eq 200){ Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'; exit 0 } }catch{}; Start-Sleep -Milliseconds 200; $t++; } Start-Process 'http://localhost:%PORT%%LOGIN_PATH%'"
+start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\open-browser.ps1" -Port %PORT% -LoginPath "%LOGIN_PATH%" -Mode quick
 goto BROWSER_DONE
 
 :BROWSER_BUSY
 echo [INFO] Port %PORT% sudah LISTENING - buka browser cepat (tanpa tunggu lama)...
-start "" "http://localhost:%PORT%%LOGIN_PATH%"
-echo [INFO] Browser lokal dibuka: http://localhost:%PORT%%LOGIN_PATH%
+start "" "http://127.0.0.1:%PORT%%LOGIN_PATH%"
+echo [INFO] Browser lokal dibuka: http://127.0.0.1:%PORT%%LOGIN_PATH%
 if "%MODE%"=="named" (
   start "" "https://service.reneepsl.my.id%LOGIN_PATH%"
   echo [INFO] Browser publik dibuka: https://service.reneepsl.my.id%LOGIN_PATH%
@@ -202,17 +189,18 @@ goto BROWSER_DONE
 :BROWSER_DONE
 
 :: ---------- 9. Jalankan backend (blocking) ----------
-if "%PORT_BUSY%"=="1" (
-  echo.
-  echo [INFO] Backend sudah berjalan di port %PORT% - tidak start ulang.
-  echo        Untuk restart: tutup window backend lama lalu jalankan run.bat lagi.
-  echo        Membuka health check...
-  curl.exe -s http://localhost:%PORT%/health 2>nul || powershell -Command "try{ (Invoke-WebRequest http://localhost:%PORT%/health -UseBasicParsing).Content }catch{ 'health fetch gagal' }"
-  echo.
-  echo [INFO] Tekan tombol apa saja untuk tutup window ini (tunnel tetap jalan).
-  pause
-  exit /b 0
-)
+if not "%PORT_BUSY%"=="1" goto SKIP_BUSY_CHECK
+echo.
+echo [INFO] Backend sudah berjalan di port %PORT% - tidak start ulang.
+echo        Untuk restart: tutup window backend lama lalu jalankan run.bat lagi.
+echo        Membuka health check...
+curl.exe -s http://127.0.0.1:%PORT%/health
+if errorlevel 1 powershell -NoProfile -Command "Invoke-WebRequest http://127.0.0.1:%PORT%/health -UseBasicParsing -TimeoutSec 2"
+echo.
+echo [INFO] Tekan tombol apa saja untuk tutup window ini (tunnel tetap jalan).
+pause
+exit /b 0
+:SKIP_BUSY_CHECK
 cd /d "%BACKEND%"
 :: Host 127.0.0.1 lebih cepat untuk localhost (hindari 0.0.0.0 scan firewall); tunnel tetap bisa via 127.0.0.1:8000
 :: --reload hanya untuk dev, tanpa reload lebih cepat 1-2 detik. Gunakan ENV=production untuk tanpa reload.

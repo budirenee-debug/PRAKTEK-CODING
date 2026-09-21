@@ -5,9 +5,9 @@ const API_BASE = (() => {
   if (stored) return stored;
   const proto = location.protocol;
   const host = location.hostname;
-  // file:// -> fallback ke localhost:8000 (dev lokal)
-  if (proto === 'file:') return 'http://localhost:8000/api';
-  if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000/api';
+  // file:// -> fallback ke 127.0.0.1:8000 IPv4 only (fix IPv6)
+  if (proto === 'file:') return 'http://127.0.0.1:8000/api';
+  if (host === 'localhost' || host === '127.0.0.1') return 'http://127.0.0.1:8000/api';
   return location.origin + '/api'; // service.reneepsl.my.id via tunnel
 })();
 let USE_API = true; // coba API dulu, fallback ke localStorage jika gagal

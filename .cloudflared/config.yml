@@ -19,19 +19,19 @@ ingress:
   # Domain utama -> Backend FastAPI (port 8000) sudah mount /frontend & /assets
   # Backend run: uvicorn app.main:app --host 0.0.0.0 --port 8000  (backend/run.py & run.bat:75)
   - hostname: service.reneepsl.my.id
-    service: http://localhost:8000
+    service: http://127.0.0.1:8000
     originRequest:
       noTLSVerify: true
       httpHostHeader: service.reneepsl.my.id
 
   - hostname: reneepsl.my.id
-    service: http://localhost:8000
+    service: http://127.0.0.1:8000
     originRequest:
       noTLSVerify: true
       httpHostHeader: reneepsl.my.id
 
   - hostname: www.reneepsl.my.id
-    service: http://localhost:8000
+    service: http://127.0.0.1:8000
     originRequest:
       noTLSVerify: true
       httpHostHeader: www.reneepsl.my.id
