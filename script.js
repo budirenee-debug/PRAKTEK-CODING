@@ -2510,7 +2510,7 @@ function renderKanban(){
   wrap.innerHTML = filtered.map(d=>`
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}">
       <div class="service-card-head">
-        <div><h4 style="margin:0">${escapeHtml(d.device)}</h4>${d.imei ? `<div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px;letter-spacing:0.3px">📱 IMEI: ${escapeHtml(d.imei)}</div>` : ''}<p style="font-size:11px;color:#6b7280;margin-top:3px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
+        <div><h4 style="margin:0">${escapeHtml(d.device)}</h4><div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px;letter-spacing:0.3px" title="${escapeHtml(d.imei||'')}">📱 IMEI: ${escapeHtml(d.imei||'—')} <span style="color:#94a3b8;font-size:10px">${escapeHtml(d.imei ? d.imei.slice(-4) : '----')}</span></div><p style="font-size:11px;color:#6b7280;margin-top:3px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>
       </div>
       <p style="margin:2px 0 0;font-size:11px;line-height:1.35">📝 ${escapeHtml(d.keluhan)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
@@ -2572,7 +2572,7 @@ function renderMenungguTeknisiBlock(){
     }).join('');
     return `<div style="background:#fff;border:1px solid #fde68a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong>${d.imei ? `<div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px">📱 IMEI: ${escapeHtml(d.imei)}</div>` : ''}<span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
+        <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong><div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px" title="${escapeHtml(d.imei||'')}">📱 IMEI: ${escapeHtml(d.imei||'—')} <span style="color:#94a3b8;font-size:10px">${escapeHtml(d.imei?d.imei.slice(-4):'----')}</span></div><span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}" style="font-size:10px">${escapeHtml(displayStatus(d.status))}</span>
       </div>
       <div style="font-size:11px;color:#374151">📝 ${escapeHtml(d.keluhan)}</div>
@@ -2741,7 +2741,7 @@ function renderStatusView(targetId, statusName){
   ).map(s=>`<option>${s}</option>`).join('');
   wrap.innerHTML = filtered.map(d=>`
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':''}">
-      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0">${d.imei ? `<span style="font-weight:400;font-size:11px;color:#64748b;letter-spacing:0.3px">📱 ${escapeHtml(d.imei)} •</span>` : ''}${escapeHtml(d.device)}</h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
+      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-weight:600;font-size:11px;color:#334155;letter-spacing:0.3px;border-left:3px solid #e2e8f0;padding-left:6px" title="${escapeHtml(d.imei||'')}">📱 ${escapeHtml(d.imei ? d.imei.slice(-4) : '----')} •</span>${escapeHtml(d.device)}</h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
       <p>📝 ${escapeHtml(d.keluhan)}</p>
       <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span><span class="meta-pill" style="display:flex;align-items:center;gap:6px">💰 <input type="text" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" id="biaya-${escapeHtml(d.id)}-${targetId}" style="width:110px;padding:4px 6px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateBiaya('${escapeHtml(d.id)}', this.value)"> <button class="btn btn-dark small" style="padding:4px 6px;font-size:10px" onclick="updateBiaya('${escapeHtml(d.id)}', document.getElementById('biaya-${escapeHtml(d.id)}-${targetId}').value)">Simpan</button></span>${deadlineBadge(d)}</div>
       <div class="card-actions">${targetId==='kanbanSudahDiambil' ? `` : `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${opts}</select>`}<button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></div>
