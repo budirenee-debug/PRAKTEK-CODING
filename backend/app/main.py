@@ -107,6 +107,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    # HTML jangan di-cache browser/CDN (menu/tampilan selalu fresh tiap deploy).
+    # Aset .js/.css sudah cache-busting via ?v= di index.html.
+    resp = await call_next(request)
+    try:
+        if "text/html" in resp.headers.get("content-type", ""):
+            resp.headers["Cache-Control"] = "no-store, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+    except Exception:
+        pass
+    return resp
+
 # Routers / Root API
 app.include_router(auth.router, prefix="/api")
 app.include_router(services.router, prefix="/api")
