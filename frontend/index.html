@@ -143,8 +143,9 @@
                     <div id="realtimeClock" style="font-size:11px;color:#4b5563;background:#fff;border:1px solid #ececec;padding:7px 10px;border-radius:10px;white-space:nowrap;font-weight:600">—</div>
                     <div class="search-box">
                         <span>⌕</span>
-                        <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, invoice...">
+                        <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, IMEI, invoice...">
                     </div>
+                    <button class="btn btn-ghost small" onclick="clearCacheAndReload()" title="Clear cache & hard reload" style="padding:7px 10px;font-size:11px;background:#fef2f2;border-color:#fecaca;color:#991b1b">🔄 Clear Cache</button>
                     <button class="btn btn-dark" id="btnServiceBaru" onclick="switchView('service-masuk')" style="display:none">+ Service Baru</button>
                     <button class="notif" id="notifBell" onclick="handleNotifClick()" title="Notifikasi persetujuan akun">◐<span class="dot" id="notifDot"></span><span class="notif-count" id="notifCount">0</span></button>
                 </div>
@@ -264,7 +265,7 @@
                                 <div class="field"><label>Nama Pelanggan *</label><input id="f-nama" required placeholder="Contoh: Renee Budiman"></div>
                                 <div class="field"><label>No. WhatsApp *</label><input id="f-wa" required placeholder="08xxxxxxxxxx"></div>
                                 <div class="field"><label>Tipe HP / Device *</label><input id="f-device" required placeholder="iPhone 11 / Samsung A54"></div>
-                                <div class="field"><label>IMEI / Serial (opsional)</label><input id="f-imei" placeholder="35xxxxxxxxxxxx"></div>
+                                <div class="field"><label>IMEI / Serial (opsional)</label><input id="f-imei" placeholder="8899 / 35xxxxxxxxxxxx" minlength="4" maxlength="30"><span style="font-size:10px;color:#8a8f98">Minimal 4 digit — akan muncul di setiap kartu seperti tipe HP</span></div>
                                 <div class="field full"><label>Keluhan / Kerusakan *</label><textarea id="f-keluhan" required placeholder="Deskripsi keluhan: mati total, LCD pecah, baterai drop..."></textarea></div>
                                 <div class="field"><label>Kelengkapan</label>
                                     <div class="chips" id="chips">
@@ -740,6 +741,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=20260918-fix-menu"></script>
+    <script src="assets/js/script.js?v=imei-final"></script>
 </body>
 </html>

@@ -56,6 +56,8 @@ class Service(Base):
     deadline_type = Column(String(20), default="harian")  # harian / mingguan (auto dari estimasi)
     deadline = Column(Date, nullable=True)  # tanggal deadline (auto = estimasi_selesai atau today+3/7)
     penerima = Column(String(100), nullable=True)  # penerima di Service Masuk (anggota terdaftar)
+    hasil = Column(String(10), nullable=True)  # JADI / TIDAK - untuk Bisa Diambil (apakah HP jadi diperbaiki)
+    keterangan = Column(Text, nullable=True)  # keterangan pengerjaan di Proses Service
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

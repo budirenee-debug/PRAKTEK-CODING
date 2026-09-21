@@ -58,10 +58,22 @@ class ServiceBase(BaseModel):
     biaya: int = Field(default=0, ge=0)
     teknisi: Optional[str] = Field(None, max_length=100)
     penerima: Optional[str] = Field(None, max_length=100)  # penerima di Service Masuk (anggota terdaftar)
+    hasil: Optional[str] = Field(None, max_length=10, description="JADI / TIDAK untuk Bisa Diambil")
+    keterangan: Optional[str] = Field(None, max_length=1000, description="Keterangan pengerjaan di Proses Service")
     status: Optional[str] = Field(default="Antri")
     estimasi_selesai: Optional[datetime.date] = None
     deadline_type: Optional[str] = Field(default=None)  # harian=3 hari, mingguan=7 hari — auto dari estimasi_selesai jika kosong
     deadline: Optional[datetime.date] = None  # auto hitung dari estimasi_selesai jika kosong
+
+    @field_validator('hasil')
+    @classmethod
+    def validate_hasil(cls, v):
+        if v is None or v == "":
+            return None
+        up = v.upper().strip()
+        if up not in ["JADI", "TIDAK"]:
+            raise ValueError('hasil harus JADI atau TIDAK')
+        return up
 
     @field_validator('status')
     @classmethod
@@ -99,10 +111,22 @@ class ServiceUpdate(BaseModel):
     biaya: Optional[int] = Field(None, ge=0)
     teknisi: Optional[str] = None
     penerima: Optional[str] = None
+    hasil: Optional[str] = Field(None, max_length=10)
+    keterangan: Optional[str] = Field(None, max_length=1000)
     status: Optional[str] = None
     estimasi_selesai: Optional[datetime.date] = None
     deadline_type: Optional[str] = None
     deadline: Optional[datetime.date] = None
+
+    @field_validator('hasil')
+    @classmethod
+    def validate_hasil(cls, v):
+        if v is None or v == "":
+            return None
+        up = v.upper().strip()
+        if up not in ["JADI", "TIDAK"]:
+            raise ValueError('hasil harus JADI atau TIDAK')
+        return up
 
     @field_validator('status')
     @classmethod
@@ -138,6 +162,8 @@ class ServiceOut(BaseModel):
     biaya: int
     teknisi: Optional[str] = None
     penerima: Optional[str] = None
+    hasil: Optional[str] = None
+    keterangan: Optional[str] = None
     status: str
     date: Optional[datetime.date] = None
     estimasi_selesai: Optional[datetime.date] = None

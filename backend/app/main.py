@@ -20,7 +20,7 @@ from .auth import ensure_superadmin
 
 # Create tables
 Base.metadata.create_all(bind=engine)
-# Migration: tambah kolom deadline & penerima jika DB lama belum ada
+# Migration: tambah kolom deadline & penerima & hasil jika DB lama belum ada
 def _migrate_deadline():
     try:
         from sqlalchemy import text
@@ -36,6 +36,12 @@ def _migrate_deadline():
             if "penerima" not in cols:
                 conn.execute(text("ALTER TABLE services ADD COLUMN penerima VARCHAR(100)"))
                 print("migrated: penerima")
+            if "hasil" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN hasil VARCHAR(10)"))
+                print("migrated: hasil JADI/TIDAK")
+            if "keterangan" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN keterangan TEXT"))
+                print("migrated: keterangan")
             conn.commit()
             # isi deadline kosong untuk data lama: prioritaskan estimasi_selesai jika ada, else today+3/7
             rows = conn.execute(text("SELECT invoice, date, estimasi_selesai, deadline_type, deadline FROM services WHERE deadline IS NULL")).fetchall()
@@ -169,7 +175,8 @@ def global_search(q: str, db: Session = Depends(get_db)):
             models.Service.wa.ilike(like),
             models.Service.device.ilike(like),
             models.Service.invoice.ilike(like),
-            models.Service.keluhan.ilike(like)
+            models.Service.keluhan.ilike(like),
+            models.Service.imei.ilike(like)
         )
     ).limit(20).all()
     return data

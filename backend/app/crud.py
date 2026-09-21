@@ -130,7 +130,8 @@ def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = Non
             (models.Service.wa.ilike(like)) |
             (models.Service.device.ilike(like)) |
             (models.Service.invoice.ilike(like)) |
-            (models.Service.keluhan.ilike(like))
+            (models.Service.keluhan.ilike(like)) |
+            (models.Service.imei.ilike(like))
         )
     if device:
         q = q.filter(models.Service.device.ilike(f"%{device}%"))
@@ -165,7 +166,8 @@ def count_services(db: Session, status: str = None, search: str = None, device: 
             (models.Service.wa.ilike(like)) |
             (models.Service.device.ilike(like)) |
             (models.Service.invoice.ilike(like)) |
-            (models.Service.keluhan.ilike(like))
+            (models.Service.keluhan.ilike(like)) |
+            (models.Service.imei.ilike(like))
         )
     if device:
         q = q.filter(models.Service.device.ilike(f"%{device}%"))

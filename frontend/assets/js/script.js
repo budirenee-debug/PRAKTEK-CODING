@@ -282,7 +282,10 @@ function normalize(item){
     nama: item.nama,
     wa: item.wa,
     device: item.device,
+    imei: item.imei || null,
     keluhan: item.keluhan,
+    keterangan: item.keterangan || null,
+    hasil: item.hasil || null,
     teknisi: item.teknisi || item.technician || '-',
     penerima: item.penerima || '-',
     biaya: item.biaya || 0,
@@ -1056,6 +1059,25 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       renderStatusView('kanbanSudahDiambil','Sudah Diambil');
       return;
     }
+    if(activeView==='view-proses'){
+      pelangganFilter = q;
+      renderKanban();
+      return;
+    }
+    if(activeView==='view-semua-service'){
+      const ss=document.getElementById('searchSemua');
+      if(ss) ss.value=q;
+      renderSemuaService();
+      return;
+    }
+    if(activeView==='view-pelanggan'){
+      pelangganFilter = q;
+      const sp=document.getElementById('searchPelanggan');
+      if(sp) sp.value=q;
+      if(USE_API){ loadData().then(renderPelanggan); } else renderPelanggan();
+      return;
+    }
+    // fallback untuk view lain tetap ke pelanggan
     pelangganFilter = q;
     statusFilter = 'all';
     switchView('pelanggan');
@@ -2317,6 +2339,123 @@ async function updateBiaya(invoice, newBiaya){
     showToast('Gagal update biaya: '+e.message);
   }
 }
+async function editKeluhan(invoice){
+  const item = data.find(d=>d.id===invoice);
+  if(!item) return;
+  const cur = item.keluhan||'';
+  const baru = prompt('Edit keluhan/kerusakan:', cur);
+  if(baru===null) return;
+  const keluhan = baru.trim();
+  if(!keluhan) return showToast('Keluhan tidak boleh kosong');
+  if(keluhan.length<5) return showToast('Keluhan minimal 5 karakter');
+  const old = item.keluhan;
+  item.keluhan = keluhan;
+  renderKanban(); renderSemuaService();
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({keluhan})});
+      await loadData();
+    } else { saveLocal(); }
+    renderKanban(); renderSemuaService();
+    showToast(`📝 ${invoice} keluhan diperbarui`);
+  }catch(e){
+    item.keluhan = old;
+    renderKanban(); renderSemuaService();
+    showToast('Gagal update keluhan: '+e.message);
+  }
+}
+async function updateHasil(invoice, hasil){
+  const item = data.find(d=>d.id===invoice);
+  if(!item) return;
+  const old = item.hasil||'';
+  if(hasil===old) return;
+  item.hasil = hasil||null;
+  renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({hasil: hasil||null})});
+      await loadData();
+    } else { saveLocal(); }
+    renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+    showToast(hasil?`✅ ${invoice} → ${hasil}`:`↩ ${invoice} hasil dihapus`);
+  }catch(e){
+    item.hasil = old;
+    renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+    showToast('Gagal update hasil: '+e.message);
+  }
+}
+async function saveKeterangan(invoice){
+  const el=document.getElementById(`keterangan-${invoice}`);
+  if(!el) return;
+  const keterangan=el.value.trim();
+  const item=data.find(d=>d.id===invoice);
+  if(!item) return;
+  const old=item.keterangan||'';
+  if(keterangan===old) return showToast('Tidak ada perubahan');
+  item.keterangan=keterangan;
+  renderKanban();
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({keterangan})});
+      await loadData();
+    } else { saveLocal(); }
+    renderKanban();
+    showToast(`📋 ${invoice} keterangan disimpan`);
+  }catch(e){
+    item.keterangan=old;
+    renderKanban();
+    showToast('Gagal simpan keterangan: '+e.message);
+  }
+}
+async function saveImei(invoice){
+  const el=document.getElementById(`imei-${invoice}`);
+  if(!el) return;
+  const imei=el.value.trim();
+  const item=data.find(d=>d.id===invoice);
+  if(!item) return;
+  const old=item.imei||'';
+  if(imei===old) return showToast('Tidak ada perubahan IMEI');
+  if(imei && imei.length<4) return showToast('IMEI minimal 4 karakter');
+  item.imei=imei;
+  renderKanban();
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({imei})});
+      await loadData();
+    } else { saveLocal(); }
+    renderKanban();
+    showToast(`📱 ${invoice} IMEI disimpan`);
+  }catch(e){
+    item.imei=old;
+    renderKanban();
+    showToast('Gagal simpan IMEI: '+e.message);
+  }
+}
+async function saveHargaProses(invoice){
+  const el=document.getElementById(`harga-proses-${invoice}`);
+  if(!el) return;
+  const n=parseRupiah(el.value);
+  if(n<0) return showToast('Harga tidak valid');
+  const item=data.find(d=>d.id===invoice);
+  if(!item) return;
+  const old=item.biaya;
+  if(n===old) return showToast('Tidak ada perubahan harga');
+  item.biaya=n;
+  renderKanban();
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({biaya:n})});
+      await loadData();
+    } else { saveLocal(); }
+    renderKanban();
+    renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+    showToast(`💰 ${invoice} harga → ${formatRupiah(n)}`);
+  }catch(e){
+    item.biaya=old;
+    renderKanban();
+    showToast('Gagal update harga: '+e.message);
+  }
+}
 function renderKanban(){
   const wrap=document.getElementById('kanban');
   if(!wrap) return;
@@ -2329,20 +2468,19 @@ function renderKanban(){
   let filtered = data.filter(d=> PROSES_STATUSES.includes(d.status));
   if(statusFilter!=='all') filtered=filtered.filter(d=>d.status===statusFilter);
   if(pelangganFilter){
-     filtered=filtered.filter(d=> (d.nama+d.device+d.keluhan).toLowerCase().includes(pelangganFilter));
-  }
-  filtered = filtered.filter(passesDeadlineFilter);
-  const opts = statusOptions().map(s=>`<option>${s}</option>`).join('');
+      filtered=filtered.filter(d=> (d.nama+d.device+d.keluhan+(d.imei||'')+(d.wa||'')).toLowerCase().includes(pelangganFilter));
+   }
+   filtered = filtered.filter(passesDeadlineFilter);
+   const opts = statusOptions().map(s=>`<option>${s}</option>`).join('');
   wrap.innerHTML = filtered.map(d=>`
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}">
       <div class="service-card-head">
-        <div><h4>${escapeHtml(d.device)}</h4><p>${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
+        <div><h4 style="margin:0">${escapeHtml(d.device)}</h4>${d.imei ? `<div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px;letter-spacing:0.3px">📱 IMEI: ${escapeHtml(d.imei)}</div>` : ''}<p style="font-size:11px;color:#6b7280;margin-top:3px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>
       </div>
-      <p>📝 ${escapeHtml(d.keluhan)}</p>
-      <div class="service-meta">
+      <p>📝 ${escapeHtml(d.keluhan)} ${d.keterangan ? `<span style="font-size:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:2px 6px;border-radius:8px;margin-left:6px">📋 ada keterangan</span>` : ''}</p>
+      <div class="service-meta" style="margin-top:8px">
         <span class="meta-pill" style="display:flex;align-items:center;gap:4px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" style="padding:4px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;min-width:130px;background:${d.teknisi==='Menunggu Teknisi'?'#fffbeb':'#fff'};color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'#374151'}">${teknisiOptionsHtml(d.teknisi)}</select> <span style="font-size:10px;color:#8a8f98">oper→</span></span>
-        <span class="meta-pill">💰 Rp ${Number(d.biaya).toLocaleString('id-ID')}</span>
         <span class="meta-pill">📦 ${escapeHtml((d.kelengkapan||[]).join(', '))}</span>
         ${deadlineBadge(d)}
       </div>
@@ -2401,7 +2539,7 @@ function renderMenungguTeknisiBlock(){
     }).join('');
     return `<div style="background:#fff;border:1px solid #fde68a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong><br><span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
+        <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong>${d.imei ? `<div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px">📱 IMEI: ${escapeHtml(d.imei)}</div>` : ''}<span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}" style="font-size:10px">${escapeHtml(displayStatus(d.status))}</span>
       </div>
       <div style="font-size:11px;color:#374151">📝 ${escapeHtml(d.keluhan)}</div>
@@ -2424,7 +2562,7 @@ function renderSemuaService(){
   // normalisasi filter legacy Selesai -> Service Sukses
   const f = fRaw==='Selesai' ? 'Service Sukses' : fRaw;
   let filtered=[...data];
-  if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.keluhan+d.penerima).toLowerCase().includes(q));
+  if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.keluhan+d.penerima+(d.imei||'')).toLowerCase().includes(q));
   if(f) {
     // Service Sukses harus match Selesai legacy juga
     if(f==='Service Sukses') filtered=filtered.filter(d=> d.status==='Service Sukses' || d.status==='Selesai');
@@ -2557,7 +2695,7 @@ function renderStatusView(targetId, statusName){
     const qSudah=(document.getElementById('globalSearch')?.value||'').toLowerCase();
     // hanya filter jika view Sudah Diambil aktif dan ada query (biar globalSearch beside jam jadi search Sudah Diambil)
     const isSudahActive=document.getElementById('view-sudah-diambil')?.classList.contains('active');
-    if(isSudahActive && qSudah) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa).toLowerCase().includes(qSudah));
+    if(isSudahActive && qSudah) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+(d.imei||'')+d.keluhan).toLowerCase().includes(qSudah));
   } else if(statusName==='Service Sukses'){
     filtered = data.filter(d=> ['Service Sukses','Selesai'].includes(d.status)).filter(passesDeadlineFilter);
   } else {
@@ -2570,7 +2708,7 @@ function renderStatusView(targetId, statusName){
   ).map(s=>`<option>${s}</option>`).join('');
   wrap.innerHTML = filtered.map(d=>`
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':''}">
-      <div class="service-card-head"><div><h4>${escapeHtml(d.device)}</h4><p>${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
+      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0">${d.imei ? `<span style="font-weight:400;font-size:11px;color:#64748b;letter-spacing:0.3px">📱 ${escapeHtml(d.imei)} •</span>` : ''}${escapeHtml(d.device)}</h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
       <p>📝 ${escapeHtml(d.keluhan)}</p>
       <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span><span class="meta-pill" style="display:flex;align-items:center;gap:6px">💰 <input type="text" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" id="biaya-${escapeHtml(d.id)}-${targetId}" style="width:110px;padding:4px 6px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateBiaya('${escapeHtml(d.id)}', this.value)"> <button class="btn btn-dark small" style="padding:4px 6px;font-size:10px" onclick="updateBiaya('${escapeHtml(d.id)}', document.getElementById('biaya-${escapeHtml(d.id)}-${targetId}').value)">Simpan</button></span>${deadlineBadge(d)}</div>
       <div class="card-actions">${targetId==='kanbanSudahDiambil' ? `` : `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${opts}</select>`}<button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></div>
@@ -2894,6 +3032,7 @@ async function handleServiceSubmit(e){
   const estimasi=document.getElementById('f-estimasi').value || null;
   const penerima=document.getElementById('f-penerima')?.value || null;
   if(!nama||!wa||!device||!keluhan) return showToast('Lengkapi field wajib!');
+  if(imei && imei.length<4) return showToast('IMEI minimal 4 digit — akan muncul di setiap kartu');
   if(!estimasi) return showToast('Estimasi Selesai wajib diisi — deadline mengikuti estimasi');
   if(!penerima) return showToast('Penerima wajib dipilih');
 
@@ -2974,8 +3113,16 @@ function openDetail(id){
     <p style="color:#8a8f98;font-size:13px;margin-bottom:14px">${escapeHtml(d.id)} • ${escapeHtml(formatTanggal(d.date))} • ${escapeHtml(d.deadline_type)} • deadline ${escapeHtml(formatTanggal(d.deadline))} ${d.estimasi_selesai? ' • estimasi '+escapeHtml(formatTanggal(d.estimasi_selesai)):''}</p>
     <div style="display:grid;gap:10px;font-size:13px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Pelanggan:</strong> ${escapeHtml(d.nama)} (${escapeHtml(d.wa)}) <button class="btn small" style="background:#dcfce7;border:1px solid #bbf7d0;color:#166534;padding:5px 10px" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')">${WA_ICON} WA Direct</button></div>
-      <div><strong>Keluhan:</strong> ${escapeHtml(d.keluhan)}</div>
       <div><strong>Kelengkapan:</strong> ${escapeHtml((d.kelengkapan||[]).join(', ')||'-')}</div>
+      <div style="display:grid;gap:10px;padding:12px;background:#f9fafb;border:1px solid #ececec;border-radius:10px">
+        <div><label style="font-size:11px;font-weight:600">Keluhan / Kerusakan *</label><textarea id="modalKeluhan" style="width:100%;min-height:60px;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px">${escapeHtml(d.keluhan)}</textarea></div>
+        <div><label style="font-size:11px;font-weight:600">Keterangan</label><textarea id="modalKeterangan" placeholder="Isi keterangan pengerjaan, diagnosis, tindakan..." style="width:100%;min-height:60px;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px">${escapeHtml(d.keterangan||'')}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;font-weight:600">IMEI / Serial</label><input id="modalImei" value="${escapeHtml(d.imei||'')}" placeholder="35xxxxxxxxxxxx" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px"></div>
+          <div><label style="font-size:11px;font-weight:600">Harga</label><input id="modalHarga" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))"></div>
+        </div>
+        <button class="btn btn-dark small" style="padding:8px 12px;font-size:12px" onclick="saveDetailEdits('${escapeHtml(d.id)}')">💾 Simpan Keluhan/Keterangan/IMEI/Harga</button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Teknisi:</strong> <span class="meta-pill">${escapeHtml(d.teknisi)}</span>
         <select id="modalTeknisi" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px;min-width:160px">${teknisiOptions}</select>
         <button class="btn btn-ghost small" onclick="assignTeknisiFromModal('${escapeHtml(d.id)}')">Assign</button>
@@ -2984,7 +3131,6 @@ function openDetail(id){
         <select id="modalPenerima" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px;min-width:160px">${hasPenerima? penerimaOptions : '<option value="">- Belum ada anggota -</option>'}</select>
         <button class="btn btn-ghost small" onclick="assignPenerimaFromModal('${escapeHtml(d.id)}')">Simpan</button>
       </div>
-      <div><strong>Biaya:</strong> Rp ${Number(d.biaya).toLocaleString('id-ID')}</div>
       <div><strong>Status:</strong> <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
       <div><strong>Estimasi Selesai:</strong> ${escapeHtml(formatTanggal(d.estimasi_selesai))} <span style="font-size:11px;color:#8a8f98">(jatuh tempo = estimasi)</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -3038,6 +3184,32 @@ async function updateEstimasi(invoice){
     renderAll(); renderSemuaService(); closeModal(); showToast(`📅 ${invoice} estimasi → ${newDate} (deadline mengikuti)`); updateDeadlinePreview();
   }catch(e){ showToast('Gagal ubah estimasi: '+e.message); }
 }
+async function saveDetailEdits(invoice){
+  const keluhan=document.getElementById('modalKeluhan')?.value.trim()||'';
+  const keterangan=document.getElementById('modalKeterangan')?.value.trim()||'';
+  const imei=document.getElementById('modalImei')?.value.trim()||'';
+  const hargaVal=document.getElementById('modalHarga')?.value||'';
+  const biaya=parseRupiah(hargaVal);
+  if(!keluhan || keluhan.length<5) return showToast('Keluhan minimal 5 karakter');
+  if(biaya<0) return showToast('Harga tidak valid');
+  const item=data.find(d=>d.id===invoice);
+  if(!item) return;
+  const old={keluhan:item.keluhan, keterangan:item.keterangan||'', imei:item.imei||'', biaya:item.biaya};
+  item.keluhan=keluhan; item.keterangan=keterangan; item.imei=imei; item.biaya=biaya;
+  renderAll(); renderKanban(); renderSemuaService();
+  try{
+    if(USE_API){
+      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({keluhan, keterangan, imei, biaya})});
+      await loadData();
+    } else { saveLocal(); }
+    renderAll(); renderKanban(); renderSemuaService(); closeModal(); openDetail(invoice);
+    showToast(`✅ ${invoice} detail disimpan`);
+  }catch(e){
+    item.keluhan=old.keluhan; item.keterangan=old.keterangan; item.imei=old.imei; item.biaya=old.biaya;
+    renderAll(); renderKanban();
+    showToast('Gagal simpan detail: '+e.message);
+  }
+}
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -3045,7 +3217,19 @@ function showToast(msg){
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
+function clearCacheAndReload(){
+  try{
+    localStorage.clear();
+    sessionStorage.clear();
+    if('caches' in window){ caches.keys().then(keys=> keys.forEach(k=> caches.delete(k))); }
+  }catch(e){}
+  const url=new URL(window.location.href);
+  url.searchParams.set('v','clear-'+Date.now());
+  window.location.href=url.toString();
+  setTimeout(()=> location.reload(true), 400);
+}
 // expose for inline onclick
+window.clearCacheAndReload=clearCacheAndReload;
 window.switchView=switchView; window.handleServiceSubmit=handleServiceSubmit; window.resetForm=resetForm;
 window.openDetail=openDetail; window.toggleInlineDetail=toggleInlineDetail; window.closeModal=closeModal; window.updateStatus=updateStatus;
 window.handleLogout=handleLogout; window.handleCustomerSubmit=handleCustomerSubmit;
