@@ -5,6 +5,11 @@ Repo sudah di-push `3e00a46` + folder `deploy/` (b-gadget.service, cloudflared.s
 ## 1. Clone & Python
 ```bash
 sudo apt update && sudo apt install -y python3.12 python3.12-venv git
+# Catatan: server saat ini di /home/budirn/PRAKTEK (cek: curl https://service.reneepsl.my.id/health -> engine sqlite:////home/budirn/...)
+# Jika sudah ada di /home/budirn/PRAKTEK, jangan clone ke /opt lagi. Pakai salah satu:
+# Opsi aktual (server existing):
+cd /home/budirn/PRAKTEK
+# Opsi fresh /opt (butuh migrasi service):
 sudo mkdir -p /opt && sudo chown $USER:$USER /opt
 git clone https://github.com/budirenee-debug/PRAKTEK-CODING.git /opt/PRAKTEK
 cd /opt/PRAKTEK
@@ -25,13 +30,16 @@ nano backend/.env
 ```bash
 curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
 sudo mv cloudflared /usr/local/bin/cloudflared && sudo chmod +x /usr/local/bin/cloudflared
-mkdir -p /opt/PRAKTEK/.cloudflared
-# copy dari lokal (PC Br):
-# scp C:\Users\Br\.cloudflared\debc4532-*.json user@server:/opt/PRAKTEK/.cloudflared/
-# scp C:\Users\Br\.cloudflared\cert.pem user@server:/opt/PRAKTEK/.cloudflared/  # opsional
-sudo nano /opt/PRAKTEK/.cloudflared/config.yml
+# Portable: config.yml sekarang pakai credentials-file: .cloudflared/debc4532...json (relatif)
+# Di server tinggal copy JSON ke .cloudflared/ :
+mkdir -p /home/budirn/PRAKTEK/.cloudflared  # atau /opt/PRAKTEK/.cloudflared jika pakai /opt
+# copy dari lokal (PC Br) - jalankan di PowerShell lokal:
+# scp ".cloudflared/debc4532-0e35-4364-967d-9d8f50344e3e.json" budirn@server:/home/budirn/PRAKTEK/.cloudflared/
+# scp ".cloudflared/cert.pem" budirn@server:/home/budirn/PRAKTEK/.cloudflared/  # opsional
+# Override absolute jika perlu (Ubuntu tidak support path Windows):
+sudo nano /home/budirn/PRAKTEK/.cloudflared/config.yml
 # pastikan: tunnel: b-gadget
-# credentials-file: /opt/PRAKTEK/.cloudflared/debc4532-0e35-4364-967d-9d8f50344e3e.json
+# credentials-file: /home/budirn/PRAKTEK/.cloudflared/debc4532-0e35-4364-967d-9d8f50344e3e.json
 ```
 
 ## 4. Systemd (auto-start habis reboot)

@@ -6,6 +6,11 @@ venv/
 .env
 backend/b_gadget.db
 backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/*.db-journal
+*.db-shm
+*.db-wal
 
 # OS
 .DS_Store

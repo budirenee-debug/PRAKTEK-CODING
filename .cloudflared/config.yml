@@ -4,12 +4,12 @@
 # Fix P1-9: pakai path relatif/portable — run.bat otomatis resolve %USERPROFILE%\.cloudflared\*.json
 
 tunnel: b-gadget
-# Portable: credentials-file mendukung %USERPROFILE% (di-resolve run.bat) dan fallback .cloudflared/*.json relatif
-# Jika pakai named tunnel, letakkan file JSON di %USERPROFILE%\.cloudflared\ atau .cloudflared\ (repo)
-# Contoh: C:\Users\Br\.cloudflared\debc4532-0e35-4364-967d-9d8f50344e3e.json
-credentials-file: C:\Users\Br\.cloudflared\debc4532-0e35-4364-967d-9d8f50344e3e.json
-# Alternatif portable (jika pindah PC, copy JSON ke .cloudflared\ dan ubah baris di atas menjadi):
-# credentials-file: .cloudflared/debc4532-0e35-4364-967d-9d8f50344e3e.json
+# Portable multi-env: lokal Windows pakai path absolut, Ubuntu pakai /home/budirn atau /opt
+# run.bat otomatis resolve %USERPROFILE% fallback; Ubuntu pakai path absolut di override server
+# Default portable relatif (dipakai run.sh & systemd override):
+credentials-file: .cloudflared/debc4532-0e35-4364-967d-9d8f50344e3e.json
+# Fallback Windows absolut (jika .cloudflared/*.json tidak ada, run.bat cari %USERPROFILE%\.cloudflared\):
+# credentials-file: C:\Users\Br\.cloudflared\debc4532-0e35-4364-967d-9d8f50344e3e.json
 # Legacy (PC lama, tunnel ID lama - sudah dihapus 2026-09-16): C:\Users\budirenee\.cloudflared\4482781b-c05e-4348-ae22-1739a7a80b83.json
 
 # Optional: log level

@@ -7,7 +7,9 @@ Requires=b-gadget.service
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/local/bin/cloudflared tunnel --config /opt/PRAKTEK/.cloudflared/config.yml run b-gadget
+# Path aktual server: /home/budirn/PRAKTEK
+ExecStart=/usr/local/bin/cloudflared tunnel --config /home/budirn/PRAKTEK/.cloudflared/config.yml run b-gadget
+# Alternatif /opt: ExecStart=/usr/local/bin/cloudflared tunnel --config /opt/PRAKTEK/.cloudflared/config.yml run b-gadget
 Restart=always
 RestartSec=5
 StandardOutput=journal

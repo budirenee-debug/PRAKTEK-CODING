@@ -42,6 +42,6 @@ else
   echo "[WARN] cloudflared tidak ada - mode lokal saja"
 fi
 
-# 6. Jalankan backend (blocking)
+# 6. Jalankan backend (blocking) - konsisten dengan b-gadget.service (127.0.0.1)
 cd "$BACKEND"
-exec $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
+exec $PYTHON -m uvicorn app.main:app --host 127.0.0.1 --port $PORT --workers 2
