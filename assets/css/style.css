@@ -184,18 +184,41 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .meta-pill{font-size:9px;padding:1px 5px;border-radius:2px !important;background:#f9fafb;border:1px solid var(--border);line-height:1.2}
 .card-actions{display:flex;gap:4px;margin-top:auto}
 .card-actions button{flex:1}
-#view-proses .kanban{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;align-items:stretch;grid-auto-rows:1fr}
-#view-proses .service-card{padding:6px 7px;gap:4px;border-radius:8px;min-width:0;overflow:visible;overflow-wrap:anywhere;word-break:break-word;height:100%;min-height:260px;display:flex;flex-direction:column}
-#view-proses .service-card p{font-size:10px;overflow-wrap:anywhere;word-break:break-word;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:22px}
-#view-proses .meta-pill{font-size:9.5px;padding:2px 6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#view-proses .service-card *{min-width:0;max-width:100%;box-sizing:border-box}
-#view-proses .service-card > div{overflow:hidden}
-/* padat: sparepart box lebih compact */
-#view-proses .service-card [style*="background:#f9fafb"]{overflow:visible;flex:1;display:flex;flex-direction:column;min-height:52px;padding:5px 6px !important;position:relative;border-radius:6px !important}
-#view-proses .service-card input, #view-proses .service-card select{max-width:100%;min-width:0;font-size:10px !important;padding:4px 6px !important}
-#view-proses .service-card .service-card-head{flex-shrink:0}
-#view-proses .service-card .service-meta{flex-shrink:0}
-#view-proses .service-card .card-actions{margin-top:auto;flex-shrink:0}
+/* HIGHLIGHT keyword search: bayangan tipis hitam + hijau */
+mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;padding:0 2px;box-shadow:0 0 0 1px rgba(17,24,39,.65),0 0 0 3px rgba(16,185,129,.35)}
+/* MODAL HASIL — modern */
+.hasil-box{max-width:430px;text-align:center;padding:26px 22px 22px;border-top:5px solid #111;animation:pop .18s ease}
+@keyframes pop{from{transform:scale(.96) translateY(6px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.hasil-icon{font-size:34px;margin-bottom:6px}
+.hasil-box h3{font-size:17px;margin-bottom:2px}
+.hasil-sub{font-size:12px;color:#8a8f98;margin-bottom:8px}
+.hasil-keluhan{font-size:12px;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:8px 10px;margin-bottom:12px;color:#374151;text-align:left;line-height:1.4}
+.hasil-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hasil-opt{display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 10px;border-radius:14px;border:2px solid #ececec;background:#fff;cursor:pointer;transition:.15s;font-size:12px;color:#6b7280;font-family:inherit}
+.hasil-opt strong{font-size:14px;color:#111}
+.hasil-opt .hasil-emoji{font-size:26px;margin-bottom:4px}
+.hasil-opt.jadi.selected{border-color:#10b981;background:#ecfdf5;color:#065f46;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+.hasil-opt.jadi.selected strong{color:#065f46}
+.hasil-opt.tidak.selected{border-color:#ef4444;background:#fef2f2;color:#991b1b;box-shadow:0 0 0 3px rgba(239,68,68,.18)}
+.hasil-opt.tidak.selected strong{color:#991b1b}
+#hasilAlasanWrap label{font-size:12px;font-weight:600;display:block;margin:12px 0 6px}
+#hasilAlasan{width:100%;min-height:64px;padding:10px 12px;border:1px solid #ececec;border-radius:10px;font-size:12px;font-family:inherit;resize:vertical}
+.hasil-actions{display:flex;gap:10px;margin-top:14px}
+.hasil-actions .btn{flex:1}
+/* BANNER hasil di kartu Bisa Diambil / Failed */
+.hasil-banner{font-size:11px;font-weight:700;padding:6px 8px;border-radius:8px;line-height:1.35}
+.hasil-banner.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.hasil-banner.fail{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.hasil-banner.wait{background:#f3f4f6;border:1px solid #e5e7eb;color:#6b7280}
+#view-proses .kanban{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;align-items:start}
+#view-proses .service-card{padding:10px 11px;gap:6px;border-radius:10px;overflow:hidden;height:auto;min-height:0}
+/* sparepart lipat — simple seperti Bisa Diambil, fungsi tetap ada */
+.sp-detail{background:#f9fafb;border:1px solid var(--border);border-radius:8px;font-size:11px}
+.sp-detail summary{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-weight:600;font-size:11px;list-style:none}
+.sp-detail summary::-webkit-details-marker{display:none}
+.sp-detail summary .sp-hint{color:#8a8f98;font-size:10px}
+.sp-detail summary .sp-tools{margin-left:auto;display:flex;gap:4px}
+.sp-detail .sp-body{padding:0 8px 8px;display:flex;flex-direction:column;gap:6px}
 #view-proses .service-card [id^="spare-dropdown-"]{z-index:20;overflow:auto;max-height:180px}
 
 /* MODAL & TOAST */

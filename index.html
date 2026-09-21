@@ -379,7 +379,7 @@
 
             <!-- SERVICE: BISA DIAMBIL -->
             <section class="view" id="view-bisa-diambil">
-                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
+                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span></div><div class="tabs" style="margin-bottom:10px"><button class="tab active" data-bisa="all" onclick="setBisaFilter('all')">Semua</button><button class="tab" data-bisa="JADI" onclick="setBisaFilter('JADI')">✅ Berhasil</button><button class="tab" data-bisa="TIDAK" onclick="setBisaFilter('TIDAK')">❌ Gagal</button></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
             </section>
 
             <!-- SERVICE: SUDAH DIAMBIL -->
@@ -735,6 +735,37 @@
         <div class="modal-box">
             <button class="modal-close" onclick="closeModal()">×</button>
             <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- MODAL HASIL SERVICE (modern: pengganti confirm/prompt JADI-TIDAK) -->
+    <div class="modal" id="hasilModal">
+        <div class="modal-box hasil-box">
+            <button class="modal-close" onclick="closeHasilModal()">×</button>
+            <div class="hasil-icon" id="hasilIcon">🔧</div>
+            <h3 id="hasilTitle">Hasil Service</h3>
+            <p class="hasil-sub" id="hasilSub">—</p>
+            <p class="hasil-keluhan" id="hasilKeluhan">—</p>
+            <div class="hasil-opts" id="hasilOpts">
+                <button class="hasil-opt jadi" onclick="pickHasil('JADI')">
+                    <span class="hasil-emoji">✅</span>
+                    <strong>JADI</strong>
+                    <span>Berhasil, siap diambil</span>
+                </button>
+                <button class="hasil-opt tidak" onclick="pickHasil('TIDAK')">
+                    <span class="hasil-emoji">❌</span>
+                    <strong>TIDAK</strong>
+                    <span>Gagal, gratis</span>
+                </button>
+            </div>
+            <div class="field" id="hasilAlasanWrap" style="display:none;text-align:left">
+                <label>Alasan gagal <span style="color:#8a8f98;font-weight:400">(info pelanggan & bahan evaluasi)</span></label>
+                <textarea id="hasilAlasan" placeholder="Contoh: IC power short, sparepart kosong..."></textarea>
+            </div>
+            <div class="hasil-actions">
+                <button class="btn btn-ghost" onclick="closeHasilModal()">Batal</button>
+                <button class="btn btn-dark" id="hasilConfirmBtn" onclick="confirmHasilModal()">Konfirmasi →</button>
+            </div>
         </div>
     </div>
 

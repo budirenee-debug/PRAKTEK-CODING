@@ -537,6 +537,7 @@ let selectedKelengkapan = new Set();
 let pelangganFilter = '';
 let statusFilter = 'all';
 let deadlineFilter = 'all'; // all, overdue, today, harian, mingguan
+let bisaFilter = 'all'; // filter tab Bisa Diambil: all, JADI, TIDAK
 const PROSES_STATUSES = ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart']; // status yang tampil di tab Proses Service
 let availableTechs = []; // cache akun terdaftar (teknisi/admin) + Technician legacy untuk assign di Semua Service
 let currentPageProses = 1;
@@ -1171,10 +1172,19 @@ async function checkHealth(){
 
 function setupNavigation(){
   document.querySelectorAll('.menu-item').forEach(btn=>{
-    btn.addEventListener('click', ()=> switchView(btn.dataset.view));
+    btn.addEventListener('click', ()=> switchView(btn.dataset.view, true));
   });
 }
-function switchView(view){
+// Bersihkan semua kolom search + filter keyword (dipanggil saat klik tab sidebar)
+function clearAllSearch(){
+  pelangganFilter='';
+  ['globalSearch','searchSemua','searchPelanggan','searchPendapatan','searchSparepart','searchAlat'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+}
+function switchView(view, clearSearch){
+  if(clearSearch) clearAllSearch();
   document.querySelectorAll('.menu-item').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   const el=document.getElementById('view-'+view);
@@ -1265,6 +1275,16 @@ function renderAll(){
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+// Highlight keyword search: teks yg cocok dibungkus <mark class="search-hit">
+function hl(text, kw){
+  const esc = escapeHtml(text ?? '');
+  const q = String(kw ?? '').trim();
+  if(!q) return esc;
+  try{
+    const rx = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    return esc.replace(rx, '<mark class="search-hit">$1</mark>');
+  }catch{ return esc; }
 }
 
 function updateStats(){
@@ -2302,16 +2322,18 @@ function renderPelanggan(){
   let filtered=[...data];
   if(pelangganFilter) filtered=filtered.filter(d=> (d.nama+d.device+d.wa+d.id).toLowerCase().includes(pelangganFilter));
   if(filterDevice) filtered=filtered.filter(d=>d.device.includes(filterDevice));
-  tbody.innerHTML = filtered.map(d=>`
+  tbody.innerHTML = filtered.map(d=>{
+  const kw = pelangganFilter || '';
+  return `
     <tr>
-      <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98;font-size:12px">${escapeHtml(d.wa)}</span></div></div></td>
-      <td>${escapeHtml(d.device)}</td>
+      <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${hl(d.nama, kw)}</strong><br><span style="color:#8a8f98;font-size:12px">${hl(d.wa, kw)}</span></div></div></td>
+      <td>${hl(d.device, kw)}</td>
       <td><span style="background:#f3f4f6;padding:4px 8px;border-radius:20px;font-size:12px">1x</span></td>
       <td>${escapeHtml(formatTanggal(d.date))}</td>
       <td><span class="badge-status Selesai">Member</span></td>
       <td><button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></td>
     </tr>
-  `).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#8a8f98">Tidak ada data</td></tr>`;
+  `}).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#8a8f98">Tidak ada data</td></tr>`;
   const pc = document.getElementById('pelangganCount');
   if(pc) pc.textContent = filtered.length + ' pelanggan';
   const pi = document.getElementById('paginationInfo');
@@ -2507,41 +2529,32 @@ function renderKanban(){
    }
    filtered = filtered.filter(passesDeadlineFilter);
    const opts = statusOptions().map(s=>`<option>${s}</option>`).join('');
-  wrap.innerHTML = filtered.map(d=>`
+   const kw = pelangganFilter || '';
+  wrap.innerHTML = filtered.map(d=>{
+    const usedCount = (serviceSpareparts[d.id]||[]).length;
+    return `
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}">
-      <div class="service-card-head">
-        <div><h4 style="margin:0">${escapeHtml(d.device)}</h4><div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px;letter-spacing:0.3px" title="${escapeHtml(d.imei||'')}">📱 IMEI: ${escapeHtml(d.imei||'—')} <span style="color:#94a3b8;font-size:10px">${escapeHtml(d.imei ? d.imei.slice(-4) : '----')}</span></div><p style="font-size:11px;color:#6b7280;margin-top:3px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div>
-        <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>
-      </div>
-      <p style="margin:2px 0 0;font-size:11px;line-height:1.35">📝 ${escapeHtml(d.keluhan)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
-       <div class="service-meta" style="margin-top:4px;gap:5px">
-         <span class="meta-pill" style="display:flex;align-items:center;gap:3px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" style="padding:3px 5px;border-radius:7px;border:1px solid #ececec;font-size:10px;font-weight:600;min-width:110px;background:${d.teknisi==='Menunggu Teknisi'?'#fffbeb':'#fff'};color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'#374151'}">${teknisiOptionsHtml(d.teknisi)}</select></span>
-         <span class="meta-pill">📦 ${escapeHtml((d.kelengkapan||[]).join(', '))}</span>
-         ${deadlineBadge(d)}
-       </div>
-        <div style="margin-top:5px;padding:7px 8px;background:#f9fafb;border:1px solid #ececec;border-radius:8px">
-          <div style="font-size:10px;font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px"><span>🔧 Sparepart</span><div style="display:flex;gap:4px;align-items:center"><button class="btn btn-ghost small" style="padding:4px 6px;font-size:9px;white-space:nowrap;background:#fff;border-color:#ececec" onclick="showStokSparepart('${escapeHtml(d.id)}')" title="Klik untuk lihat stok sparepart">📦 Stok</button><button class="btn btn-ghost small" style="padding:4px 6px;font-size:9px;white-space:nowrap" onclick="suggestSparepart('${escapeHtml(d.id)}')" title="Suggest sesuai merk & keluhan">💡 Suggest</button></div></div>
+      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kw)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kw)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kw)} • ${hl(d.nama, kw)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
+      <p>📝 ${hl(d.keluhan, kw)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
+      <div class="service-meta"><span class="meta-pill" style="display:inline-flex;align-items:center;gap:4px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" class="teknisi-select" style="border:0;background:transparent;font-size:10px;font-weight:600;max-width:110px;outline:none;color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'inherit'}">${teknisiOptionsHtml(d.teknisi)}</select></span><span class="meta-pill">📦 ${hl((d.kelengkapan||[]).join(', ')||'-', kw)}</span>${deadlineBadge(d)}</div>
+      <details class="sp-detail">
+        <summary>🔧 Sparepart${usedCount?` (${usedCount})`:''} <span class="sp-hint">▾</span><span class="sp-tools" onclick="event.stopPropagation()"><button class="btn btn-ghost small" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();showStokSparepart('${escapeHtml(d.id)}')" title="Lihat stok">📦</button><button class="btn btn-ghost small" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();suggestSparepart('${escapeHtml(d.id)}')" title="Suggest sesuai merk & keluhan">💡</button></span></summary>
+        <div class="sp-body" onclick="event.stopPropagation()">
           <div style="display:flex;gap:5px;align-items:flex-start">
             <div style="position:relative;flex:1">
-              <input type="text" id="spare-search-${escapeHtml(d.id)}" placeholder="Ketik nama part / merk... klik 📦 untuk lihat stok" style="width:100%;padding:5px 7px;border:1px solid #ececec;border-radius:7px;font-size:10px" oninput="filterSparepartInput('${escapeHtml(d.id)}')" onfocus="showSparepartDropdown('${escapeHtml(d.id)}')" autocomplete="off">
+              <input type="text" id="spare-search-${escapeHtml(d.id)}" placeholder="Ketik nama part / merk..." style="width:100%;padding:5px 7px;border:1px solid #ececec;border-radius:7px;font-size:10px" oninput="filterSparepartInput('${escapeHtml(d.id)}')" onfocus="showSparepartDropdown('${escapeHtml(d.id)}')" autocomplete="off">
               <input type="hidden" id="spare-select-${escapeHtml(d.id)}" value="">
               <div id="spare-dropdown-${escapeHtml(d.id)}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ececec;border-radius:7px;max-height:160px;overflow:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-top:3px"></div>
             </div>
-            <input type="number" id="spare-qty-${escapeHtml(d.id)}" value="1" min="1" style="width:48px;padding:5px 6px;border:1px solid #ececec;border-radius:7px;font-size:10px;text-align:center" title="Qty">
+            <input type="number" id="spare-qty-${escapeHtml(d.id)}" value="1" min="1" style="width:44px;padding:5px 6px;border:1px solid #ececec;border-radius:7px;font-size:10px;text-align:center" title="Qty">
             <button class="btn btn-dark small" style="padding:5px 8px;font-size:10px;white-space:nowrap" onclick="pakaiSparepart('${escapeHtml(d.id)}')">Pakai</button>
           </div>
-         ${renderUsedSpareparts(d.id)}
-       </div>
-       <div class="card-actions" style="margin-top:2px">
-         <select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px">
-          <option disabled selected>Ubah status</option>
-          ${opts}
-        </select>
-        <button class="btn btn-ghost small" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" style="background:#dcfce7;border-color:#bbf7d0;color:#166534" title="Direct WA">${WA_ICON}</button>
-        <button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button>
-      </div>
+          ${renderUsedSpareparts(d.id)}
+        </div>
+      </details>
+      <div class="card-actions"><button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button><button class="btn btn-ghost small" style="flex:none;background:#dcfce7;border-color:#bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" title="Direct WA">${WA_ICON}</button><select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${opts}</select></div>
     </div>
-  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Menunggu Konfirmasi / Dikerjakan / Menunggu Sparepart</div>`;
+  `}).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Menunggu Konfirmasi / Dikerjakan / Menunggu Sparepart</div>`;
   // update hitungan tab hanya untuk tab filter di view-proses
   document.querySelectorAll('#view-proses .tab[data-filter]').forEach(tab=>{
     const f=tab.dataset.filter;
@@ -2591,6 +2604,7 @@ function renderSemuaService(){
   const tbody=document.querySelector('#tableSemua tbody');
   if(!tbody) return;
   const q = (document.getElementById('searchSemua')?.value || '').toLowerCase();
+  const kwSemua = document.getElementById('searchSemua')?.value || '';
   const fRaw = document.getElementById('filterStatusSemua')?.value || '';
   // normalisasi filter legacy Selesai -> Service Sukses
   const f = fRaw==='Selesai' ? 'Service Sukses' : fRaw;
@@ -2623,9 +2637,9 @@ function renderSemuaService(){
     const statusStyle = (()=>{ const s=d.status; if(s==='Antri') return 'background:#fffbeb;border-color:#fde68a;color:#92400e'; if(s==='Menunggu Konfirmasi') return 'background:#fef9c3;border-color:#fde68a;color:#854d0e'; if(s==='Dikerjakan') return 'background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8'; if(s==='Menunggu Sparepart') return 'background:#fef3c7;border-color:#fde68a;color:#92400e'; if(s==='Selesai'||s==='Service Sukses'||s==='Bisa Diambil') return 'background:#ecfdf5;border-color:#a7f3d0;color:#065f46'; if(s==='Sudah Diambil') return 'background:#f3f4f6;border-color:#e5e7eb;color:#374151'; if(s==='Service Failed') return 'background:#fef2f2;border-color:#fecaca;color:#991b1b'; if(s==='Garansi') return 'background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6'; if(s==='Dibatalkan') return 'background:#f3f4f6;border-color:#e5e7eb;color:#6b7280'; return 'background:#fff;border-color:#ececec'; })();
     return `
     <tr data-invoice="${escapeHtml(d.id)}" style="${d.is_overdue?'background:#fffafa':''}">
-      <td><strong style="font-size:11px">${escapeHtml(d.id)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(formatTanggal(d.date))}</span></td>
-      <td><div class="avatar-cell" style="gap:6px"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}" style="width:26px;height:26px"><div><strong style="font-size:11px">${escapeHtml(d.nama)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(d.device)}</span></div></div></td>
-      <td style="font-size:11px">${escapeHtml(d.keluhan)}<br><span style="font-size:10px">${deadlineBadge(d)}</span></td>
+      <td><strong style="font-size:11px">${hl(d.id, kwSemua)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(formatTanggal(d.date))}</span></td>
+      <td><div class="avatar-cell" style="gap:6px"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}" style="width:26px;height:26px"><div><strong style="font-size:11px">${hl(d.nama, kwSemua)}</strong><br><span style="color:#8a8f98;font-size:10px">${hl(d.device, kwSemua)}</span></div></div></td>
+      <td style="font-size:11px">${hl(d.keluhan, kwSemua)}<br><span style="font-size:10px">${deadlineBadge(d)}</span></td>
       <td>
         <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Ubah teknisi" style="padding:5px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;min-width:120px;${selectStyle}">
           ${optionsHtml}
@@ -2678,12 +2692,14 @@ function toggleInlineDetail(invoice){
   const row = document.querySelector(`tr[data-invoice="${invoice}"]`);
   if(!row) return;
   const kelengkapan = Array.isArray(d.kelengkapan) ? d.kelengkapan.join(', ') : (d.kelengkapan||'-');
+  const kwDetail = (document.getElementById('searchSemua')?.value || document.getElementById('globalSearch')?.value || '');
   const detailHtml = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;font-size:13px">
       <div style="display:grid;gap:6px">
-        <div><strong>Device:</strong> ${escapeHtml(d.device)}</div>
-        <div><strong>Pelanggan:</strong> ${escapeHtml(d.nama)} • ${escapeHtml(d.wa)}</div>
-        <div><strong>Keluhan:</strong> ${escapeHtml(d.keluhan)}</div>
+        <div><strong>Device:</strong> ${hl(d.device, kwDetail)}</div>
+        <div><strong>IMEI / Serial:</strong> ${hl(d.imei||'-', kwDetail)}</div>
+        <div><strong>Pelanggan:</strong> ${hl(d.nama, kwDetail)} • ${escapeHtml(d.wa)}</div>
+        <div><strong>Keluhan:</strong> ${hl(d.keluhan, kwDetail)}</div>
         <div><strong>Kelengkapan:</strong> ${escapeHtml(kelengkapan||'-')}</div>
       </div>
       <div style="display:grid;gap:6px">
@@ -2717,10 +2733,14 @@ function toggleInlineDetail(invoice){
 function renderStatusView(targetId, statusName){
   const wrap=document.getElementById(targetId);
   if(!wrap) return;
-  // Flow: Bisa Diambil (ready) -> pilih Sukses/Failed di sini -> pindah ke Sudah Diambil sebagai Sukses
+  // Flow: hasil (JADI/TIDAK) diputuskan di Proses → Bisa Diambil = serah terima.
+  // JADI → diambil → Sudah Diambil • TIDAK (gratis) → diambil → Service Failed (evaluasi)
+  const isBisa = targetId==='kanbanBisaDiambil';
+  const isFailedView = targetId==='kanbanFailed';
   let filtered;
   if(statusName==='Bisa Diambil'){
     filtered = data.filter(d=> ['Bisa Diambil'].includes(d.status)).filter(passesDeadlineFilter);
+    if(bisaFilter!=='all') filtered=filtered.filter(d=> (d.hasil||'JADI')===bisaFilter);
   } else if(statusName==='Sudah Diambil'){
     filtered = data.filter(d=> ['Sudah Diambil','Service Sukses','Selesai'].includes(d.status)).filter(passesDeadlineFilter);
     // terurut dari Bisa Diambil terbaru (updated_at desc) + search permanen di topbar beside jam
@@ -2734,19 +2754,44 @@ function renderStatusView(targetId, statusName){
   } else {
     filtered = data.filter(d=>d.status===statusName).filter(passesDeadlineFilter);
   }
-  // Bisa Diambil hanya boleh ke Sukses / Failed (request)
-  const opts = (targetId==='kanbanBisaDiambil'
-    ? ['Service Sukses','Service Failed']
-    : statusOptions()
-  ).map(s=>`<option>${s}</option>`).join('');
-  wrap.innerHTML = filtered.map(d=>`
+  // Opsi status di Bisa Diambil mengikuti hasil: JADI→Sukses saja, TIDAK→Failed saja
+  const optsBisa = (hasil)=>{
+    if(hasil==='JADI') return ['Service Sukses'];
+    if(hasil==='TIDAK') return ['Service Failed'];
+    return ['Service Sukses','Service Failed']; // legacy: hasil belum ditandai
+  };
+  // highlight hanya utk Sudah Diambil yg memang difilter globalSearch
+  const kwStatus = (targetId==='kanbanSudahDiambil') ? (document.getElementById('globalSearch')?.value || '') : '';
+  wrap.innerHTML = filtered.map(d=>{
+    const hasil = d.hasil || (isBisa ? 'JADI' : '');
+    const gagal = hasil==='TIDAK';
+    const optsHtml = (isBisa ? optsBisa(hasil) : statusOptions()).map(s=>`<option>${s}</option>`).join('');
+    const banner = isBisa
+      ? (hasil==='JADI' ? `<div class="hasil-banner ok">✅ Berhasil — Siap diambil</div>`
+        : hasil==='TIDAK' ? `<div class="hasil-banner fail">❌ Gagal — Gratis, HP kembali ke pelanggan</div>`
+        : `<div class="hasil-banner wait">❓ Hasil belum ditandai</div>`)
+      : (isFailedView ? `<div class="hasil-banner fail">❌ Gagal — Bahan evaluasi</div>` : '');
+    const ketLabel = (isFailedView || (isBisa && gagal)) ? '📋 Alasan: ' : '📋 ';
+    const biayaCell = (gagal && (isBisa || isFailedView))
+      ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;font-weight:700">💰 Gratis</span>`
+      : `<span class="meta-pill" style="display:flex;align-items:center;gap:6px">💰 <input type="text" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" id="biaya-${escapeHtml(d.id)}-${targetId}" style="width:110px;padding:4px 6px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateBiaya('${escapeHtml(d.id)}', this.value)"> <button class="btn btn-dark small" style="padding:4px 6px;font-size:10px" onclick="updateBiaya('${escapeHtml(d.id)}', document.getElementById('biaya-${escapeHtml(d.id)}-${targetId}').value)">Simpan</button></span>`;
+    let aksi = `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button>`;
+    if(targetId!=='kanbanSudahDiambil'){
+      if(isBisa && gagal) aksi += `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="prosesUlang('${escapeHtml(d.id)}')" title="Kembalikan ke teknisi untuk dikerjakan ulang">🔄 Proses Ulang</button>`;
+      aksi += `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${optsHtml}</select>`;
+    }
+    return `
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':''}">
-      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-weight:600;font-size:11px;color:#334155;letter-spacing:0.3px;border-left:3px solid #e2e8f0;padding-left:6px" title="${escapeHtml(d.imei||'')}">📱 ${escapeHtml(d.imei ? d.imei.slice(-4) : '----')} •</span>${escapeHtml(d.device)}</h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
-      <p>📝 ${escapeHtml(d.keluhan)}</p>
-      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span><span class="meta-pill" style="display:flex;align-items:center;gap:6px">💰 <input type="text" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" id="biaya-${escapeHtml(d.id)}-${targetId}" style="width:110px;padding:4px 6px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateBiaya('${escapeHtml(d.id)}', this.value)"> <button class="btn btn-dark small" style="padding:4px 6px;font-size:10px" onclick="updateBiaya('${escapeHtml(d.id)}', document.getElementById('biaya-${escapeHtml(d.id)}-${targetId}').value)">Simpan</button></span>${deadlineBadge(d)}</div>
-      <div class="card-actions">${targetId==='kanbanSudahDiambil' ? `` : `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${opts}</select>`}<button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button></div>
+      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kwStatus)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kwStatus)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kwStatus)} • ${hl(d.nama, kwStatus)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
+      ${banner}
+      <p>📝 ${hl(d.keluhan, kwStatus)}</p>
+      ${d.keterangan ? `<p>${ketLabel}${hl(d.keterangan, kwStatus)}</p>` : ''}
+      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${deadlineBadge(d)}</div>
+      <div class="card-actions">${aksi}</div>
     </div>
-  `).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Belum ada service dengan status <strong>${statusName==='Bisa Diambil' ? 'Bisa Diambil' : statusName==='Sudah Diambil' ? 'Service Sukses / Sudah Diambil' : escapeHtml(displayStatus(statusName))}</strong></div>`;
+    `;
+  }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Belum ada service dengan status <strong>${statusName==='Bisa Diambil' ? 'Bisa Diambil' : statusName==='Sudah Diambil' ? 'Service Sukses / Sudah Diambil' : escapeHtml(displayStatus(statusName))}</strong>${isBisa && bisaFilter!=='all' ? ` • filter ${bisaFilter==='JADI' ? '✅ Berhasil' : '❌ Gagal'}` : ''}</div>`;
+  if(isBisa) document.querySelectorAll('[data-bisa]').forEach(b=> b.classList.toggle('active', b.dataset.bisa===bisaFilter));
   // update transaksi tab jika sedang aktif
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
 }
@@ -3019,21 +3064,129 @@ async function handleCustomerSubmit(e){
   } else { showToast('Pelanggan ditambahkan (lokal) ✓'); e.target.reset(); switchView('pelanggan'); }
 }
 
+// === Modal hasil JADI/TIDAK (modern, promise-based pengganti confirm/prompt) ===
+let _hasilResolver=null, _hasilPick='', _hasilMode='pilih';
+function askHasilService(id, mode){
+  const d=data.find(x=>x.id===id);
+  return new Promise(resolve=>{
+    _hasilResolver=resolve; _hasilMode=mode||'pilih';
+    _hasilPick = _hasilMode==='gagal' ? 'TIDAK' : '';
+    document.getElementById('hasilTitle').textContent = _hasilMode==='gagal' ? 'Alasan Gagal' : 'Hasil Service';
+    document.getElementById('hasilIcon').textContent = _hasilMode==='gagal' ? '❌' : '🔧';
+    document.getElementById('hasilSub').textContent = d ? `${d.id} • ${d.device} • ${d.nama}` : id;
+    document.getElementById('hasilKeluhan').textContent = d ? `📝 Keluhan: ${d.keluhan||'-'}` : '';
+    document.getElementById('hasilOpts').style.display = _hasilMode==='gagal' ? 'none' : '';
+    document.getElementById('hasilAlasan').value = (d && d.keterangan) || '';
+    syncHasilModal();
+    document.getElementById('hasilModal').classList.add('show');
+    if(_hasilMode==='gagal') setTimeout(()=>document.getElementById('hasilAlasan')?.focus(),100);
+  });
+}
+function pickHasil(v){
+  _hasilPick=v;
+  syncHasilModal();
+}
+function syncHasilModal(){
+  document.querySelectorAll('#hasilOpts .hasil-opt').forEach(b=>{
+    b.classList.toggle('selected', (_hasilPick==='JADI' && b.classList.contains('jadi')) || (_hasilPick==='TIDAK' && b.classList.contains('tidak')));
+  });
+  document.getElementById('hasilAlasanWrap').style.display = _hasilPick==='TIDAK' ? '' : 'none';
+  document.getElementById('hasilConfirmBtn').textContent = _hasilMode==='gagal' ? 'Simpan →' : 'Konfirmasi →';
+}
+function confirmHasilModal(){
+  if(_hasilMode==='pilih' && !_hasilPick) return showToast('Pilih dulu: ✅ JADI atau ❌ TIDAK');
+  const alasan = document.getElementById('hasilAlasan').value.trim();
+  const r=_hasilResolver; _hasilResolver=null;
+  document.getElementById('hasilModal').classList.remove('show');
+  if(r) r({hasil:_hasilPick||'TIDAK', alasan});
+}
+function closeHasilModal(){
+  const r=_hasilResolver; _hasilResolver=null;
+  document.getElementById('hasilModal').classList.remove('show');
+  if(r) r(null);
+}
 async function updateStatus(id, newStatus){
   // instant sync dashboard Menunggu Konfirmasi + Semua Service — optimistik dulu biar kotak kuning langsung berubah
   const item0=data.find(d=>d.id===id);
-  const oldStatus=item0?item0.status:null;
-  if(item0){ item0.status=newStatus; updateStats(); renderSemuaService(); renderKanban(); }
+  if(!item0) return;
+  const oldStatus=item0.status;
+  const oldHasil=item0.hasil||null;
+  const oldBiaya=Number(item0.biaya)||0;
+  const oldKet=item0.keterangan||null;
+  const fromProses=PROSES_STATUSES.includes(oldStatus);
+
+  // === Flow hasil: diputuskan saat HP selesai diproses ===
+  // JADI = berhasil • TIDAK = gagal (gratis) — sesuai kolom backend
+  let hasil = oldHasil;
+  let ketPatch = null, biayaPatch = null, tanyaHasil = false;
+  if(newStatus==='Bisa Diambil' && fromProses){
+    tanyaHasil = true;
+    const res = await askHasilService(id, 'pilih');
+    if(!res){ renderKanban(); renderSemuaService(); return; } // Batal → kembalikan tampilan
+    hasil = res.hasil;
+    if(hasil==='TIDAK'){
+      if(res.alasan) ketPatch = res.alasan;
+      biayaPatch = 0; // gagal = gratis
+    }
+  } else if(newStatus==='Service Failed'){
+    hasil = 'TIDAK';
+    if(fromProses && !oldKet){
+      const res2 = await askHasilService(id, 'gagal');
+      if(!res2){ renderKanban(); renderSemuaService(); return; } // Batal → kembalikan tampilan
+      if(res2.alasan) ketPatch = res2.alasan;
+    }
+    if(fromProses) biayaPatch = 0; // gagal = gratis
+  } else if(['Service Sukses','Selesai','Sudah Diambil'].includes(newStatus)){
+    if(!hasil) hasil = 'JADI';
+  } else if(PROSES_STATUSES.includes(newStatus)){
+    hasil = null; // balik diproses (proses ulang) → keputusan hasil di-reset
+  }
+  const resetHasil = !['Garansi','Dibatalkan'].includes(newStatus);
+
+  const refreshStatusViews = ()=>{
+    renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+    renderStatusView('kanbanSudahDiambil','Sudah Diambil');
+    renderStatusView('kanbanFailed','Service Failed');
+    renderStatusView('kanbanGaransi','Garansi');
+  };
+
+  if(item0){
+    item0.status=newStatus;
+    if(resetHasil) item0.hasil=hasil;
+    if(ketPatch!==null) item0.keterangan=ketPatch;
+    if(biayaPatch!==null) item0.biaya=biayaPatch;
+    updateStats(); renderSemuaService(); renderKanban(); refreshStatusViews();
+  }
   try{
     await apiUpdateStatus(id, newStatus);
-    if(!USE_API) saveLocal();
-    else await loadData();
-    renderAll(); renderSemuaService(); showToast(`Status ${id} → ${newStatus}`);
+    if(!USE_API){ saveLocal(); }
+    else {
+      const patch={};
+      if(resetHasil) patch.hasil=hasil;
+      if(ketPatch!==null) patch.keterangan=ketPatch;
+      if(biayaPatch!==null) patch.biaya=biayaPatch;
+      if(Object.keys(patch).length) await apiFetch(`/services/${id}`, {method:'PATCH', body: JSON.stringify(patch)});
+      await loadData();
+    }
+    renderAll(); renderSemuaService(); refreshStatusViews();
+    if(newStatus==='Bisa Diambil' && tanyaHasil) showToast(hasil==='JADI' ? `✅ ${id} → Bisa Diambil (Berhasil)` : `❌ ${id} → Bisa Diambil (Gagal, gratis)`);
+    else if(newStatus==='Dikerjakan' && fromProses===false && oldStatus==='Bisa Diambil') showToast(`🔄 ${id} diproses ulang`);
+    else showToast(`Status ${id} → ${newStatus}`);
   }catch(e){
     // rollback jika gagal
-    if(item0 && oldStatus) { item0.status=oldStatus; updateStats(); renderSemuaService(); }
+    if(item0) { item0.status=oldStatus; item0.hasil=oldHasil; item0.biaya=oldBiaya; item0.keterangan=oldKet; updateStats(); renderSemuaService(); renderKanban(); }
     showToast('Gagal update: '+ e.message);
   }
+}
+// Kembalikan HP gagal ke meja teknisi (hasil di-reset, tanya ulang saat selesai)
+function prosesUlang(id){
+  updateStatus(id, 'Dikerjakan');
+}
+// Filter chip tab Bisa Diambil: all / JADI / TIDAK
+function setBisaFilter(f){
+  bisaFilter = f;
+  document.querySelectorAll('[data-bisa]').forEach(b=> b.classList.toggle('active', b.dataset.bisa===f));
+  renderStatusView('kanbanBisaDiambil','Bisa Diambil');
 }
 async function updateDeadline(invoice){
   const sel = document.getElementById('modalDeadlineType');
