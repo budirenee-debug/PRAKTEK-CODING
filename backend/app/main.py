@@ -117,6 +117,20 @@ def _migrate_diambil():
         print("migrate diambil fail:", e)
 _migrate_diambil()
 
+def _migrate_profil():
+    """Foto profil: tambah users.foto untuk DB lama."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
+            if "foto" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN foto VARCHAR(255)"))
+                print("migrated: users.foto")
+            conn.commit()
+    except Exception as e:
+        print("migrate profil fail:", e)
+_migrate_profil()
+
 def _migrate_unique_per_store():
     """BOS Fase 2: UNIQUE global -> komposit per toko.
     customers.wa UNIQUE -> UNIQUE(wa, store_id); technicians.nama UNIQUE -> UNIQUE(nama, store_id).
@@ -386,7 +400,7 @@ def seed_db(db: Session = Depends(get_db), current = Depends(auth.require_supera
 @app.get("/api/search", tags=["Root"])
 def global_search(q: str, store_id: int = None, db: Session = Depends(get_db), current = Depends(auth.get_current_user)):
     """Global search pelanggan, HP, invoice — di-scope per toko aktif (multi-toko BOS)."""
-    from .store_ctx import resolve_store
+    from .store_ctx import resolve_store, store_role, teknisi_scope_names, is_own_or_free
     store = resolve_store(db, current, store_id)
     from sqlalchemy import or_
     like = f"%{q}%"
@@ -402,5 +416,11 @@ def global_search(q: str, store_id: int = None, db: Session = Depends(get_db), c
     )
     if store is not None:
         sq = sq.filter(models.Service.store_id == store.id)
-    data = sq.limit(20).all()
+    data = sq.limit(200).all()
+    # teknisi: hanya miliknya + tak bertuan
+    if store_role(db, current, store) == "teknisi":
+        names = teknisi_scope_names(current)
+        data = [s for s in data if is_own_or_free(s.teknisi, names)][:20]
+    else:
+        data = data[:20]
     return data

@@ -85,6 +85,7 @@ class User(Base):
     role = Column(String(20), default="superadmin")  # superadmin, owner, admin, kasir, teknisi
     nama = Column(String(120), nullable=True)  # nama lengkap (wajib untuk owner baru via invite)
     wa = Column(String(20), nullable=True)  # no WA (wajib untuk owner baru via invite)
+    foto = Column(String(255), nullable=True)  # path foto profil (/assets/images/avatars/u{id}.jpg)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     last_login = Column(DateTime, nullable=True)
@@ -187,3 +188,15 @@ class AuditLog(Base):
     target = Column(String(120), nullable=True)  # mis. kode invite / username
     detail = Column(Text, nullable=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
+
+
+class WaTemplate(Base):
+    """Template pesan WA per toko per status. Kosong = pakai default."""
+    __tablename__ = "wa_templates"
+    __table_args__ = (UniqueConstraint("store_id", "key", name="uq_wa_tpl_store_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+    key = Column(String(30), nullable=False, index=True)  # service_masuk/bisa_diambil/gagal/sudah_diambil/klaim_garansi/umum
+    template = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

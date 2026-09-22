@@ -134,10 +134,19 @@ def get_service(db: Session, invoice: str, store_id=None):
         return None
     return enrich_service(svc)
 
-def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None, store_id=None):
+def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None, store_id=None, teknisi_scope: set = None):
     q = db.query(models.Service)
     if store_id is not None:
         q = q.filter(models.Service.store_id == store_id)
+    if teknisi_scope is not None:
+        # teknisi: hanya miliknya + yang belum di-assign
+        from sqlalchemy import or_ as _or
+        from .store_ctx import UNASSIGNED_TEKNISI
+        q = q.filter(_or(
+            models.Service.teknisi.in_(list(teknisi_scope)),
+            models.Service.teknisi.is_(None),
+            models.Service.teknisi.in_(list(UNASSIGNED_TEKNISI)),
+        ))
     if status and status != "all":
         q = q.filter(models.Service.status == status)
     if search:

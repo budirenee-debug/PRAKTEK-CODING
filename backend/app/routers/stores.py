@@ -10,6 +10,18 @@ from .auth import get_current_user, require_superadmin
 router = APIRouter(prefix="/stores", tags=["Stores"])
 
 
+# ---------- Template WA per status (default; {variabel} diisi frontend) ----------
+DEFAULT_WA_TEMPLATES = {
+    "umum": "Halo {nama} 👋\nDari {toko}\nInvoice: {invoice}\nDevice: {device}\nKeluhan: {keluhan}\n\nTerima kasih 🙏",
+    "service_masuk": "Halo {nama} 👋\nHP {device} sudah kami terima di {toko} ✅\nInvoice: {invoice}\nKeluhan: {keluhan}\nKami kabari lagi kalau sudah selesai. Terima kasih 🙏",
+    "bisa_diambil": "Halo {nama} 👋\nKabar baik! HP {device} sudah SELESAI diperbaiki ✅\nInvoice: {invoice}\nBiaya: {biaya}\nSilakan diambil di {toko}. Terima kasih 🙏",
+    "gagal": "Halo {nama} 🙏\nMohon maaf, HP {device} belum bisa diperbaiki (gratis, tidak ada biaya).\nInvoice: {invoice}\nSilakan diambil kembali di {toko}.",
+    "sudah_diambil": "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
+    "klaim_garansi": "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
+}
+WA_TEMPLATE_KEYS = list(DEFAULT_WA_TEMPLATES.keys())
+
+
 def make_store_code(db: Session, nama: str) -> str:
     """Kode toko unik dari nama (3 huruf pertama alfanumerik, + digit jika tabrakan)."""
     base = "".join(c for c in nama.upper() if c.isalnum())[:3] or "TKO"
@@ -319,3 +331,49 @@ def remove_member(store_id: int, membership_id: int,
     log_action(db, "member.remove", target=u_rm.username if u_rm else f"uid={m.user_id}",
                detail=f"role={m.role}", actor=current, store_id=store_id)
     return {"message": "Anggota dikeluarkan dari toko (nonaktif)", "membership_id": m.id}
+
+
+@router.get("/{store_id}/wa-templates", response_model=list[schemas.WaTemplateOut])
+def list_wa_templates(store_id: int, db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Template WA efektif per status (custom toko, fallback default). Butuh login anggota."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    s = db.query(models.Store).filter(models.Store.id == store_id).first()
+    if not s or not s.is_active:
+        raise HTTPException(status_code=404, detail="Toko tidak ditemukan / nonaktif")
+    customs = {t.key: t for t in db.query(models.WaTemplate).filter(models.WaTemplate.store_id == store_id).all()}
+    return [
+        {"key": k,
+         "template": customs[k].template if k in customs else v,
+         "is_custom": k in customs,
+         "updated_at": customs[k].updated_at if k in customs else None}
+        for k, v in DEFAULT_WA_TEMPLATES.items()
+    ]
+
+
+@router.put("/{store_id}/wa-templates", response_model=schemas.WaTemplateOut)
+def upsert_wa_template(store_id: int, payload: schemas.WaTemplateIn,
+                       db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Ubah 1 template WA toko (owner/admin). Template kosong = reset ke default."""
+    _require_store_manager(db, current, store_id)
+    key = (payload.key or "").strip()
+    if key not in DEFAULT_WA_TEMPLATES:
+        raise HTTPException(status_code=400, detail=f"key harus salah satu: {WA_TEMPLATE_KEYS}")
+    tpl = (payload.template or "").strip()
+    if not tpl:
+        db.query(models.WaTemplate).filter(
+            models.WaTemplate.store_id == store_id, models.WaTemplate.key == key).delete()
+        db.commit()
+        log_action(db, "wa.template_reset", target=key, actor=current, store_id=store_id)
+        return {"key": key, "template": DEFAULT_WA_TEMPLATES[key], "is_custom": False, "updated_at": None}
+    row = db.query(models.WaTemplate).filter(
+        models.WaTemplate.store_id == store_id, models.WaTemplate.key == key).first()
+    if row:
+        row.template = tpl
+    else:
+        row = models.WaTemplate(store_id=store_id, key=key, template=tpl)
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    log_action(db, "wa.template", target=key, detail=f"{len(tpl)} karakter", actor=current, store_id=store_id)
+    return {"key": key, "template": row.template, "is_custom": True, "updated_at": row.updated_at}

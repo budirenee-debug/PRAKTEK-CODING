@@ -239,22 +239,111 @@ function cleanWA(wa){
   return s;
 }
 const WA_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle"><path d="M19.05 4.94A9.88 9.88 0 0012 2C6.48 2 2 6.48 2 12c0 1.76.46 3.48 1.32 4.99L2 22l5.09-1.33A9.88 9.88 0 0012 22c5.52 0 10-4.48 10-10 0-2.64-1.03-5.12-2.95-6.94v-.12z" fill="#25D366"/><path d="M17.1 14.3c-.23-.12-1.35-.67-1.56-.75-.21-.08-.36-.12-.51.12-.15.23-.58.75-.71.9-.13.15-.25.17-.47.06-.22-.12-.94-.35-1.79-1.11-.66-.59-1.1-1.32-1.23-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.25.33-.38.11-.12.15-.22.22-.37.07-.15.04-.27-.02-.38-.06-.11-.51-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43c-.15 0-.38.06-.58.27-.2.22-.77.75-.77 1.84s.79 2.13.9 2.28c.11.15 1.55 2.37 3.76 3.32.53.22.94.36 1.26.46.53.17 1.01.14 1.39.09.42-.06 1.35-.55 1.54-1.08.19-.53.19-.98.13-1.08-.06-.1-.21-.16-.43-.27z" fill="white"/></svg>`;
-function openWhatsApp(wa, nama, device, invoice, keluhan){
+function openWhatsApp(wa, nama, device, invoice, keluhan, key){
   const clean = cleanWA(wa);
   if(!clean) return showToast('No WA tidak valid');
-  const name = nama||'Pelanggan';
-  const dev = device||'Device';
-  const inv = invoice||'';
-  const kel = keluhan||'';
-  let msg = `Halo ${name} 👋\n`;
-  msg += `Dari B_gadget POS Service HP\n`;
-  if(inv) msg += `Invoice: ${inv}\n`;
-  if(dev) msg += `Device: ${dev}\n`;
-  if(kel) msg += `Keluhan: ${kel}\n`;
-  msg += `\nTerima kasih 🙏`;
+  const d = data.find(x=>x.id===invoice);
+  const vars = {
+    nama: nama||'Pelanggan', device: device||'Device', invoice: invoice||'',
+    keluhan: keluhan||'', toko: storeDisplayName(),
+    biaya: formatRupiah(Number(d?.biaya)||0), teknisi: d?.teknisi||'-',
+    status: d ? displayStatus(d.status) : '', garansi_dari: d?.garansi_dari||'',
+  };
+  const tpl = waTemplateFor(key||'umum');
+  const msg = tpl.replace(/\{(\w+)\}/g, (_,k)=> (k in vars ? vars[k] : ''));
   // Use wa.me which will open WhatsApp Web/Desktop logged in on PC
   const url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
+}
+// ---------- Template WA per status (per toko, editable di Pengaturan) ----------
+const DEFAULT_WA_TPL = {
+  umum: "Halo {nama} 👋\nDari {toko}\nInvoice: {invoice}\nDevice: {device}\nKeluhan: {keluhan}\n\nTerima kasih 🙏",
+  service_masuk: "Halo {nama} 👋\nHP {device} sudah kami terima di {toko} ✅\nInvoice: {invoice}\nKeluhan: {keluhan}\nKami kabari lagi kalau sudah selesai. Terima kasih 🙏",
+  bisa_diambil: "Halo {nama} 👋\nKabar baik! HP {device} sudah SELESAI diperbaiki ✅\nInvoice: {invoice}\nBiaya: {biaya}\nSilakan diambil di {toko}. Terima kasih 🙏",
+  gagal: "Halo {nama} 🙏\nMohon maaf, HP {device} belum bisa diperbaiki (gratis, tidak ada biaya).\nInvoice: {invoice}\nSilakan diambil kembali di {toko}.",
+  sudah_diambil: "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
+  klaim_garansi: "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
+};
+const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', umum:'Umum 💬'};
+function storeDisplayName(){
+  try{
+    const stores = getMyStores();
+    const cur = stores.find(s=>s.id===getActiveStoreId());
+    if(cur) return cur.nama;
+  }catch{}
+  return 'B_gadget';
+}
+function waTemplateFor(key){
+  try{
+    const sid = getActiveStoreId();
+    const cache = JSON.parse(localStorage.getItem('wa_tpl') || 'null');
+    if(cache && cache.storeId === sid && cache.map && cache.map[key]) return cache.map[key];
+  }catch{}
+  return DEFAULT_WA_TPL[key] || DEFAULT_WA_TPL.umum;
+}
+async function refreshWaTemplates(){
+  const sid = getActiveStoreId();
+  if(!sid || !USE_API || !localStorage.getItem('access_token')) return;
+  try{
+    const rows = await apiFetch(`/stores/${sid}/wa-templates`);
+    const map = {};
+    (rows||[]).forEach(r=>{ if(r.key && r.template) map[r.key]=r.template; });
+    localStorage.setItem('wa_tpl', JSON.stringify({storeId: sid, map}));
+  }catch(e){ console.warn('refreshWaTemplates gagal:', e.message); }
+}
+async function loadWaSettings(){
+  const wrap = document.getElementById('waTplList');
+  const nameEl = document.getElementById('waStoreName');
+  const roleEl = document.getElementById('waMyRole');
+  const sid = getActiveStoreId();
+  if(!sid){
+    if(wrap) wrap.innerHTML = '<p style="font-size:12px;color:#dc2626">Belum ada toko aktif — login dulu</p>';
+    return;
+  }
+  if(wrap) wrap.innerHTML = '<p style="font-size:12px;color:#8a8f98">Memuat template...</p>';
+  try{
+    const [store, rows] = await Promise.all([
+      apiFetch(`/stores/${sid}`),
+      apiFetch(`/stores/${sid}/wa-templates`),
+    ]);
+    if(nameEl) nameEl.textContent = `${store.nama} (${store.kode})`;
+    if(roleEl) roleEl.textContent = store.role_saya ? `Peran saya: ${store.role_saya}` : '';
+    const map = {};
+    (rows||[]).forEach(r=>{ map[r.key] = r; });
+    wrap.innerHTML = Object.keys(WA_TPL_LABELS).map(k=>{
+      const r = map[k] || {template: DEFAULT_WA_TPL[k], is_custom: false};
+      return `<div style="border:1px solid #ececec;border-radius:12px;padding:12px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <strong style="font-size:13px">${WA_TPL_LABELS[k]}</strong>
+          ${r.is_custom
+            ? '<span style="font-size:10px;background:#ecfdf5;color:#059669;padding:2px 8px;border-radius:12px">custom</span>'
+            : '<span style="font-size:10px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:12px">default</span>'}
+          <span style="flex:1"></span>
+          <button class="btn btn-ghost small" style="font-size:11px" onclick="resetWaTemplate('${k}')">↩ Reset</button>
+          <button class="btn btn-dark small" style="font-size:11px" onclick="saveWaTemplate('${k}')">Simpan</button>
+        </div>
+        <textarea id="wa-tpl-${k}" rows="4" style="width:100%;padding:10px;border:1px solid #ececec;border-radius:10px;font-size:12px;font-family:inherit;resize:vertical">${escapeHtml(r.template||'')}</textarea>
+      </div>`;
+    }).join('');
+    await refreshWaTemplates();
+  }catch(e){
+    if(wrap) wrap.innerHTML = `<p style="font-size:12px;color:#dc2626">Gagal: ${escapeHtml(String(e.message)).slice(0,200)}${String(e.message).includes('403') ? ' — hanya owner/admin toko' : ''}</p>`;
+  }
+}
+async function saveWaTemplate(key){
+  const sid = getActiveStoreId();
+  const tpl = document.getElementById(`wa-tpl-${key}`)?.value || '';
+  try{
+    await apiFetch(`/stores/${sid}/wa-templates`, {method:'PUT', body: JSON.stringify({key, template: tpl})});
+    showToast(tpl.trim() ? `✅ Template ${key} disimpan` : `↩ Template ${key} kembali default`);
+    await refreshWaTemplates();
+    await loadWaSettings();
+  }catch(e){ showToast('Gagal simpan: '+e.message); }
+}
+async function resetWaTemplate(key){
+  const ta = document.getElementById(`wa-tpl-${key}`);
+  if(ta) ta.value = DEFAULT_WA_TPL[key] || '';
+  await saveWaTemplate(key);
 }
 function normalize(item){
   // backend -> frontend shape — deadline sekarang = estimasi_selesai jika ada (jatuh tempo = estimasi)
@@ -423,6 +512,56 @@ async function apiFetch(path, opts={}){
 }
 
 let _offlineToastShown = false;
+// ---------- Batas visibilitas teknisi (frontend lapis 2; backend yang menegakkan) ----------
+function myActiveRole(){
+  const g = localStorage.getItem('role') || '';
+  if(g === 'superadmin') return 'superadmin';
+  try{
+    const stores = getMyStores();
+    const active = getActiveStoreId();
+    const cur = stores.find(s=>s.id===active);
+    if(cur && (cur.role_saya || cur.role)) return cur.role_saya || cur.role;
+  }catch{}
+  return g;
+}
+function myTechNames(){
+  const n = new Set();
+  const u = localStorage.getItem('username'); if(u) n.add(u);
+  const nama = localStorage.getItem('nama'); if(nama) n.add(nama);
+  return n;
+}
+function isTeknisiMode(){ return myActiveRole() === 'teknisi'; }
+const TEKNISI_FREE = new Set(['Menunggu Teknisi', '-', '', null, undefined]);
+function filterTeknisiView(list){
+  if(!isTeknisiMode()) return list;
+  const mine = myTechNames();
+  return list.filter(d=> mine.has(d.teknisi) || TEKNISI_FREE.has(d.teknisi));
+}
+async function cacheMyProfile(){
+  // simpan nama lengkap untuk pencocokan teknisi + sembunyikan menu yg tak berhak
+  try{
+    const me = await apiFetch('/auth/me');
+    if(me){
+      if(me.nama) localStorage.setItem('nama', me.nama);
+      if(me.foto) localStorage.setItem('foto', me.foto);
+      else localStorage.removeItem('foto');
+    }
+  }catch{}
+  applyRoleMenu();
+}
+function applyRoleMenu(){
+  const isTek = isTeknisiMode();
+  document.querySelectorAll('.menu-item[data-view="pelanggan"], .menu-item[data-view="tambah-pelanggan"]').forEach(b=>{
+    b.style.display = isTek ? 'none' : '';
+  });
+  const cat = document.getElementById('cat-customer');
+  if(cat) cat.style.display = isTek ? 'none' : '';
+  // kelola tim & pengaturan toko khusus owner/admin (backend juga menolak kasir/teknisi)
+  const canManage = ['superadmin','owner','admin'].includes(myActiveRole());
+  document.querySelectorAll('.menu-item[data-view="kelola-tim"], .menu-item[data-view="pengaturan"]').forEach(b=>{
+    b.style.display = canManage ? '' : 'none';
+  });
+}
 async function loadData(silent){
   if(!USE_API){
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -430,6 +569,7 @@ async function loadData(silent){
     else data = defaultData;
     // jika stored 0 tapi API sebenarnya ada 88, jangan pakai 0 — fallback ke default dan coba online lagi next poll
     if(!data || !data.length) data = defaultData;
+    data = filterTeknisiView(data);
     return;
   }
   try{
@@ -444,6 +584,7 @@ async function loadData(silent){
       saveLocal();
     }
     if(mapped.length) data = mapped;
+    data = filterTeknisiView(data);
     const el = document.querySelector('.store-info span:first-child');
     if(el) el.textContent = '● Sistem Online (API)';
     if(el) el.style.color = '#10b981';
@@ -518,6 +659,7 @@ async function loadAvailableTechs(){
     populateTeknisiSelect();
   }
   if(!USE_API){
+    populateTechFilters();
     return availableTechs;
   }
   try{
@@ -545,6 +687,7 @@ async function loadAvailableTechs(){
     }
   }
   populateTeknisiSelect();
+  populateTechFilters();
   return availableTechs;
 }
 
@@ -663,14 +806,25 @@ function handleLogout(){
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
     localStorage.removeItem('role');
+    localStorage.removeItem('nama');
+    localStorage.removeItem('foto');
     localStorage.removeItem('bos_stores');
     localStorage.removeItem('active_store_id');
     showToast('Logout berhasil - mengalihkan...');
     setTimeout(()=> location.href='login.html', 600);
   }
 }
+function userFotoUrl(f){
+  // path /assets/... dari backend -> absolute ke origin server yg sedang dipakai
+  if(!f) return null;
+  if(/^https?:\/\//i.test(f) || f.startsWith('data:')) return f;
+  const base = (location.origin && location.origin !== 'null' && location.protocol !== 'file:')
+    ? location.origin : API_BASE.replace(/\/api$/, '');
+  return base + (f.startsWith('/') ? f : '/' + f);
+}
 function avatarUrlFor(name, foto){
-  if(foto) return foto;
+  const direct = userFotoUrl(foto);
+  if(direct) return direct;
   if(!name) return 'https://i.pravatar.cc/100?img=33';
   // deterministik: hash username -> 1..70
   let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%70;
@@ -691,9 +845,10 @@ function updateSidebarUser(){
     else elR.textContent = 'Belum login';
   }
   if(elA){
-    // cari foto dari availableTechs jika ada
+    // prioritas: foto upload sendiri > foto teknisi > pravatar
+    const myFoto = localStorage.getItem('foto');
     const tech = availableTechs.find(t=>t.username===u);
-    elA.src = avatarUrlFor(u, tech && tech.foto);
+    elA.src = userFotoUrl(myFoto) || avatarUrlFor(u, tech && tech.foto);
     elA.alt = u;
   }
   // tampilkan menu superadmin hanya untuk superadmin
@@ -702,6 +857,7 @@ function updateSidebarUser(){
   const menu = document.getElementById('menu-approval');
   if(cat) cat.style.display = isSuper ? 'block' : 'none';
   if(menu) menu.style.display = isSuper ? 'flex' : 'none';
+  applyRoleMenu();
   // selalu coba refresh badge jika superadmin
   if(isSuper) refreshPendingBadge();
   else {
@@ -747,12 +903,14 @@ async function loadProfil(){
     if(elCreated) elCreated.textContent= me.created_at ? new Date(me.created_at).toLocaleString('id-ID') : '-';
     if(elLast) elLast.textContent= me.last_login ? new Date(me.last_login).toLocaleString('id-ID') : '-';
     const tech = availableTechs.find(t=>t.username===me.username);
-    if(elAvatar) elAvatar.src=avatarUrlFor(me.username, tech && tech.foto);
+    if(elAvatar) elAvatar.src = userFotoUrl(me.foto) || avatarUrlFor(me.username, tech && tech.foto);
     if(inpUser) inpUser.value=me.username;
     if(inpRole) inpRole.value=me.role;
     // sync sidebar juga
     localStorage.setItem('username', me.username);
     localStorage.setItem('role', me.role);
+    if(me.nama) localStorage.setItem('nama', me.nama);
+    if(me.foto) localStorage.setItem('foto', me.foto); else localStorage.removeItem('foto');
     updateSidebarUser();
   }catch(e){
     console.warn('loadProfil gagal', e.message);
@@ -767,6 +925,33 @@ async function loadProfil(){
     if(inpRole) inpRole.value=r;
     if(elAvatar) elAvatar.src=avatarUrlFor(u);
   }
+}
+async function uploadFoto(){
+  const inp=document.getElementById('p-foto');
+  if(!inp || !inp.files || !inp.files.length) return showToast('Pilih file foto dulu');
+  const fd=new FormData();
+  fd.append('file', inp.files[0]);
+  try{
+    const token=localStorage.getItem('access_token');
+    const res=await fetch(`${API_BASE}/auth/me/foto`, {method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd});
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(j.detail || 'Gagal upload');
+    localStorage.setItem('foto', j.foto);
+    inp.value='';
+    updateSidebarUser();
+    await loadProfil();
+    showToast('📷 Foto profil diperbarui');
+  }catch(e){ showToast('Gagal upload: '+e.message); }
+}
+async function deleteFoto(){
+  if(!confirm('Hapus foto profil? Kembali ke avatar default.')) return;
+  try{
+    await apiFetch('/auth/me', {method:'PATCH', body: JSON.stringify({foto: null})});
+    localStorage.removeItem('foto');
+    updateSidebarUser();
+    await loadProfil();
+    showToast('🗑 Foto dihapus');
+  }catch(e){ showToast('Gagal hapus: '+e.message); }
 }
 async function handleProfilUpdate(e){
   e.preventDefault();
@@ -1224,6 +1409,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setupNavigation();
   setupChips();
   await initStoreContext();
+  await cacheMyProfile();
+  refreshWaTemplates();
   await loadData();
   await loadAvailableTechs();
   await loadInventory();
@@ -1444,6 +1631,11 @@ function clearAllSearch(){
   });
 }
 function switchView(view, clearSearch){
+  // teknisi tidak boleh buka modul pelanggan
+  if(isTeknisiMode() && (view==='pelanggan' || view==='tambah-pelanggan')){
+    showToast('⛔ Modul pelanggan khusus owner/admin/kasir');
+    return;
+  }
   if(clearSearch) clearAllSearch();
   document.querySelectorAll('.menu-item').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -1471,6 +1663,7 @@ function switchView(view, clearSearch){
     'laporan-teknisi':['Laporan Teknisi','Performa teknisi — avatar sesuai foto profil'],
     'laporan-penjualan':['Laporan Penjualan','Pendapatan & penjualan'],
     'profil':['Atur Profil','Kelola username & password akun Anda — avatar sinkron dengan sidebar'],
+    'pengaturan':['Pengaturan Toko','Template pesan WhatsApp per status — owner/admin only'],
     'kelola-tim':['Kelola Tim','Undang kasir/teknisi/admin via kode invite toko — owner/admin only'],
     'approval-akun':['Persetujuan Akun','Kelola persetujuan admin & teknisi — superadmin only']
   };
@@ -1494,6 +1687,7 @@ function switchView(view, clearSearch){
   if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); }
   if(view==='laporan-teknisi') renderLaporanTeknisi();
   if(view==='profil') loadProfil();
+  if(view==='pengaturan') loadWaSettings();
   if(view==='kelola-tim') loadTeamData();
   if(view==='approval-akun') loadApprovalData();
   // +Service Baru hanya di 3 tab
@@ -2643,7 +2837,10 @@ function passesDeadlineFilter(d){
   return true;
 }
 function teknisiOptionsHtml(current){
-  const base = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
+  // mode teknisi: hanya boleh oper ke diri sendiri / kembalikan ke Menunggu
+  const base = isTeknisiMode()
+    ? ['Menunggu Teknisi', ...myTechNames()]
+    : ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
   if(current && !base.includes(current)) base.push(current);
   const uniq = [...new Set(base)];
   return uniq.map(name=>{
@@ -2653,6 +2850,25 @@ function teknisiOptionsHtml(current){
     const style = name==='Menunggu Teknisi' ? 'color:#92400e' : '';
     return `<option value="${escapeHtml(name)}" ${sel} style="${style}">${escapeHtml(label)}</option>`;
   }).join('');
+}
+// ---------- Filter teknisi per tab (penilaian kinerja, admin/owner) ----------
+const TECH_FILTER_IDS = ['filterTeknisiSemua','filterTeknisiProses','filterTeknisiBisa','filterTeknisiSudah','filterTeknisiFailed','filterTeknisiGaransi','filterTeknisiPendapatan'];
+function techFilterVal(id){
+  return document.getElementById(id)?.value || '';
+}
+function populateTechFilters(){
+  if(!availableTechs.length) return;
+  TECH_FILTER_IDS.forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const cur=sel.value||'';
+    sel.innerHTML = `<option value="">Semua Teknisi</option>` + availableTechs.map(t=>`<option value="${escapeHtml(t.username)}">${escapeHtml(t.username)}${t.role?` (${escapeHtml(t.role)})`:''}</option>`).join('');
+    if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  });
+}
+function applyTechFilter(list, techName){
+  if(!techName) return list;
+  return list.filter(d=>d.teknisi===techName);
 }
 async function updateBiaya(invoice, newBiaya){
   const n = parseRupiah(String(newBiaya));
@@ -2811,6 +3027,7 @@ function renderKanban(){
       filtered=filtered.filter(d=> (d.nama+d.device+d.keluhan+(d.imei||'')+(d.wa||'')).toLowerCase().includes(pelangganFilter));
    }
    filtered = filtered.filter(passesDeadlineFilter);
+   filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiProses'));
    // terbaru dulu (aktivitas terakhir di atas) biar habis klik langsung ketemu
    filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
    const opts = statusOptions().map(s=>`<option>${s}</option>`).join('');
@@ -2820,7 +3037,7 @@ function renderKanban(){
     return `
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}">
       <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kw)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kw)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kw)} • ${hl(d.nama, kw)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
-      <p>📝 ${hl(d.keluhan, kw)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
+      <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kw)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
       <div class="service-meta"><span class="meta-pill" style="display:inline-flex;align-items:center;gap:4px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" class="teknisi-select" style="border:0;background:transparent;font-size:10px;font-weight:600;max-width:110px;outline:none;color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'inherit'}">${teknisiOptionsHtml(d.teknisi)}</select></span><span class="meta-pill">📦 ${hl((d.kelengkapan||[]).join(', ')||'-', kw)}</span>${deadlineBadge(d)}</div>
       <details class="sp-detail">
         <summary>🔧 Sparepart${usedCount?` (${usedCount})`:''} <span class="sp-hint">▾</span><span class="sp-tools" onclick="event.stopPropagation()"><button class="btn btn-ghost small" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();showStokSparepart('${escapeHtml(d.id)}')" title="Lihat stok">📦</button><button class="btn btn-ghost small" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();suggestSparepart('${escapeHtml(d.id)}')" title="Suggest sesuai merk & keluhan">💡</button></span></summary>
@@ -2873,13 +3090,13 @@ function renderMenungguTeknisiBlock(){
         <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong><div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px" title="${escapeHtml(d.imei||'')}">📱 IMEI: ${escapeHtml(d.imei||'—')} <span style="color:#94a3b8;font-size:10px">${escapeHtml(d.imei?d.imei.slice(-4):'----')}</span></div><span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
         <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}" style="font-size:10px">${escapeHtml(displayStatus(d.status))}</span>
       </div>
-      <div style="font-size:11px;color:#374151">📝 ${escapeHtml(d.keluhan)}</div>
+      <div style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${escapeHtml(d.keluhan)}</div>
       <div style="display:flex;gap:6px;align-items:center">
         <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid #fde68a;background:#fffbeb;font-size:12px;font-weight:600;color:#92400e">${optsHtml}</select>
         <button class="btn btn-dark small" style="padding:7px 10px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;justify-content:space-between">
-        <button class="btn btn-ghost small" style="padding:5px 7px;background:#dcfce7;border-color:#bbf7d0;color:#166534;display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" title="WA">${WA_ICON}</button>
+        <button class="btn btn-ghost small" style="padding:5px 7px;background:#dcfce7;border-color:#bbf7d0;color:#166534;display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}','service_masuk')" title="WA">${WA_ICON}</button>
         <span style="font-size:10px;color:#8a8f98">${escapeHtml(formatTanggal(d.date))} • ${deadlineBadge(d)}</span>
       </div>
     </div>`;
@@ -2900,12 +3117,18 @@ function renderSemuaService(){
     if(f==='Service Sukses') filtered=filtered.filter(d=> d.status==='Service Sukses' || d.status==='Selesai');
     else filtered=filtered.filter(d=>d.status===f);
   }
-  filtered = filtered.filter(passesDeadlineFilter);
+  filtered=filtered.filter(passesDeadlineFilter);
+  filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiSemua'));
+  // mode teknisi: opsi assign terbatas ke diri sendiri (backend juga menolak yg lain)
+  const canAssignAll = !isTeknisiMode();
+  const assignBase = canAssignAll
+    ? ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)]
+    : ['Menunggu Teknisi', ...myTechNames()];
   // update blok menunggu teknisi (selalu dari data full, bukan filtered, agar warning tetap)
   renderMenungguTeknisiBlock();
   tbody.innerHTML = filtered.map(d=>{
     const isMenunggu = d.teknisi==='Menunggu Teknisi' || !d.teknisi || d.teknisi==='-';
-    const baseOpts = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
+    const baseOpts = [...assignBase];
     if(d.teknisi && !baseOpts.includes(d.teknisi)) baseOpts.push(d.teknisi);
     const uniqOpts = [...new Set(baseOpts)];
     const optionsHtml = uniqOpts.map(name=>{
@@ -3154,6 +3377,8 @@ function renderStatusView(targetId, statusName){
   const qStatus = qStatusRaw.toLowerCase();
   const isStatusActive = statusViewMap[targetId] && document.getElementById(statusViewMap[targetId])?.classList.contains('active');
   if(isStatusActive && qStatus) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+(d.imei||'')+d.keluhan).toLowerCase().includes(qStatus));
+  const statusTechMap = {kanbanBisaDiambil:'filterTeknisiBisa', kanbanSudahDiambil:'filterTeknisiSudah', kanbanFailed:'filterTeknisiFailed', kanbanGaransi:'filterTeknisiGaransi'};
+  if(statusTechMap[targetId]) filtered=applyTechFilter(filtered, techFilterVal(statusTechMap[targetId]));
   // terbaru dulu (aktivitas terakhir di atas) di semua tab status
   filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
   // Opsi status di Bisa Diambil mengikuti hasil: JADI→Sukses saja, TIDAK→Failed saja
@@ -3194,7 +3419,7 @@ function renderStatusView(targetId, statusName){
       <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kwStatus)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kwStatus)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kwStatus)} • ${hl(d.nama, kwStatus)}</p></div><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
       ${banner}
       ${garansiBadge}
-      <p>📝 ${hl(d.keluhan, kwStatus)}</p>
+      <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kwStatus)}</p>
       ${d.keterangan ? `<p>${ketLabel}${hl(d.keterangan, kwStatus)}</p>` : ''}
       <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${deadlineBadge(d)}${(isSudahTab && d.diambil_at) ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46" title="Tanggal HP diambil pelanggan">📥 Diambil ${fmtDiambil(d.diambil_at)}</span>` : ''}</div>
       ${garansiBox}
@@ -3216,6 +3441,7 @@ function renderTransaksiPendapatan(){
   const q=(document.getElementById('searchPendapatan')?.value||'').toLowerCase();
   let filtered=data.filter(d=> ['Service Sukses'].includes(d.status));
   if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.teknisi).toLowerCase().includes(q));
+  filtered=applyTechFilter(filtered, techFilterVal('filterTeknisiPendapatan'));
   filtered=filtered.filter(passesDeadlineFilter);
   // sort terbaru dulu
   filtered.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')));
@@ -3570,9 +3796,10 @@ async function updateStatus(id, newStatus){
     }
   } else if(newStatus==='Service Failed'){
     hasil = 'TIDAK';
-    if(fromProses && !oldKet){
+    // alasan gagal selalu ditanya kalau kosong (dari tab mana pun) — bahan evaluasi
+    if(!oldKet){
       const res2 = await askHasilService(id, 'gagal');
-      if(!res2){ renderKanban(); renderSemuaService(); return; } // Batal → kembalikan tampilan
+      if(!res2){ renderKanban(); renderStatusView('kanbanBisaDiambil','Bisa Diambil'); renderStatusView('kanbanFailed','Service Failed'); renderSemuaService(); return; } // Batal → kembalikan tampilan
       if(res2.alasan) ketPatch = res2.alasan;
     }
     if(fromProses) biayaPatch = 0; // gagal = gratis
@@ -3892,7 +4119,7 @@ window.setDeadlineFilter=setDeadlineFilter; window.updateDeadline=updateDeadline
 window.hitungLama=hitungLama; window.formatTanggalImage=formatTanggalImage; window.cleanWA=cleanWA; window.openWhatsApp=openWhatsApp;
 window.API_BASE=API_BASE;
 window.renderHitsIndicators=renderHitsIndicators; window.getBrandFromDevice=getBrandFromDevice; window.getKeluhanCategory=getKeluhanCategory; window.renderMenungguTeknisiBlock=renderMenungguTeknisiBlock; window.badgeClassForStatus=badgeClassForStatus; window.displayStatus=displayStatus;
-window.loadProfil=loadProfil; window.handleProfilUpdate=handleProfilUpdate; window.renderLaporanTeknisi=renderLaporanTeknisi; window.avatarUrlFor=avatarUrlFor;
+window.loadProfil=loadProfil; window.handleProfilUpdate=handleProfilUpdate; window.uploadFoto=uploadFoto; window.deleteFoto=deleteFoto; window.userFotoUrl=userFotoUrl; window.openWhatsApp=openWhatsApp; window.storeDisplayName=storeDisplayName; window.refreshWaTemplates=refreshWaTemplates; window.loadWaSettings=loadWaSettings; window.saveWaTemplate=saveWaTemplate; window.resetWaTemplate=resetWaTemplate; window.renderLaporanTeknisi=renderLaporanTeknisi; window.avatarUrlFor=avatarUrlFor;
 window.loadInventory=loadInventory; window.saveInventory=saveInventory; window.renderSparepart=renderSparepart; window.updateSparepartField=updateSparepartField; window.saveSparepartRow=saveSparepartRow; window.deleteSparepart=deleteSparepart; window.handleSparepartAdd=handleSparepartAdd; window.openSpEditModal=openSpEditModal; window.closeSpEditModal=closeSpEditModal; window.submitSpEdit=submitSpEdit; window.resetSparepartDummy=resetSparepartDummy;
 window.loadAlat=loadAlat; window.saveAlat=saveAlat; window.renderAlat=renderAlat; window.updateAlatField=updateAlatField; window.saveAlatRow=saveAlatRow; window.deleteAlat=deleteAlat; window.openAlatAddModal=openAlatAddModal; window.openAlatEditModal=openAlatEditModal; window.closeAlatModal=closeAlatModal; window.submitAlatEdit=submitAlatEdit; window.resetAlatDummy=resetAlatDummy; window.kondisiBadge=kondisiBadge;
 window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.showStokSparepart=showStokSparepart; window.openSparepartLog=openSparepartLog; window.closeSpareDropdown=closeSpareDropdown; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;

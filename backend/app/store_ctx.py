@@ -70,3 +70,42 @@ def ensure_in_store(row, store: Optional[models.Store], label: str = "Data"):
         from fastapi import HTTPException as _HE
         raise _HE(status_code=404, detail=f"{label} tidak ditemukan di toko ini")
     return row
+
+
+# ---------- Batas visibilitas teknisi (hanya kerjaan sendiri + tak bertuan) ----------
+UNASSIGNED_TEKNISI = {"Menunggu Teknisi", "-", ""}
+
+
+def store_role(db: Session, current, store) -> Optional[str]:
+    """Peran requester di toko aktif: superadmin/owner/admin/kasir/teknisi, None jika bukan anggota."""
+    if not current:
+        return None
+    if getattr(current, "role", None) == "superadmin":
+        return "superadmin"
+    if store is None:
+        return getattr(current, "role", None)
+    m = db.query(models.Membership).filter(
+        models.Membership.user_id == current.id,
+        models.Membership.store_id == store.id,
+        models.Membership.is_active == True,
+    ).first()
+    return m.role if m else None
+
+
+def teknisi_scope_names(current) -> set:
+    """Nama-nama yang dianggap milik teknisi: username + nama lengkap akun."""
+    names = set()
+    if getattr(current, "username", None):
+        names.add(current.username)
+    if getattr(current, "nama", None):
+        names.add(current.nama)
+    return names
+
+
+def is_own_or_free(svc_teknisi, names: set) -> bool:
+    """True jika service milik teknisi (nama cocok) atau belum di-assign siapa pun."""
+    if svc_teknisi in names:
+        return True
+    if svc_teknisi is None or svc_teknisi in UNASSIGNED_TEKNISI:
+        return True
+    return False

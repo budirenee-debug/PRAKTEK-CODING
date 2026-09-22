@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+import os
 
 from ..database import get_db
 from .. import models, schemas
@@ -41,6 +42,8 @@ class UserOut(BaseModel):
     username: str
     role: str
     is_active: bool
+    nama: Optional[str] = None
+    foto: Optional[str] = None
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
     class Config:
@@ -305,6 +308,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 class UpdateMeIn(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
+    foto: Optional[str] = None  # null = hapus foto
 
 @router.patch("/me", response_model=UserOut)
 def update_me(payload: UpdateMeIn, db: Session = Depends(get_db), current = Depends(get_current_user)):
@@ -325,6 +329,8 @@ def update_me(payload: UpdateMeIn, db: Session = Depends(get_db), current = Depe
             raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
         from ..auth import hash_password
         current.password_hash = hash_password(payload.password)
+    if "foto" in payload.model_dump(exclude_unset=True):
+        current.foto = payload.foto
     db.commit()
     db.refresh(current)
     return current
@@ -400,6 +406,45 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current = Depends(r
     db.commit()
     log_action(db, "user.delete", target=uname, actor=current)
     return {"message": f"User {uname} dihapus"}
+
+@router.post("/me/foto")
+def upload_my_foto(file: UploadFile = File(...), db: Session = Depends(get_db), current = Depends(get_current_user)):
+    """Upload foto profil sendiri — otomatis dikompres (max 256px, JPEG q70). Maks 5MB."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File harus gambar (JPG/PNG/WebP)")
+    raw = file.file.read(5 * 1024 * 1024 + 1)
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Ukuran maksimal 5MB")
+    try:
+        from PIL import Image
+        import io
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        img.thumbnail((256, 256), Image.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, "JPEG", quality=70, optimize=True)
+        blob = out.getvalue()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Gambar tidak valid / rusak")
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    av_dir = os.path.join(root, "frontend", "assets", "images", "avatars")
+    os.makedirs(av_dir, exist_ok=True)
+    for ext in ("jpg", "png", "webp", "jpeg"):
+        p = os.path.join(av_dir, f"u{current.id}.{ext}")
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except Exception:
+            pass
+    with open(os.path.join(av_dir, f"u{current.id}.jpg"), "wb") as f:
+        f.write(blob)
+    current.foto = f"/assets/images/avatars/u{current.id}.jpg"
+    db.commit()
+    log_action(db, "user.foto", target=current.username, actor=current)
+    return {"foto": current.foto, "size": len(blob)}
 
 @router.post("/seed-superadmin")
 def seed_superadmin(db: Session = Depends(get_db)):

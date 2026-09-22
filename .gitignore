@@ -28,5 +28,9 @@ tunnel*.log
 *.bak
 Browser/
 
+# Foto profil upload user (data, jangan commit — kayak DB)
+frontend/assets/images/avatars/*
+!frontend/assets/images/avatars/.gitkeep
+
 # VSCode
 .vscode/settings.json

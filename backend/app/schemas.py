@@ -378,6 +378,19 @@ class AuditLogOut(BaseModel):
     class Config:
         from_attributes = True
 
+# ---------- Pengaturan toko: template WA per status ----------
+class WaTemplateIn(BaseModel):
+    key: str = Field(..., description="service_masuk/bisa_diambil/gagal/sudah_diambil/klaim_garansi/umum")
+    template: str = Field(..., description="kosongkan untuk reset ke default")
+
+class WaTemplateOut(BaseModel):
+    key: str
+    template: str
+    is_custom: bool = False
+    updated_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
 class InviteCreate(BaseModel):
     kind: str = Field(..., description="owner | member")
     store_id: Optional[int] = Field(None, description="wajib jika kind=member")

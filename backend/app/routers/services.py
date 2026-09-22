@@ -5,13 +5,19 @@ import datetime
 from ..database import get_db
 from .. import schemas, crud
 from ..audit import log_action
-from ..store_ctx import resolve_store, ensure_in_store
+from ..store_ctx import resolve_store, ensure_in_store, store_role, teknisi_scope_names, is_own_or_free
 from .auth import require_superadmin, get_current_user
 
 router = APIRouter(prefix="/services", tags=["Services"])
 
 def _sid(store) -> Optional[int]:
     return store.id if store is not None else None
+
+def _teknisi_scope(db, current, store):
+    """Set nama milik teknisi jika requester role teknisi, else None (bebas)."""
+    if store_role(db, current, store) == "teknisi":
+        return teknisi_scope_names(current)
+    return None
 
 @router.get("", response_model=List[schemas.ServiceOut])
 def list_services(
@@ -27,7 +33,7 @@ def list_services(
     current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
-    data = crud.get_services(db, skip=skip, limit=limit, status=status, search=search, device=device, deadline_type=deadline_type, overdue=overdue, store_id=_sid(store))
+    data = crud.get_services(db, skip=skip, limit=limit, status=status, search=search, device=device, deadline_type=deadline_type, overdue=overdue, store_id=_sid(store), teknisi_scope=_teknisi_scope(db, current, store))
     return data
 
 @router.get("/{invoice}", response_model=schemas.ServiceOut)
@@ -40,6 +46,9 @@ def get_service(
     store = resolve_store(db, current, store_id)
     svc = crud.get_service(db, invoice, store_id=_sid(store))
     if not svc:
+        raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    scope = _teknisi_scope(db, current, store)
+    if scope is not None and not is_own_or_free(svc.teknisi, scope):
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     return svc
 
@@ -59,6 +68,13 @@ def create_service(
         store = default_store(db)
         if not store:
             raise HTTPException(status_code=400, detail="Belum ada toko — buat dulu via /api/stores")
+    scope = _teknisi_scope(db, current, store)
+    if scope is not None:
+        # teknisi hanya boleh buat service untuk dirinya sendiri
+        if payload.teknisi and payload.teknisi not in scope:
+            raise HTTPException(status_code=403, detail="Teknisi hanya bisa buat service untuk diri sendiri")
+        if not payload.teknisi:
+            payload.teknisi = current.username
     svc = crud.create_service(db, payload, store_id=store.id, store=store)
     return svc
 
@@ -77,6 +93,13 @@ def update_service(
     if not existing:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     ensure_in_store(existing, store, "Service")
+    scope = _teknisi_scope(db, current, store)
+    if scope is not None:
+        if not is_own_or_free(existing.teknisi, scope):
+            raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+        new_tek = payload.model_dump(exclude_unset=True).get("teknisi")
+        if new_tek and new_tek not in scope:
+            raise HTTPException(status_code=403, detail="Teknisi hanya bisa oper ke diri sendiri")
     svc = crud.update_service(db, invoice, payload)
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
@@ -103,6 +126,9 @@ def update_status(
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     ensure_in_store(svc, store, "Service")
+    scope = _teknisi_scope(db, current, store)
+    if scope is not None and not is_own_or_free(svc.teknisi, scope):
+        raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     svc.status = status
     # tgl pengambilan: dicatat persis saat jadi Sukses/Sudah Diambil
     if status in ("Sudah Diambil", "Service Sukses", "Selesai"):
@@ -134,6 +160,12 @@ def klaim_garansi(
     if not orig:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     ensure_in_store(orig, store, "Service")
+    scope = _teknisi_scope(db, current, store)
+    if scope is not None:
+        if not is_own_or_free(orig.teknisi, scope):
+            raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+        if payload.teknisi and payload.teknisi not in scope:
+            raise HTTPException(status_code=403, detail="Teknisi hanya bisa klaim untuk diri sendiri")
     if orig.status not in ("Sudah Diambil", "Service Sukses", "Selesai", "Garansi"):
         raise HTTPException(status_code=400, detail="Klaim garansi hanya dari status Sukses/Sudah Diambil/Garansi")
     # telusuri ke root (klaim dari klaim mengikuti garansi aslinya)

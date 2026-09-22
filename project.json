@@ -71,7 +71,8 @@
       "passlib[bcrypt]==1.7.4",
       "bcrypt==4.0.1",
       "python-jose[cryptography]==3.3.0",
-      "httpx==0.28.1"
+      "httpx==0.28.1",
+      "Pillow==12.3.0"
     ],
     "env_example": "backend/.env.example",
     "env_vars": {

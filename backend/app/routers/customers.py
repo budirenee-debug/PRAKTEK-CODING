@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..database import get_db
 from .. import schemas, crud, models
-from ..store_ctx import resolve_store, ensure_in_store
+from ..store_ctx import resolve_store, ensure_in_store, store_role
 from .auth import get_current_user
 from sqlalchemy import desc
 
@@ -11,6 +11,11 @@ router = APIRouter(prefix="/customers", tags=["Customers"])
 
 def _sid(store) -> Optional[int]:
     return store.id if store is not None else None
+
+def _block_teknisi(db, current, store):
+    # modul pelanggan khusus owner/admin/kasir — teknisi tidak boleh akses
+    if store_role(db, current, store) == "teknisi":
+        raise HTTPException(status_code=403, detail="Modul pelanggan khusus owner/admin/kasir")
 
 @router.get("", response_model=List[dict])
 def list_customers(
@@ -23,6 +28,7 @@ def list_customers(
     current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
+    _block_teknisi(db, current, store)
     sid = _sid(store)
     customers = crud.get_customers(db, search=search, device=device, skip=skip, limit=limit, store_id=sid)
     result = []
@@ -52,6 +58,7 @@ def get_customer(
     current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
+    _block_teknisi(db, current, store)
     c, total, last = crud.get_customer_detail(db, customer_id, store_id=_sid(store)) or (None, None, None)
     if not c:
         raise HTTPException(status_code=404, detail="Customer tidak ditemukan")
@@ -77,6 +84,7 @@ def create_customer(
     current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
+    _block_teknisi(db, current, store)
     if store is None:
         from ..store_ctx import default_store
         store = default_store(db)

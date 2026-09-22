@@ -58,7 +58,7 @@
                         <span class="badge" id="badge-status-garansi">0</span>
                     </button>
 
-                    <div class="menu-category">CUSTOMER</div>
+                    <div class="menu-category" id="cat-customer">CUSTOMER</div>
                     <button class="menu-item" data-view="pelanggan">
                         <span class="mi">◎</span> Data Pelanggan
                     </button>
@@ -101,6 +101,9 @@
                     </button>
 
                     <div class="menu-category">AKUN</div>
+                    <button class="menu-item" data-view="pengaturan">
+                        <span class="mi">⚙</span> Pengaturan Toko
+                    </button>
                     <button class="menu-item" data-view="kelola-tim">
                         <span class="mi">👥</span> Kelola Tim
                     </button>
@@ -358,6 +361,10 @@
                     <button class="tab" data-deadline="harian" onclick="setDeadlineFilter('harian')">Harian 3h <span id="countHarian">0</span></button>
                     <button class="tab" data-deadline="mingguan" onclick="setDeadlineFilter('mingguan')">Mingguan 7h <span id="countMingguan">0</span></button>
                 </div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                    <label for="filterTeknisiProses" style="font-size:11px;color:#8a8f98">👨‍🔧 Teknisi:</label>
+                    <select id="filterTeknisiProses" onchange="renderKanban()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select>
+                </div>
                 <div class="kanban" id="kanban"></div>
             </section>
 
@@ -378,7 +385,8 @@
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>Semua Service</h3><span class="count-pill" id="semuaCount">0 service</span></div>
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchSemua" placeholder="Cari invoice, pelanggan..."></div>
-                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Menunggu Konfirmasi</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Service Sukses</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select></div>
+                        <select id="filterStatusSemua"><option value="">Semua Status</option><option>Antri</option><option>Menunggu Konfirmasi</option><option>Dikerjakan</option><option>Menunggu Sparepart</option><option>Service Sukses</option><option>Bisa Diambil</option><option>Sudah Diambil</option><option>Service Failed</option><option>Garansi</option></select>
+                        <select id="filterTeknisiSemua" onchange="renderSemuaService()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select></div>
                     </div>
                     <div class="table-wrap"><table class="table compact" id="tableSemua"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Keluhan</th><th>Teknisi</th><th>Penerima</th><th title="WhatsApp" style="text-align:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle"><path d="M19.05 4.94A9.88 9.88 0 0012 2C6.48 2 2 6.48 2 12c0 1.76.46 3.48 1.32 4.99L2 22l5.09-1.33A9.88 9.88 0 0012 22c5.52 0 10-4.48 10-10 0-2.64-1.03-5.12-2.95-6.94v-.12z" fill="#25D366"/><path d="M17.1 14.3c-.23-.12-1.35-.67-1.56-.75-.21-.08-.36-.12-.51.12-.15.23-.58.75-.71.9-.13.15-.25.17-.47.06-.22-.12-.94-.35-1.79-1.11-.66-.59-1.1-1.32-1.23-1.54-.13-.22-.01-.34.1-.45.1-.1.22-.25.33-.38.11-.12.15-.22.22-.37.07-.15.04-.27-.02-.38-.06-.11-.51-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43c-.15 0-.38.06-.58.27-.2.22-.77.75-.77 1.84s.79 2.13.9 2.28c.11.15 1.55 2.37 3.76 3.32.53.22.94.36 1.26.46.53.17 1.01.14 1.39.09.42-.06 1.35-.55 1.54-1.08.19-.53.19-.98.13-1.08-.06-.1-.21-.16-.43-.27z" fill="white"/></svg></th><th>Biaya</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
                 </div>
@@ -386,22 +394,22 @@
 
             <!-- SERVICE: BISA DIAMBIL -->
             <section class="view" id="view-bisa-diambil">
-                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span></div><div class="tabs" style="margin-bottom:10px"><button class="tab active" data-bisa="all" onclick="setBisaFilter('all')">Semua</button><button class="tab" data-bisa="JADI" onclick="setBisaFilter('JADI')">✅ Berhasil</button><button class="tab" data-bisa="TIDAK" onclick="setBisaFilter('TIDAK')">❌ Gagal</button></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
+                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span><select id="filterTeknisiBisa" onchange="renderStatusView('kanbanBisaDiambil','Bisa Diambil')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="tabs" style="margin-bottom:10px"><button class="tab active" data-bisa="all" onclick="setBisaFilter('all')">Semua</button><button class="tab" data-bisa="JADI" onclick="setBisaFilter('JADI')">✅ Berhasil</button><button class="tab" data-bisa="TIDAK" onclick="setBisaFilter('TIDAK')">❌ Gagal</button></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
             </section>
 
             <!-- SERVICE: SUDAH DIAMBIL -->
             <section class="view" id="view-sudah-diambil">
-                <div class="card"><div class="card-head toolbar"><div class="toolbar-left"><h3>Sudah Diambil</h3><span class="count-pill" id="sudahCount">0 selesai</span><span class="muted">Terurut dari Bisa Diambil terbaru</span></div></div><div class="kanban" id="kanbanSudahDiambil"></div></div>
+                <div class="card"><div class="card-head toolbar"><div class="toolbar-left"><h3>Sudah Diambil</h3><span class="count-pill" id="sudahCount">0 selesai</span><span class="muted">Terurut dari Bisa Diambil terbaru</span></div><div class="toolbar-right"><select id="filterTeknisiSudah" onchange="renderStatusView('kanbanSudahDiambil','Sudah Diambil')" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select></div></div><div class="kanban" id="kanbanSudahDiambil"></div></div>
             </section>
 
             <!-- SERVICE: FAILED -->
             <section class="view" id="view-service-failed">
-                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="count-pill" id="failedCount">0 failed</span><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span></div><div class="kanban" id="kanbanFailed"></div></div>
+                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="count-pill" id="failedCount">0 failed</span><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span><select id="filterTeknisiFailed" onchange="renderStatusView('kanbanFailed','Service Failed')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanFailed"></div></div>
             </section>
 
             <!-- SERVICE: GARANSI -->
             <section class="view" id="view-status-garansi">
-                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="count-pill" id="garansiCount">0 garansi</span><span class="muted">Service dalam masa garansi</span></div><div class="kanban" id="kanbanGaransi"></div></div>
+                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="count-pill" id="garansiCount">0 garansi</span><span class="muted">Service dalam masa garansi</span><select id="filterTeknisiGaransi" onchange="renderStatusView('kanbanGaransi','Garansi')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanGaransi"></div></div>
             </section>
 
             <!-- CUSTOMER: TAMBAH PELANGGAN -->
@@ -546,7 +554,7 @@
                 <div class="card">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>💰 Pendapatan Sukses</h3><span class="count-pill" id="pendapatanCount">0 service</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="pendapatanTotal">Rp 0</span></div>
-                        <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchPendapatan" placeholder="Cari invoice, pelanggan, device..."></div><button class="btn btn-dark small" onclick="exportPendapatanCSV()">⬇ Export CSV</button></div>
+                        <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchPendapatan" placeholder="Cari invoice, pelanggan, device..."></div><select id="filterTeknisiPendapatan" onchange="renderTransaksiPendapatan()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select><button class="btn btn-dark small" onclick="exportPendapatanCSV()">⬇ Export CSV</button></div>
                     </div>
                     <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>harga tercatat</strong> untuk HP <strong>Service Sukses</strong> saja — otomatis sinkron saat Harga diubah di tab Bisa Diambil/Sudah Diambil. Total = sum `biaya`.</p>
                     <div class="table-wrap"><table class="table compact" id="tablePendapatan"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Status</th><th>Sparepart Dipakai</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyPendapatan"><tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
@@ -626,6 +634,23 @@
             <section class="view" id="view-laporan-penjualan">
                 <div class="card"><div class="card-head"><h3>Laporan Penjualan</h3><span class="muted">Pendapatan</span></div>
                 <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 0</h3><p class="trend">Belum ada penjualan</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>-</h3><p class="trend">Belum ada data</p></div></div></div>
+            </section>
+
+            <!-- AKUN: PENGATURAN TOKO (template WA per status) -->
+            <section class="view" id="view-pengaturan">
+                <div class="card" style="max-width:760px;margin:0 auto">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left">
+                            <h3>⚙ Pengaturan Toko — <span id="waStoreName">-</span></h3>
+                            <span class="muted" id="waMyRole">-</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{invoice}</code> <code>{keluhan}</code> <code>{toko}</code> <code>{biaya}</code> <code>{teknisi}</code> <code>{status}</code> <code>{garansi_dari}</code>. Kosongkan + Simpan = kembali ke default.</p>
+                    <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
+                </div>
             </section>
 
             <!-- AKUN: KELOLA TIM (BOS Fase 3) -->
@@ -710,6 +735,13 @@
                         </div>
                         <button class="btn btn-ghost small" onclick="loadProfil()">↻ Refresh</button>
                     </div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;padding:12px;background:#f9fafb;border:1px solid #ececec;border-radius:14px;flex-wrap:wrap">
+                        <strong style="font-size:12px">📷 Foto Profil</strong>
+                        <input type="file" id="p-foto" accept="image/*" style="font-size:12px;flex:1;min-width:160px">
+                        <button class="btn btn-dark small" onclick="uploadFoto()">Upload</button>
+                        <button class="btn btn-ghost small" onclick="deleteFoto()" title="Kembali ke avatar default">Hapus</button>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin:-10px 0 18px">Otomatis dikompres (max 256px, JPG ringan, maks 5MB). Tampil di sidebar & laporan.</p>
                     <form id="profilForm" onsubmit="handleProfilUpdate(event)">
                         <div class="form-grid">
                             <div class="field"><label>Username *</label><input id="p-username" required minlength="3" placeholder="username baru"></div>
@@ -883,6 +915,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=multistore-detail-ro"></script>
+    <script src="assets/js/script.js?v=multistore-keluhan-besar"></script>
 </body>
 </html>
