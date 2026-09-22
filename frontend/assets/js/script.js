@@ -1298,6 +1298,36 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       if(USE_API){ loadData().then(renderPelanggan); } else renderPelanggan();
       return;
     }
+    if(activeView==='view-bisa-diambil'){
+      renderStatusView('kanbanBisaDiambil','Bisa Diambil');
+      return;
+    }
+    if(activeView==='view-service-failed'){
+      renderStatusView('kanbanFailed','Service Failed');
+      return;
+    }
+    if(activeView==='view-status-garansi'){
+      renderStatusView('kanbanGaransi','Garansi');
+      return;
+    }
+    if(activeView==='view-inventory-sparepart'){
+      const s=document.getElementById('searchSparepart');
+      if(s) s.value=e.target.value;
+      renderSparepart();
+      return;
+    }
+    if(activeView==='view-inventory-alat'){
+      const s=document.getElementById('searchAlat');
+      if(s) s.value=e.target.value;
+      renderAlat();
+      return;
+    }
+    if(activeView==='view-transaksi-pendapatan'){
+      const s=document.getElementById('searchPendapatan');
+      if(s) s.value=e.target.value;
+      renderTransaksiPendapatan();
+      return;
+    }
     // fallback untuk view lain tetap ke pelanggan
     pelangganFilter = q;
     statusFilter = 'all';
@@ -2965,25 +2995,28 @@ function renderStatusView(targetId, statusName){
     if(bisaFilter!=='all') filtered=filtered.filter(d=> (d.hasil||'JADI')===bisaFilter);
   } else if(statusName==='Sudah Diambil'){
     filtered = data.filter(d=> ['Sudah Diambil','Service Sukses','Selesai'].includes(d.status)).filter(passesDeadlineFilter);
-    // terurut dari Bisa Diambil terbaru (updated_at desc) + search permanen di topbar beside jam
+    // terurut dari Bisa Diambil terbaru (updated_at desc) + search topbar (lihat filter umum di bawah)
     filtered.sort((a,b)=> String(b.updated_at||b.date||'').localeCompare(String(a.updated_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
-    const qSudah=(document.getElementById('globalSearch')?.value||'').toLowerCase();
-    // hanya filter jika view Sudah Diambil aktif dan ada query (biar globalSearch beside jam jadi search Sudah Diambil)
-    const isSudahActive=document.getElementById('view-sudah-diambil')?.classList.contains('active');
-    if(isSudahActive && qSudah) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+(d.imei||'')+d.keluhan).toLowerCase().includes(qSudah));
   } else if(statusName==='Service Sukses'){
     filtered = data.filter(d=> ['Service Sukses','Selesai'].includes(d.status)).filter(passesDeadlineFilter);
   } else {
     filtered = data.filter(d=>d.status===statusName).filter(passesDeadlineFilter);
   }
+  // Search topbar mengikuti tab status yang sedang terbuka (Bisa Diambil / Sudah Diambil /
+  // Service Failed / Garansi) — filter in-place, tidak pindah view.
+  const statusViewMap = {kanbanBisaDiambil:'view-bisa-diambil', kanbanSudahDiambil:'view-sudah-diambil', kanbanFailed:'view-service-failed', kanbanGaransi:'view-status-garansi'};
+  const qStatusRaw = (document.getElementById('globalSearch')?.value || '');
+  const qStatus = qStatusRaw.toLowerCase();
+  const isStatusActive = statusViewMap[targetId] && document.getElementById(statusViewMap[targetId])?.classList.contains('active');
+  if(isStatusActive && qStatus) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+(d.imei||'')+d.keluhan).toLowerCase().includes(qStatus));
   // Opsi status di Bisa Diambil mengikuti hasil: JADI→Sukses saja, TIDAK→Failed saja
   const optsBisa = (hasil)=>{
     if(hasil==='JADI') return ['Service Sukses'];
     if(hasil==='TIDAK') return ['Service Failed'];
     return ['Service Sukses','Service Failed']; // legacy: hasil belum ditandai
   };
-  // highlight hanya utk Sudah Diambil yg memang difilter globalSearch
-  const kwStatus = (targetId==='kanbanSudahDiambil') ? (document.getElementById('globalSearch')?.value || '') : '';
+  // highlight keyword hanya saat kanban-nya memang aktif & difilter globalSearch
+  const kwStatus = (isStatusActive && qStatus) ? qStatusRaw : '';
   wrap.innerHTML = filtered.map(d=>{
     const hasil = d.hasil || (isBisa ? 'JADI' : '');
     const gagal = hasil==='TIDAK';
