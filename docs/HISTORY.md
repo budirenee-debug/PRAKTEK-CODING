@@ -2,11 +2,11 @@
 
 > Terakhir update: 22 Sep 2026 (sesi malam, Fase 3 + Dev Dashboard DONE di code). Next: uji browser + push POS1+BOS1.
 
-## 1. Penanda Git (lokal, BELUM push)
+## 1. Penanda Git (SUDAH push 23 Sep 2026)
 - `POS1` (4b8d28c, empty commit) — titik beku POS satu-toko sebelum platform.
 - `BOS1` (a8b6424, 20 files, +1606/-215) — platform multi-toko Fase 1+2.
-- Remote: `https://github.com/budirenee-debug/PRAKTEK-CODING.git` — terakhir push `7da53a6`.
-- **TODO push:** `POS1` + `BOS1` sekaligus (user minta digabung nanti).
+- `BOS2` (342d094, 14 files, +941/-14) — Fase 3 undang tim + dev dashboard + audit log.
+- Remote: `https://github.com/budirenee-debug/PRAKTEK-CODING.git` — main sejajar origin/main.
 
 ## 2. Runner (3 file, jangan dicampur)
 | File | Mode | Bind |
@@ -42,5 +42,5 @@
 ## 6. NEXT (belum dikerjakan)
 - **Fase 3 DONE di code (belum uji browser):** backend `GET/POST /api/stores/{id}/invites` + `POST .../revoke` + `PATCH/DELETE .../members/{membership_id}` (owner/admin only, guard anti-lockout); dashboard menu+view **Kelola Tim** (`?v=multistore-fase3`); `register.html?invite=` dukung member. Catatan: `backend/.env` pakai `DATABASE_URL` relatif — jalanin server via `run.bat`/dari `backend/` agar pakai DB asli.
 - **Dev Dashboard DONE di code (22 Sep malam, belum uji browser):** `frontend/dev.html` terpisah (superadmin only, guard via `/api/auth/me`): kelola invite owner (buat/lihat/batalkan via `/api/invites` existing), reset password akun toko (`PUT /api/auth/users/{id}` password-only — catatan: jangan kirim role owner, ditolak validator), log aktivitas (`audit_logs` + `GET /api/audit` filter action/q, wiring: invite×3, member×2, user×5, store.create, register×3). E2E lolos di DB copy (403 non-superadmin OK). Pintu masuk: tombol 🛠️ Dev di view Persetujuan Akun + URL langsung `/frontend/dev.html`.
-- Push `POS1`+`BOS1` ke GitHub (sekarang termasuk Fase 3 + dev, belum di-commit).
+- Push selesai (POS1+BOS1+BOS2) — repo bersih.
 - Nanti: laporan gabungan owner, paket/billing, root `/` → landing (butuh edit `main.py`).
