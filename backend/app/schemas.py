@@ -64,6 +64,8 @@ class ServiceBase(BaseModel):
     estimasi_selesai: Optional[datetime.date] = None
     deadline_type: Optional[str] = Field(default=None)  # harian=3 hari, mingguan=7 hari — auto dari estimasi_selesai jika kosong
     deadline: Optional[datetime.date] = None  # auto hitung dari estimasi_selesai jika kosong
+    garansi_hari: Optional[int] = Field(default=None, ge=0, description="masa garansi hari, opsional/editable")
+    garansi_sampai: Optional[datetime.date] = Field(default=None, description="batas klaim garansi (auto dari tgl diambil + hari, editable)")
 
     @field_validator('hasil')
     @classmethod
@@ -101,6 +103,12 @@ class ServiceBase(BaseModel):
 class ServiceCreate(ServiceBase):
     pass
 
+class KlaimGaransiIn(BaseModel):
+    """Body klaim garansi: keluhan baru wajib, teknisi & biaya opsional (default ikut asli / 0)."""
+    keluhan: str = Field(..., min_length=5, max_length=1000)
+    teknisi: Optional[str] = Field(None, max_length=100)
+    biaya: int = Field(default=0, ge=0)
+
 class ServiceUpdate(BaseModel):
     nama: Optional[str] = None
     wa: Optional[str] = None
@@ -117,6 +125,8 @@ class ServiceUpdate(BaseModel):
     estimasi_selesai: Optional[datetime.date] = None
     deadline_type: Optional[str] = None
     deadline: Optional[datetime.date] = None
+    garansi_hari: Optional[int] = Field(None, ge=0)
+    garansi_sampai: Optional[datetime.date] = None
 
     @field_validator('hasil')
     @classmethod
@@ -171,6 +181,10 @@ class ServiceOut(BaseModel):
     deadline: Optional[datetime.date] = None
     sisa_hari: Optional[int] = None  # computed: deadline - today
     is_overdue: Optional[bool] = None
+    garansi_hari: Optional[int] = None
+    garansi_sampai: Optional[datetime.date] = None
+    garansi_dari: Optional[str] = None  # invoice asal jika hasil klaim garansi
+    diambil_at: Optional[dt] = None  # kapan jadi Sukses/Sudah Diambil (auto)
     created_at: Optional[dt] = None
     updated_at: Optional[dt] = None
 

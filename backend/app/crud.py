@@ -291,6 +291,17 @@ def update_service(db: Session, invoice: str, payload: schemas.ServiceUpdate):
         # normalisasi dtype
         if "deadline_type" in data and data["deadline_type"]:
             data["deadline_type"] = data["deadline_type"].lower()
+    # garansi: masa hari diisi pada record selesai/diambil & batas masih kosong -> isi otomatis
+    if data.get("garansi_hari"):
+        try:
+            cur_status = data.get("status", svc.status)
+            if cur_status in ("Sudah Diambil", "Service Sukses", "Selesai") and "garansi_sampai" not in data and not svc.garansi_sampai:
+                data["garansi_sampai"] = date.today() + datetime.timedelta(days=int(data["garansi_hari"]))
+        except Exception:
+            pass
+    # tgl pengambilan: dicatat saat status berubah jadi Sukses/Sudah Diambil
+    if data.get("status") in ("Sudah Diambil", "Service Sukses", "Selesai"):
+        data["diambil_at"] = datetime.datetime.now()
     for k, v in data.items():
         setattr(svc, k, v)
     db.commit()

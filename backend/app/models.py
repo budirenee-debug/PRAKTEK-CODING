@@ -63,6 +63,11 @@ class Service(Base):
     penerima = Column(String(100), nullable=True)  # penerima di Service Masuk (anggota terdaftar)
     hasil = Column(String(10), nullable=True)  # JADI / TIDAK - untuk Bisa Diambil (apakah HP jadi diperbaiki)
     keterangan = Column(Text, nullable=True)  # keterangan pengerjaan di Proses Service
+    # garansi: klaim ulang tanpa input baru — masa garansi opsional dari tanggal diambil
+    garansi_hari = Column(Integer, nullable=True)  # lama garansi hari (opsional, editable)
+    garansi_sampai = Column(Date, nullable=True)  # batas klaim (auto = tgl diambil + hari, editable)
+    garansi_dari = Column(String(20), nullable=True)  # invoice asal jika ini hasil klaim garansi
+    diambil_at = Column(DateTime, nullable=True)  # kapan status jadi Sukses/Sudah Diambil (auto, untuk tgl pengambilan & basis garansi)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

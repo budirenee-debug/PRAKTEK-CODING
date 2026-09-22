@@ -79,6 +79,44 @@ def _migrate_deadline():
         print("migrate deadline fail:", e)
 _migrate_deadline()
 
+def _migrate_garansi():
+    """Klaim garansi tanpa input baru: tambah garansi_hari/garansi_sampai/garansi_dari untuk DB lama."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(services)")).fetchall()]
+            if "garansi_hari" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN garansi_hari INTEGER"))
+                print("migrated: garansi_hari")
+            if "garansi_sampai" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN garansi_sampai DATE"))
+                print("migrated: garansi_sampai")
+            if "garansi_dari" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN garansi_dari VARCHAR(20)"))
+                print("migrated: garansi_dari")
+            conn.commit()
+    except Exception as e:
+        print("migrate garansi fail:", e)
+_migrate_garansi()
+
+def _migrate_diambil():
+    """Tgl pengambilan: tambah diambil_at + backfill dari updated_at untuk yg sudah Sukses/diambil."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(services)")).fetchall()]
+            if "diambil_at" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN diambil_at DATETIME"))
+                print("migrated: diambil_at")
+            conn.execute(text(
+                "UPDATE services SET diambil_at = updated_at "
+                "WHERE diambil_at IS NULL AND updated_at IS NOT NULL "
+                "AND status IN ('Sudah Diambil','Service Sukses','Selesai')"))
+            conn.commit()
+    except Exception as e:
+        print("migrate diambil fail:", e)
+_migrate_diambil()
+
 def _migrate_unique_per_store():
     """BOS Fase 2: UNIQUE global -> komposit per toko.
     customers.wa UNIQUE -> UNIQUE(wa, store_id); technicians.nama UNIQUE -> UNIQUE(nama, store_id).
