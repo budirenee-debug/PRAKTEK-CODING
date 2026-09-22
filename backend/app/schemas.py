@@ -283,3 +283,101 @@ class StatsOut(BaseModel):
     deadline_hari_ini: int = 0
     harian: int = 0
     mingguan: int = 0
+
+# ---------- BOS SERVICE multi-toko ----------
+class StoreMini(BaseModel):
+    id: int
+    nama: str
+    kode: str
+    role: str  # peran user di toko ini
+    class Config:
+        from_attributes = True
+
+class StoreCreate(BaseModel):
+    nama: str = Field(..., min_length=2, max_length=120)
+    kode: Optional[str] = Field(None, max_length=10, description="Prefix invoice, mis. BGJ. Auto dari nama jika kosong")
+    alamat: Optional[str] = Field(None, max_length=255)
+    wa: Optional[str] = Field(None, max_length=20)
+
+class StoreOut(BaseModel):
+    id: int
+    nama: str
+    kode: str
+    alamat: Optional[str] = None
+    wa: Optional[str] = None
+    owner_id: Optional[int] = None
+    owner_username: Optional[str] = None
+    is_active: bool = True
+    role_saya: Optional[str] = None  # peran requester di toko ini
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+class MembershipOut(BaseModel):
+    id: int
+    user_id: int
+    username: Optional[str] = None
+    store_id: int
+    store_nama: Optional[str] = None
+    role: str
+    is_active: bool = True
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+class InviteCreate(BaseModel):
+    kind: str = Field(..., description="owner | member")
+    store_id: Optional[int] = Field(None, description="wajib jika kind=member")
+    role: Optional[str] = Field(None, description="admin/kasir/teknisi, wajib jika kind=member")
+    expires_days: Optional[int] = Field(default=30, description="masa berlaku hari, 0 = tanpa batas")
+
+    @field_validator('kind')
+    @classmethod
+    def validate_kind(cls, v):
+        v = v.lower().strip()
+        if v not in ["owner", "member"]:
+            raise ValueError('kind harus owner atau member')
+        return v
+
+class InviteOut(BaseModel):
+    id: int
+    code: str
+    kind: str
+    store_id: Optional[int] = None
+    store_nama: Optional[str] = None
+    role: Optional[str] = None
+    is_used: bool = False
+    used_by_username: Optional[str] = None
+    expires_at: Optional[dt] = None
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+class InviteValidateOut(BaseModel):
+    valid: bool
+    reason: Optional[str] = None
+    kind: Optional[str] = None
+    role: Optional[str] = None
+    store_id: Optional[int] = None
+    store_nama: Optional[str] = None
+
+class RegisterOwnerIn(BaseModel):
+    invite_code: str = Field(..., min_length=8, max_length=20)
+    nama: str = Field(..., min_length=2, max_length=120)
+    username: str = Field(..., min_length=3, max_length=50)
+    wa: str = Field(..., min_length=9, max_length=20)
+    password: str = Field(..., min_length=6)
+    nama_toko: Optional[str] = Field(None, max_length=120, description="wajib jika invite kind=owner")
+
+class RegisterOut(BaseModel):
+    id: int
+    username: str
+    role: str
+    is_active: bool
+    nama: Optional[str] = None
+    store_id: Optional[int] = None
+    store_nama: Optional[str] = None
+    store_kode: Optional[str] = None
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True

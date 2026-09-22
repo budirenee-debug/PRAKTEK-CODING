@@ -16,9 +16,13 @@
                 <div class="brand">
                     <div class="brand-icon">◈</div>
                     <div>
-                        <h2>B_gadget</h2>
+                        <h2 id="brandStoreName">B_gadget</h2>
                         <p>POS Service HP</p>
                     </div>
+                </div>
+                <div class="store-switch" style="padding:8px 12px 0">
+                    <label id="storeSwitcherLabel" for="storeSwitcher" style="font-size:10.5px;color:#9aa0a6;display:block;margin-bottom:4px">🏪 Toko aktif</label>
+                    <select id="storeSwitcher" onchange="switchActiveStore(this.value)" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid #2a2c2f;background:#1b1d1f;color:#e5e7eb;font-size:12px;outline:0"></select>
                 </div>
                 <nav class="menu">
                     <button class="menu-item active" data-view="dashboard">
@@ -772,6 +776,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=9585847-nocache"></script>
+    <script src="assets/js/script.js?v=multistore-fase2"></script>
 </body>
 </html>

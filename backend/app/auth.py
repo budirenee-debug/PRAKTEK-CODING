@@ -70,3 +70,18 @@ def ensure_superadmin(db: Session):
     db.commit()
     db.refresh(user)
     return user
+
+
+_INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # tanpa I,O,0,1 biar tidak ambigu
+
+
+def generate_invite_code(db: Session) -> str:
+    """Buat kode invite unik format BOS-XXXX-XXXX."""
+    import secrets
+    for _ in range(50):
+        part = lambda: "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(4))
+        code = f"BOS-{part()}-{part()}"
+        exists = db.query(models.Invite).filter(models.Invite.code == code).first()
+        if not exists:
+            return code
+    raise RuntimeError("Gagal generate kode invite unik")

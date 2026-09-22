@@ -327,9 +327,82 @@ function updateDeadlinePreview(){
 
 function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
+// ---------- BOS multi-toko: konteks toko aktif ----------
+// Semua request data lewat apiFetch otomatis bawa ?store_id=<aktif>,
+// kecuali endpoint platform (/auth, /stores, /invites, /seed).
+const BOS_NOSCOPE_PREFIX = ['/auth', '/stores', '/invites', '/seed'];
+function getActiveStoreId(){
+  try{
+    const v = localStorage.getItem('active_store_id');
+    const n = v ? parseInt(v, 10) : null;
+    return Number.isFinite(n) ? n : null;
+  }catch{ return null; }
+}
+function getMyStores(){
+  try{
+    const arr = JSON.parse(localStorage.getItem('bos_stores') || '[]');
+    return Array.isArray(arr) ? arr : [];
+  }catch{ return []; }
+}
+function withStoreScope(path){
+  const sid = getActiveStoreId();
+  if(!sid) return path;
+  const noscope = BOS_NOSCOPE_PREFIX.some(x => path === x || path.startsWith(x + '/') || path.startsWith(x + '?'));
+  if(noscope) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'store_id=' + sid;
+}
+async function initStoreContext(){
+  updateStoreBrand();
+  const token = localStorage.getItem('access_token');
+  if(!token || !USE_API) return;
+  try{
+    const stores = await apiFetch('/stores');
+    if(Array.isArray(stores) && stores.length){
+      localStorage.setItem('bos_stores', JSON.stringify(stores));
+      let active = getActiveStoreId();
+      if(!active || !stores.some(s => s.id === active)){
+        active = stores[0].id;
+        localStorage.setItem('active_store_id', String(active));
+      }
+      buildStoreSwitcher(stores, active);
+      updateStoreBrand();
+    }
+  }catch(e){ console.warn('initStoreContext gagal:', e.message); }
+}
+function buildStoreSwitcher(stores, active){
+  const sel = document.getElementById('storeSwitcher');
+  if(!sel) return;
+  sel.innerHTML = '';
+  stores.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `${s.nama} (${s.kode})`;
+    sel.appendChild(o);
+  });
+  sel.value = String(active);
+  const multi = stores.length > 1;
+  sel.style.display = multi ? '' : 'none';
+  const label = document.getElementById('storeSwitcherLabel');
+  if(label) label.style.display = multi ? '' : 'none';
+}
+function updateStoreBrand(){
+  const stores = getMyStores();
+  const active = getActiveStoreId();
+  const cur = stores.find(s => s.id === active) || null;
+  const name = cur ? cur.nama : 'B_gadget';
+  const h2 = document.getElementById('brandStoreName');
+  if(h2) h2.textContent = name;
+  try{ document.title = name + ' — POS Service HP Dashboard'; }catch{}
+}
+function switchActiveStore(id){
+  localStorage.setItem('active_store_id', String(id));
+  updateStoreBrand();
+  location.reload(); // render ulang bersih dengan scope toko baru
+}
+
 // ---------- API helpers ----------
 async function apiFetch(path, opts={}){
-  const url = `${API_BASE}${path}`;
+  const url = `${API_BASE}${withStoreScope(path)}`;
   const token = localStorage.getItem('access_token');
   const baseHeaders = {'Content-Type':'application/json'};
   if(token) baseHeaders['Authorization'] = `Bearer ${token}`;
@@ -444,7 +517,9 @@ async function loadAvailableTechs(){
   try{
     const token = localStorage.getItem('access_token');
     const headers = token ? getAuthHeaders() : {'Content-Type':'application/json'};
-    const res = await fetch(`${API_BASE}/auth/available-technicians`, {headers});
+    const sid = getActiveStoreId();
+    const techUrl = sid ? `${API_BASE}/auth/available-technicians?store_id=${sid}` : `${API_BASE}/auth/available-technicians`;
+    const res = await fetch(techUrl, {headers});
     if(!res.ok) throw new Error(await res.text());
     const rows = await res.json();
     // rows = [{username, role, source}]
@@ -582,6 +657,8 @@ function handleLogout(){
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
     localStorage.removeItem('role');
+    localStorage.removeItem('bos_stores');
+    localStorage.removeItem('active_store_id');
     showToast('Logout berhasil - mengalihkan...');
     setTimeout(()=> location.href='login.html', 600);
   }
@@ -998,6 +1075,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // if(!localStorage.getItem('access_token')){ location.href='login.html'; return; }
   setupNavigation();
   setupChips();
+  await initStoreContext();
   await loadData();
   await loadAvailableTechs();
   await loadInventory();

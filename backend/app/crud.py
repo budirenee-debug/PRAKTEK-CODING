@@ -8,9 +8,22 @@ import datetime
 from datetime import date
 from . import models, schemas
 
-def generate_invoice(db: Session) -> str:
-    """Generate INV-YYYY-XXXX increment. Tahun ambil dari date.today().year"""
+def generate_invoice(db: Session, store=None) -> str:
+    """Generate invoice increment. Per toko: {KODE}-{YYYY}-XXXX (mis. REN-2026-0001).
+    Tanpa store: legacy INV-YYYY-XXXX (tidak berubah)."""
     year = date.today().year
+    if store is not None and getattr(store, "kode", None):
+        prefix = f"{store.kode}-{year}-"
+        last = db.query(models.Service).filter(models.Service.invoice.like(f"{prefix}%")).order_by(desc(models.Service.invoice)).first()
+        if last:
+            try:
+                num = int(last.invoice.split("-")[-1])
+            except:
+                num = 0
+            new_num = num + 1
+        else:
+            new_num = 1
+        return f"{prefix}{str(new_num).zfill(4)}"
     prefix = f"INV-{year}-"
     # cari max invoice tahun ini
     last = db.query(models.Service).filter(models.Service.invoice.like(f"{prefix}%")).order_by(desc(models.Service.invoice)).first()
@@ -115,12 +128,16 @@ def enrich_service(svc):
     return svc
 
 # ----- Service -----
-def get_service(db: Session, invoice: str):
+def get_service(db: Session, invoice: str, store_id=None):
     svc = db.query(models.Service).filter(models.Service.invoice == invoice).first()
+    if svc and store_id is not None and svc.store_id != store_id:
+        return None
     return enrich_service(svc)
 
-def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None):
+def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None, store_id=None):
     q = db.query(models.Service)
+    if store_id is not None:
+        q = q.filter(models.Service.store_id == store_id)
     if status and status != "all":
         q = q.filter(models.Service.status == status)
     if search:
@@ -155,8 +172,10 @@ def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = Non
     rows = [enrich_service(r) for r in rows]
     return rows
 
-def count_services(db: Session, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None):
+def count_services(db: Session, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None, store_id=None):
     q = db.query(models.Service)
+    if store_id is not None:
+        q = q.filter(models.Service.store_id == store_id)
     if status and status != "all":
         q = q.filter(models.Service.status == status)
     if search:
@@ -185,12 +204,15 @@ def count_services(db: Session, status: str = None, search: str = None, device: 
             )
     return q.count()
 
-def create_service(db: Session, payload: schemas.ServiceCreate):
-    invoice = generate_invoice(db)
-    # upsert customer berdasarkan WA
-    customer = db.query(models.Customer).filter(models.Customer.wa == payload.wa).first()
+def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, store=None):
+    invoice = generate_invoice(db, store)
+    # upsert customer berdasarkan WA di toko yang sama
+    cq = db.query(models.Customer).filter(models.Customer.wa == payload.wa)
+    if store_id is not None:
+        cq = cq.filter(models.Customer.store_id == store_id)
+    customer = cq.first()
     if not customer:
-        customer = models.Customer(nama=payload.nama, wa=payload.wa)
+        customer = models.Customer(nama=payload.nama, wa=payload.wa, store_id=store_id)
         db.add(customer)
         db.flush()  # dapat id
     else:
@@ -198,10 +220,13 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
         if customer.nama != payload.nama:
             customer.nama = payload.nama
 
-    # cari technician_id jika nama teknisi diberikan
+    # cari technician_id jika nama teknisi diberikan (di toko yang sama)
     tech_id = None
     if payload.teknisi:
-        tech = db.query(models.Technician).filter(models.Technician.nama == payload.teknisi).first()
+        tq = db.query(models.Technician).filter(models.Technician.nama == payload.teknisi)
+        if store_id is not None:
+            tq = tq.filter(models.Technician.store_id == store_id)
+        tech = tq.first()
         if tech:
             tech_id = tech.id
 
@@ -210,6 +235,7 @@ def create_service(db: Session, payload: schemas.ServiceCreate):
 
     svc = models.Service(
         invoice=invoice,
+        store_id=store_id,
         customer_id=customer.id,
         technician_id=tech_id,
         nama=payload.nama,
@@ -279,17 +305,20 @@ def delete_service(db: Session, invoice: str):
     db.commit()
     return True
 
-def get_stats(db: Session):
-    total = db.query(models.Service).count()
-    dalam_proses = db.query(models.Service).filter(models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
-    selesai_hari = db.query(models.Service).filter(models.Service.status.in_(["Selesai","Service Sukses"]), models.Service.date==date.today()).count()
-    pendapatan = db.query(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.date==date.today()).scalar() or 0
-    antri = db.query(models.Service).filter(models.Service.status=="Antri").count()
-    dikerjakan = db.query(models.Service).filter(models.Service.status=="Dikerjakan").count()
-    sparepart = db.query(models.Service).filter(models.Service.status=="Menunggu Sparepart").count()
-    selesai = db.query(models.Service).filter(models.Service.status.in_(["Selesai","Service Sukses"])).count()
+def get_stats(db: Session, store_id=None):
+    sq = db.query(models.Service)
+    if store_id is not None:
+        sq = sq.filter(models.Service.store_id == store_id)
+    total = sq.count()
+    dalam_proses = sq.filter(models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
+    selesai_hari = sq.filter(models.Service.status.in_(["Selesai","Service Sukses"]), models.Service.date==date.today()).count()
+    pendapatan = sq.with_entities(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.date==date.today()).scalar() or 0
+    antri = sq.filter(models.Service.status=="Antri").count()
+    dikerjakan = sq.filter(models.Service.status=="Dikerjakan").count()
+    sparepart = sq.filter(models.Service.status=="Menunggu Sparepart").count()
+    selesai = sq.filter(models.Service.status.in_(["Selesai","Service Sukses"])).count()
     # deadline stats
-    all_svc = db.query(models.Service).all()
+    all_svc = sq.all()
     overdue = 0
     deadline_hari_ini = 0
     harian = 0
@@ -320,21 +349,26 @@ def get_stats(db: Session):
     }
 
 # ----- Technician -----
-def get_technicians(db: Session):
-    return db.query(models.Technician).filter(models.Technician.is_active==1).all()
+def get_technicians(db: Session, store_id=None):
+    q = db.query(models.Technician).filter(models.Technician.is_active==1)
+    if store_id is not None:
+        q = q.filter(models.Technician.store_id == store_id)
+    return q.all()
 
-def create_technician(db: Session, payload: schemas.TechnicianCreate):
-    t = models.Technician(nama=payload.nama, foto=payload.foto)
+def create_technician(db: Session, payload: schemas.TechnicianCreate, store_id=None):
+    t = models.Technician(nama=payload.nama, foto=payload.foto, store_id=store_id)
     db.add(t)
     db.commit()
     db.refresh(t)
     return t
 
 # ----- Customer -----
-def get_customers(db: Session, search: str = None, device: str = None, skip: int=0, limit: int=50):
+def get_customers(db: Session, search: str = None, device: str = None, skip: int=0, limit: int=50, store_id=None):
     # customer unik by WA, agregasi dari service
     # kita query service dulu lalu group, tapi simpel: query customer + join
     q = db.query(models.Customer)
+    if store_id is not None:
+        q = q.filter(models.Customer.store_id == store_id)
     if search:
         like = f"%{search}%"
         q = q.filter((models.Customer.nama.ilike(like)) | (models.Customer.wa.ilike(like)))
@@ -343,17 +377,25 @@ def get_customers(db: Session, search: str = None, device: str = None, skip: int
         q = q.join(models.Service, models.Service.customer_id==models.Customer.id).filter(models.Service.device.ilike(f"%{device}%")).distinct()
     return q.offset(skip).limit(limit).all()
 
-def get_customer_detail(db: Session, customer_id: int):
-    c = db.query(models.Customer).filter(models.Customer.id==customer_id).first()
+def get_customer_detail(db: Session, customer_id: int, store_id=None):
+    cq = db.query(models.Customer).filter(models.Customer.id==customer_id)
+    if store_id is not None:
+        cq = cq.filter(models.Customer.store_id == store_id)
+    c = cq.first()
     if not c:
         return None
-    total = db.query(models.Service).filter(models.Service.customer_id==c.id).count()
-    last = db.query(models.Service).filter(models.Service.customer_id==c.id).order_by(desc(models.Service.date)).first()
+    sq = db.query(models.Service).filter(models.Service.customer_id==c.id)
+    if store_id is not None:
+        sq = sq.filter(models.Service.store_id == store_id)
+    total = sq.count()
+    last = sq.order_by(desc(models.Service.date)).first()
     return c, total, last
 
 # ----- Sparepart (multi-PC sync) -----
-def get_spareparts(db: Session, search: str = None, merk: str = None, kategori: str = None):
+def get_spareparts(db: Session, search: str = None, merk: str = None, kategori: str = None, store_id=None):
     q = db.query(models.Sparepart)
+    if store_id is not None:
+        q = q.filter(models.Sparepart.store_id == store_id)
     if search:
         like = f"%{search}%"
         q = q.filter((models.Sparepart.nama.ilike(like)) | (models.Sparepart.merk.ilike(like)) | (models.Sparepart.kategori.ilike(like)))
@@ -363,7 +405,7 @@ def get_spareparts(db: Session, search: str = None, merk: str = None, kategori: 
         q = q.filter(models.Sparepart.kategori == kategori)
     return q.order_by(models.Sparepart.updated_at.desc(), models.Sparepart.id.desc()).all()
 
-def create_sparepart(db: Session, payload: schemas.SparepartCreate):
+def create_sparepart(db: Session, payload: schemas.SparepartCreate, store_id=None):
     # stok auto = masuk - keluar jika tidak dikirim
     stok = payload.stok
     if stok is None:
@@ -373,6 +415,7 @@ def create_sparepart(db: Session, payload: schemas.SparepartCreate):
     if merk not in ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]:
         merk = "LAIN"
     sp = models.Sparepart(
+        store_id=store_id,
         nama=payload.nama.strip(),
         merk=merk,
         kategori=payload.kategori or "Display",
@@ -460,8 +503,10 @@ def pakai_sparepart(db: Session, sp_id: int, qty: int = 1):
         return sp, None
 
 # ----- Alat (multi-PC sync) -----
-def get_alats(db: Session, search: str = None, kondisi: str = None):
+def get_alats(db: Session, search: str = None, kondisi: str = None, store_id=None):
     q = db.query(models.Alat)
+    if store_id is not None:
+        q = q.filter(models.Alat.store_id == store_id)
     if search:
         like = f"%{search}%"
         q = q.filter((models.Alat.nama.ilike(like)) | (models.Alat.kondisi.ilike(like)) | (models.Alat.peminjam.ilike(like)))
@@ -469,11 +514,12 @@ def get_alats(db: Session, search: str = None, kondisi: str = None):
         q = q.filter(models.Alat.kondisi == kondisi)
     return q.order_by(models.Alat.updated_at.desc(), models.Alat.id.desc()).all()
 
-def create_alat(db: Session, payload: schemas.AlatCreate):
+def create_alat(db: Session, payload: schemas.AlatCreate, store_id=None):
     stok = payload.stok
     if stok is None:
         stok = max(0, (payload.masuk or 0) - (payload.keluar or 0))
     alat = models.Alat(
+        store_id=store_id,
         nama=payload.nama.strip(),
         kondisi=payload.kondisi or "Baik",
         peminjam=payload.peminjam or "-",

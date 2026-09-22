@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime
 
 from ..database import get_db
-from .. import models
+from .. import models, schemas
 from ..auth import authenticate_user, create_access_token, decode_token, get_user_by_username, ensure_superadmin
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -20,13 +20,20 @@ class LoginIn(BaseModel):
 class RegisterIn(BaseModel):
     username: str
     password: str
-    role: str  # admin, kasir, teknisi
+    role: Optional[str] = None  # legacy (tanpa invite): admin/kasir/teknisi
+    # kontrak baru BOS (invite-only):
+    invite_code: Optional[str] = None
+    nama: Optional[str] = None
+    wa: Optional[str] = None
+    nama_toko: Optional[str] = None  # wajib jika invite kind=owner
 
 class LoginOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
     role: str
+    stores: list[schemas.StoreMini] = []  # toko yang bisa diakses + peran
+    primary_store_id: Optional[int] = None
 
 class UserOut(BaseModel):
     id: int
@@ -57,6 +64,33 @@ def require_superadmin(current = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Hanya superadmin yang boleh mengakses persetujuan akun")
     return current
 
+def _stores_for_login(db: Session, user) -> tuple[list, Optional[int]]:
+    """Daftar toko user untuk response login. Self-contained (tanpa import stores)."""
+    items = []
+    if user.role == "superadmin":
+        for s in db.query(models.Store).order_by(models.Store.id).all():
+            items.append({"id": s.id, "nama": s.nama, "kode": s.kode, "role": "superadmin"})
+    else:
+        mems = db.query(models.Membership).filter(
+            models.Membership.user_id == user.id,
+            models.Membership.is_active == True,
+        ).all()
+        for m in mems:
+            s = db.query(models.Store).filter(models.Store.id == m.store_id).first()
+            if s and s.is_active:
+                items.append({"id": s.id, "nama": s.nama, "kode": s.kode, "role": m.role})
+    primary = items[0]["id"] if items else None
+    return items, primary
+
+def _login_response(db: Session, user):
+    user.last_login = datetime.utcnow()
+    db.commit()
+    token = create_access_token({"sub": user.username, "role": user.role})
+    stores, primary = _stores_for_login(db, user)
+    return {"access_token": token, "token_type": "bearer",
+            "username": user.username, "role": user.role,
+            "stores": stores, "primary_store_id": primary}
+
 @router.post("/login", response_model=LoginOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     ensure_superadmin(db)
@@ -65,10 +99,7 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Username atau password salah")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Akun menunggu persetujuan superadmin — hubungi superadmin untuk aktivasi")
-    user.last_login = datetime.utcnow()
-    db.commit()
-    token = create_access_token({"sub": user.username, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
+    return _login_response(db, user)
 
 @router.post("/login-form", response_model=LoginOut)
 def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -78,10 +109,7 @@ def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         raise HTTPException(status_code=401, detail="Username atau password salah")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Akun menunggu persetujuan superadmin — hubungi superadmin untuk aktivasi")
-    user.last_login = datetime.utcnow()
-    db.commit()
-    token = create_access_token({"sub": user.username, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
+    return _login_response(db, user)
 
 @router.get("/me", response_model=UserOut)
 def me(current = Depends(get_current_user)):
@@ -98,20 +126,41 @@ def pending_users(db: Session = Depends(get_db), current = Depends(require_super
     return db.query(models.User).filter(models.User.is_active == False).all()
 
 @router.get("/available-technicians")
-def available_technicians(db: Session = Depends(get_db), current = Depends(get_current_user)):
+def available_technicians(
+    store_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current = Depends(get_current_user),
+):
     """
     Daftar akun yang bisa di-assign sebagai teknisi/penerima di tab Semua Service & Service Masuk.
-    Menggabungkan User aktif (semua role) + Technician legacy.
+    Di-scope per toko aktif (multi-toko BOS): anggota toko + Technician legacy toko itu.
     Butuh login (token), tidak harus superadmin.
     """
+    from ..store_ctx import resolve_store
     if not current:
         raise HTTPException(status_code=401, detail="Belum login")
-    # User aktif semua role (teknisi/admin/kasir/superadmin) — untuk penerima butuh semua, teknisi butuh filter di frontend
-    users = db.query(models.User).filter(
-        models.User.is_active == True,
-        models.User.role.in_(["teknisi", "admin", "kasir", "superadmin"])
-    ).all()
-    techs = db.query(models.Technician).filter(models.Technician.is_active == 1).all()
+    store = resolve_store(db, current, store_id)
+    sid = store.id if store is not None else None
+    # User aktif: anggota toko (atau semua jika superadmin tanpa scope)
+    if sid is None:
+        users = db.query(models.User).filter(
+            models.User.is_active == True,
+            models.User.role.in_(["teknisi", "admin", "kasir", "superadmin", "owner"])
+        ).all()
+    else:
+        mems = db.query(models.Membership).filter(
+            models.Membership.store_id == sid,
+            models.Membership.is_active == True,
+        ).all()
+        uids = [m.user_id for m in mems]
+        users = db.query(models.User).filter(
+            models.User.id.in_(uids),
+            models.User.is_active == True,
+        ).all() if uids else []
+    tq = db.query(models.Technician).filter(models.Technician.is_active == 1)
+    if sid is not None:
+        tq = tq.filter(models.Technician.store_id == sid)
+    techs = tq.all()
     names = set()
     result = []
     for u in users:
@@ -151,19 +200,17 @@ def reject_user(user_id: int, db: Session = Depends(get_db), current = Depends(r
     db.commit()
     return {"message": f"User {user.username} ditolak & dihapus"}
 
-@router.post("/register", response_model=UserOut, status_code=201)
+@router.post("/register", response_model=schemas.RegisterOut, status_code=201)
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
     from ..auth import hash_password
-    allowed = ["admin", "kasir", "teknisi"]
-    # normalize
-    username = payload.username.strip()
-    role = payload.role.strip().lower()
+    from .invites import check_invite
+    allowed_legacy = ["admin", "kasir", "teknisi"]
+    # normalize umum
+    username = (payload.username or "").strip()
     if len(username) < 3:
         raise HTTPException(status_code=400, detail="Username minimal 3 karakter")
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
-    if role not in allowed:
-        raise HTTPException(status_code=400, detail=f"Role harus salah satu: {allowed}")
     # superadmin tidak boleh daftar via register umum
     if username.lower() == "superadmin":
         raise HTTPException(status_code=400, detail="Username superadmin tidak boleh didaftar")
@@ -172,6 +219,64 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username sudah terdaftar")
     # ensure superadmin tetap ada
     ensure_superadmin(db)
+
+    def _wa_ok(wa: str) -> bool:
+        cleaned = (wa or "").replace(" ", "").replace("-", "").replace("+", "")
+        return cleaned.isdigit() and 9 <= len(cleaned) <= 16
+
+    # ---------- Alur BARU: invite-only BOS ----------
+    if payload.invite_code:
+        inv, reason = check_invite(db, payload.invite_code)
+        if not inv:
+            raise HTTPException(status_code=400, detail=reason or "Kode undangan tidak valid")
+        nama = (payload.nama or "").strip()
+        wa = (payload.wa or "").strip()
+        if len(nama) < 2:
+            raise HTTPException(status_code=400, detail="Nama lengkap minimal 2 karakter")
+        if not _wa_ok(wa):
+            raise HTTPException(status_code=400, detail="No. WA tidak valid (9–16 digit angka)")
+        if inv.kind == "owner":
+            nama_toko = (payload.nama_toko or "").strip()
+            if len(nama_toko) < 2:
+                raise HTTPException(status_code=400, detail="Nama toko pertama wajib diisi")
+            from .stores import make_store_code  # lazy: hindari circular import
+            user = models.User(username=username, password_hash=hash_password(payload.password),
+                               role="owner", nama=nama, wa=wa, is_active=True)
+            db.add(user)
+            db.flush()
+            store = models.Store(nama=nama_toko, kode=make_store_code(db, nama_toko),
+                                 owner_id=user.id, is_active=True)
+            db.add(store)
+            db.flush()
+            db.add(models.Membership(user_id=user.id, store_id=store.id, role="owner", is_active=True))
+            inv.is_used = True
+            inv.used_by = user.id
+            db.commit()
+            db.refresh(user)
+            return {"id": user.id, "username": user.username, "role": user.role,
+                    "is_active": user.is_active, "nama": user.nama,
+                    "store_id": store.id, "store_nama": store.nama, "store_kode": store.kode,
+                    "created_at": user.created_at}
+        else:  # member: gabung ke toko undangan
+            user = models.User(username=username, password_hash=hash_password(payload.password),
+                               role=inv.role, nama=nama, wa=wa, is_active=True)
+            db.add(user)
+            db.flush()
+            db.add(models.Membership(user_id=user.id, store_id=inv.store_id, role=inv.role, is_active=True))
+            inv.is_used = True
+            inv.used_by = user.id
+            db.commit()
+            db.refresh(user)
+            s = db.query(models.Store).filter(models.Store.id == inv.store_id).first()
+            return {"id": user.id, "username": user.username, "role": user.role,
+                    "is_active": user.is_active, "nama": user.nama,
+                    "store_id": s.id if s else None, "store_nama": s.nama if s else None,
+                    "store_kode": s.kode if s else None, "created_at": user.created_at}
+
+    # ---------- Alur LEGACY: tanpa invite (butuh persetujuan superadmin) ----------
+    role = (payload.role or "").strip().lower()
+    if role not in allowed_legacy:
+        raise HTTPException(status_code=400, detail=f"Tanpa kode undangan, role harus salah satu: {allowed_legacy}. Untuk akun Owner, daftar dengan kode undangan.")
     user = models.User(
         username=username,
         password_hash=hash_password(payload.password),
@@ -181,7 +286,10 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return {"id": user.id, "username": user.username, "role": user.role,
+            "is_active": user.is_active, "nama": user.nama,
+            "store_id": None, "store_nama": None, "store_kode": None,
+            "created_at": user.created_at}
 
 class UpdateMeIn(BaseModel):
     username: Optional[str] = None

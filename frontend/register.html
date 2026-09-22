@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daftar — BOS SERVICE</title>
+  <meta name="description" content="Pendaftaran akun Owner BOS SERVICE (invite-only). Siapkan kode undangan dari admin.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/bos.css">
+</head>
+<body>
+  <nav class="bos-nav">
+    <div class="wrap">
+      <a class="bos-brand" href="landing.html">
+        <span class="bos-mark">BOS</span>
+        <span>BOS SERVICE<small>Bisnis Operasional System</small></span>
+      </a>
+      <div class="bos-links">
+        <a href="landing.html">← Beranda</a>
+        <a href="login.html">Masuk</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>Daftar sebagai Owner</h1>
+      <p class="tagline">Invite-only — pendaftaran butuh <strong>kode undangan</strong> dari admin BOS SERVICE. Toko pertamamu langsung dibuatkan.</p>
+
+      <div id="alert" class="alert"></div>
+
+      <form id="registerForm" onsubmit="handleBosRegister(event)" autocomplete="off">
+        <div class="field">
+          <label>Kode Undangan *</label>
+          <input id="r-invite" required placeholder="contoh: BOS-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <span class="hint">Belum punya? Minta ke admin / pemilik toko mitra.</span>
+        </div>
+        <div class="field"><label>Nama Lengkap *</label><input id="r-nama" required placeholder="nama pemilik usaha" autocomplete="off"></div>
+        <div class="field"><label>Username *</label><input id="r-username" required placeholder="min. 3 karakter, tanpa spasi" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label>No. WA *</label><input id="r-wa" required placeholder="contoh: 081234567890" inputmode="tel" autocomplete="off"></div>
+        <div class="field"><label>Nama Toko Pertama *</label><input id="r-toko" required placeholder="contoh: B_gadget Ngawi" autocomplete="off"></div>
+        <div class="field"><label>Password *</label><input id="r-password" type="password" required placeholder="minimal 6 karakter" autocomplete="new-password"></div>
+        <div class="field"><label>Konfirmasi Password *</label><input id="r-confirm" type="password" required placeholder="ulang password" autocomplete="new-password"></div>
+        <button class="btn btn-accent btn-block" style="margin-top:6px" type="submit">Daftar →</button>
+      </form>
+
+      <p class="auth-foot">Sudah punya akun? <a href="login.html">Masuk</a> • <a href="landing.html">Kembali ke Beranda</a></p>
+    </div>
+  </div>
+
+  <script>
+    // API base mengikuti pola project: same-origin /api, fallback localhost saat file://
+    const BOS_API = (() => {
+      const stored = localStorage.getItem('API_BASE');
+      if (stored) return stored;
+      const proto = location.protocol;
+      const host = location.hostname;
+      if (proto === 'file:' || !host || host === 'null' || host === 'localhost' || host === '127.0.0.1')
+        return 'http://127.0.0.1:8000/api';
+      return location.origin + '/api';
+    })();
+
+    function bosAlert(kind, msg){
+      const a = document.getElementById('alert');
+      a.className = 'alert ' + kind; a.textContent = msg; a.style.display = 'block';
+    }
+
+    async function handleBosRegister(e){
+      e.preventDefault();
+      const invite = document.getElementById('r-invite').value.trim().toUpperCase();
+      const nama = document.getElementById('r-nama').value.trim();
+      const username = document.getElementById('r-username').value.trim();
+      const wa = document.getElementById('r-wa').value.trim();
+      const toko = document.getElementById('r-toko').value.trim();
+      const p1 = document.getElementById('r-password').value;
+      const p2 = document.getElementById('r-confirm').value;
+      if (p1 !== p2) return bosAlert('err', 'Konfirmasi password tidak cocok');
+      if (p1.length < 6) return bosAlert('err', 'Password minimal 6 karakter');
+      if (username.length < 3 || /\s/.test(username)) return bosAlert('err', 'Username minimal 3 karakter tanpa spasi');
+      if (!/^[0-9+]{9,16}$/.test(wa)) return bosAlert('err', 'No. WA tidak valid (9–16 digit angka)');
+
+      // Kontrak API Fase backend: POST /api/auth/register
+      // {invite_code, nama, username, wa, password, nama_toko} -> 201 {username, role:"owner", store}
+      try{
+        const res = await fetch(`${BOS_API}/auth/register`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({invite_code: invite, nama, username, wa, password: p1, nama_toko: toko})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Pendaftaran ditolak server');
+        bosAlert('ok', `✅ Berhasil! Akun "${data.username || username}" terdaftar sebagai Owner. Silakan masuk.`);
+        document.getElementById('registerForm').reset();
+        setTimeout(() => location.href = 'login.html', 2000);
+      }catch(err){
+        // Backend lama (sebelum Fase multi-toko) belum kenal kontrak ini
+        const msg = (err.message && err.message !== 'Failed to fetch')
+          ? err.message
+          : 'Server belum mendukung pendaftaran BOS (backend Fase multi-toko menyusul). Data tidak terkirim — coba lagi setelah backend update.';
+        bosAlert(err.message === 'Failed to fetch' ? 'info' : 'err', 'ℹ️ ' + msg);
+      }
+    }
+
+    // prefill kode invite dari link landing: register.html?invite=BOS-XXXX
+    window.addEventListener('load', () => {
+      const code = new URLSearchParams(location.search).get('invite');
+      if (code) document.getElementById('r-invite').value = code.trim().toUpperCase();
+    });
+  </script>
+</body>
+</html>

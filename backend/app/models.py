@@ -2,16 +2,18 @@
 Models - SQLAlchemy ORM
 B_gadget POS Service HP
 """
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, func, Boolean
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, func, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from .database import Base
 import datetime
 
 class Technician(Base):
     __tablename__ = "technicians"
+    __table_args__ = (UniqueConstraint("nama", "store_id", name="uq_technician_nama_store"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    nama = Column(String(100), unique=True, nullable=False, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
+    nama = Column(String(100), nullable=False, index=True)  # unik per toko (composite)
     foto = Column(String(255), nullable=True)  # URL avatar
     is_active = Column(Integer, default=1)  # 1 aktif, 0 nonaktif
     created_at = Column(DateTime, default=func.now())
@@ -21,10 +23,12 @@ class Technician(Base):
 
 class Customer(Base):
     __tablename__ = "customers"
+    __table_args__ = (UniqueConstraint("wa", "store_id", name="uq_customer_wa_store"),)
 
     id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     nama = Column(String(120), nullable=False, index=True)
-    wa = Column(String(20), unique=True, nullable=False, index=True)
+    wa = Column(String(20), nullable=False, index=True)  # unik per toko (composite)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -36,6 +40,7 @@ class Service(Base):
 
     # Invoice sebagai PK string: INV-2026-XXXX
     invoice = Column(String(20), primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=True)
 
@@ -72,16 +77,21 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)  # superadmin
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default="superadmin")  # superadmin, admin, kasir
+    role = Column(String(20), default="superadmin")  # superadmin, owner, admin, kasir, teknisi
+    nama = Column(String(120), nullable=True)  # nama lengkap (wajib untuk owner baru via invite)
+    wa = Column(String(20), nullable=True)  # no WA (wajib untuk owner baru via invite)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     last_login = Column(DateTime, nullable=True)
+
+    memberships = relationship("Membership", back_populates="user")
 
 
 class Sparepart(Base):
     __tablename__ = "spareparts"
 
     id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     nama = Column(String(120), nullable=False, index=True)
     merk = Column(String(20), nullable=False, default="LAIN", index=True)  # IPHONE/SAMSUNG/XIAOMI/OPPO/VIVO/INFINIX/LAIN
     kategori = Column(String(30), nullable=False, default="Display")
@@ -98,6 +108,7 @@ class Alat(Base):
     __tablename__ = "alats"
 
     id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     nama = Column(String(120), nullable=False, index=True)
     kondisi = Column(String(30), nullable=False, default="Baik")  # Baik/Perlu Kalibrasi/Rusak/Dipinjam
     peminjam = Column(String(100), nullable=False, default="-")
@@ -107,3 +118,53 @@ class Alat(Base):
     harga = Column(Integer, default=0)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+# ---------- BOS SERVICE multi-toko ----------
+
+class Store(Base):
+    """Toko/cabang. 1 owner bisa punya banyak toko, 1 user bisa jadi anggota banyak toko."""
+    __tablename__ = "stores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(120), nullable=False)
+    kode = Column(String(10), unique=True, nullable=False, index=True)  # prefix invoice, mis. BGJ
+    alamat = Column(String(255), nullable=True)
+    wa = Column(String(20), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+
+    memberships = relationship("Membership", back_populates="store")
+
+
+class Membership(Base):
+    """Keanggotaan user di toko + peran di toko itu. 1 user boleh multi-toko."""
+    __tablename__ = "memberships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+    role = Column(String(20), default="kasir")  # owner, admin, kasir, teknisi
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+
+    user = relationship("User", back_populates="memberships")
+    store = relationship("Store", back_populates="memberships")
+
+
+class Invite(Base):
+    """Kode undangan. kind=owner -> daftar jadi owner + buat toko baru.
+    kind=member -> gabung ke store_id sebagai role tertentu."""
+    __tablename__ = "invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(20), unique=True, nullable=False, index=True)  # BOS-XXXX-XXXX
+    kind = Column(String(10), default="owner")  # owner | member
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)  # wajib untuk member
+    role = Column(String(20), nullable=True)  # role untuk member: admin/kasir/teknisi
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_used = Column(Boolean, default=False)
+    used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
