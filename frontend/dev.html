@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dev Dashboard — BOS SERVICE</title>
+  <meta name="description" content="Panel developer BOS SERVICE: invite owner, reset password, log aktivitas. Superadmin only.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/bos.css">
+  <style>
+    .dev-wrap{max-width:960px;margin:0 auto;padding:20px 16px 60px}
+    .dev-card{background:#fff;border:1px solid var(--bos-line);border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 18px rgba(0,0,0,.04)}
+    .dev-card h2{font-size:16px;margin-bottom:4px}
+    .dev-card>p.sub{font-size:12.5px;color:var(--bos-muted);margin-bottom:14px}
+    .dev-table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .dev-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--bos-muted);padding:8px;border-bottom:2px solid var(--bos-line)}
+    .dev-table td{padding:8px;border-bottom:1px solid var(--bos-line);vertical-align:top}
+    .dev-table code{font-weight:700;letter-spacing:.5px;cursor:pointer}
+    .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .pill.ok{background:#ecfdf5;color:#059669}
+    .pill.used{background:#f3f4f6;color:#6b7280}
+    .row-flex{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+    .row-flex .field{flex:1;min-width:160px;margin-bottom:0}
+    .mini{font-size:11px;color:var(--bos-muted)}
+    #guardMsg{text-align:center;padding:60px 20px;color:var(--bos-muted)}
+  </style>
+</head>
+<body>
+  <nav class="bos-nav">
+    <div class="wrap">
+      <a class="bos-brand" href="index.html">
+        <span class="bos-mark">DEV</span>
+        <span>BOS SERVICE<small>Developer Dashboard</small></span>
+      </a>
+      <div class="bos-links">
+        <a href="index.html">← Dashboard Toko</a>
+        <a href="#" onclick="devLogout(event)">Keluar</a>
+      </div>
+    </div>
+  </nav>
+
+  <div id="guardMsg">Memeriksa akses superadmin...</div>
+
+  <div class="dev-wrap" id="devWrap" style="display:none">
+    <div id="alert" class="alert"></div>
+
+    <!-- 1. INVITE OWNER -->
+    <div class="dev-card">
+      <h2>🎟️ Invite Owner</h2>
+      <p class="sub">Kode <strong>BOS-XXXX-XXXX</strong> untuk pendaftaran owner + toko baru. 1 kode = 1 akun. Bagikan via <code>register.html?invite=KODE</code>.</p>
+      <div class="row-flex" style="margin-bottom:14px">
+        <div class="field"><label>Berlaku</label>
+          <select id="ownerExpiry">
+            <option value="30">30 hari</option>
+            <option value="7">7 hari</option>
+            <option value="1">1 hari</option>
+            <option value="0">Tanpa batas</option>
+          </select>
+        </div>
+        <button class="btn btn-accent" onclick="createOwnerInvite()">Buat Kode Owner →</button>
+        <button class="btn btn-ghost" onclick="loadOwnerInvites()">↻</button>
+      </div>
+      <div id="newOwnerCode" class="alert ok" style="display:none"></div>
+      <table class="dev-table">
+        <thead><tr><th>Kode</th><th>Status</th><th>Dipakai oleh</th><th>Kedaluwarsa</th><th style="text-align:right">Aksi</th></tr></thead>
+        <tbody id="tbodyOwnerInvites"><tr><td colspan="5">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- 2. RESET PASSWORD -->
+    <div class="dev-card">
+      <h2>🔑 Reset Password Akun Toko</h2>
+      <p class="sub">Untuk owner toko yang lupa password. Password baru langsung aktif — tercatat di log. Tidak bisa reset sesama superadmin.</p>
+      <div class="row-flex" style="margin-bottom:6px">
+        <div class="field"><label>Akun</label><select id="resetUser"><option>Memuat...</option></select></div>
+        <div class="field"><label>Password baru</label><input id="resetPass" placeholder="min. 6 karakter" autocomplete="new-password"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="genPassword()">🎲 Generate Acak</button>
+        <button class="btn btn-dark" onclick="doResetPassword()">Reset Password →</button>
+      </div>
+      <p class="mini" id="resetInfo" style="margin-top:8px"></p>
+    </div>
+
+    <!-- 3. LOG AKTIVITAS -->
+    <div class="dev-card">
+      <h2>📜 Log Aktivitas</h2>
+      <p class="sub">Jejak aksi penting: invite, register, reset password, kelola anggota/toko. <span id="auditCount"></span></p>
+      <div class="row-flex" style="margin-bottom:14px">
+        <div class="field"><label>Aksi</label>
+          <select id="auditAction" onchange="loadAudit()">
+            <option value="">Semua aksi</option>
+            <option value="invite.create_owner">invite.create_owner</option>
+            <option value="invite.create_member">invite.create_member</option>
+            <option value="invite.revoke">invite.revoke</option>
+            <option value="auth.register_owner">auth.register_owner</option>
+            <option value="auth.register_member">auth.register_member</option>
+            <option value="user.reset_password">user.reset_password</option>
+            <option value="user.update">user.update</option>
+            <option value="user.approve">user.approve</option>
+            <option value="user.reject">user.reject</option>
+            <option value="user.toggle">user.toggle</option>
+            <option value="user.delete">user.delete</option>
+            <option value="member.update">member.update</option>
+            <option value="member.remove">member.remove</option>
+            <option value="store.create">store.create</option>
+          </select>
+        </div>
+        <div class="field"><label>Cari (pelaku/target/detail)</label><input id="auditQ" placeholder="ketik + Enter" onkeydown="if(event.key==='Enter')loadAudit()"></div>
+        <button class="btn btn-ghost" onclick="loadAudit()">↻ Refresh</button>
+      </div>
+      <table class="dev-table">
+        <thead><tr><th>Waktu</th><th>Pelaku</th><th>Aksi</th><th>Target / Detail</th></tr></thead>
+        <tbody id="tbodyAudit"><tr><td colspan="4">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const BOS_API = (() => {
+      const stored = localStorage.getItem('API_BASE');
+      if (stored) return stored;
+      const proto = location.protocol, host = location.hostname;
+      if (proto === 'file:' || !host || host === 'null' || host === 'localhost' || host === '127.0.0.1')
+        return 'http://127.0.0.1:8000/api';
+      return location.origin + '/api';
+    })();
+
+    function devAlert(kind, msg){
+      const a = document.getElementById('alert');
+      a.className = 'alert ' + kind; a.textContent = msg; a.style.display = 'block';
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    function authHeaders(){
+      const h = {'Content-Type': 'application/json'};
+      const t = localStorage.getItem('access_token');
+      if (t) h['Authorization'] = 'Bearer ' + t;
+      return h;
+    }
+    async function devFetch(path, opts = {}){
+      const res = await fetch(BOS_API + path, {...opts, headers: authHeaders()});
+      if (!res.ok){
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.detail || ('HTTP ' + res.status));
+      }
+      return res.json();
+    }
+    function devLogout(e){
+      if (e) e.preventDefault();
+      ['access_token','username','role','bos_stores','active_store_id'].forEach(k => localStorage.removeItem(k));
+      location.href = 'login.html';
+    }
+    function copyText(t){
+      const done = () => devAlert('ok', '📋 Disalin: ' + t);
+      if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, () => devAlert('info', t));
+      else devAlert('info', t);
+    }
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+    // ---------- guard: superadmin only ----------
+    (async function guard(){
+      const token = localStorage.getItem('access_token');
+      if (!token){ location.href = 'login.html'; return; }
+      try{
+        const me = await devFetch('/auth/me');
+        if (me.role !== 'superadmin'){
+          document.getElementById('guardMsg').innerHTML = '⛔ Halaman ini khusus <strong>superadmin</strong>.<br><br><a href="index.html">← Kembali ke Dashboard</a>';
+          return;
+        }
+        document.getElementById('guardMsg').style.display = 'none';
+        document.getElementById('devWrap').style.display = 'block';
+        await Promise.all([loadOwnerInvites(), loadResetUsers(), loadAudit()]);
+      }catch(err){
+        document.getElementById('guardMsg').innerHTML = 'Gagal verifikasi akses: ' + esc(err.message) + '<br><br><a href="login.html">Login ulang →</a>';
+      }
+    })();
+
+    // ---------- 1. invite owner ----------
+    async function loadOwnerInvites(){
+      const tb = document.getElementById('tbodyOwnerInvites');
+      tb.innerHTML = '<tr><td colspan="5">Memuat...</td></tr>';
+      try{
+        const rows = await devFetch('/invites');
+        const owners = rows.filter(r => r.kind === 'owner');
+        tb.innerHTML = owners.length ? owners.map(r => `
+          <tr>
+            <td><code onclick="copyText('${r.code}')" title="Klik untuk salin">${esc(r.code)}</code></td>
+            <td>${r.is_used ? '<span class="pill used">Terpakai</span>' : '<span class="pill ok">Aktif</span>'}</td>
+            <td>${esc(r.used_by_username || '-')}</td>
+            <td class="mini">${r.expires_at ? new Date(r.expires_at).toLocaleDateString('id-ID') : '∞'}</td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copyText('${r.code}')">📋</button>
+              <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copyText('${location.origin}/frontend/register.html?invite=${r.code}')">🔗</button>
+              ${r.is_used ? '' : `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#dc2626" onclick="revokeOwnerInvite(${r.id}, '${r.code}')">✕</button>`}
+            </td>
+          </tr>`).join('')
+          : '<tr><td colspan="5">Belum ada kode owner — buat satu di atas.</td></tr>';
+      }catch(err){ tb.innerHTML = `<tr><td colspan="5">Gagal: ${esc(err.message)}</td></tr>`; }
+    }
+    async function createOwnerInvite(){
+      const days = parseInt(document.getElementById('ownerExpiry').value || '30', 10);
+      try{
+        const inv = await devFetch('/invites', {method: 'POST', body: JSON.stringify({kind: 'owner', expires_days: days})});
+        const box = document.getElementById('newOwnerCode');
+        box.style.display = 'block';
+        box.innerHTML = `✅ Kode owner baru: <strong style="font-family:monospace;letter-spacing:1px">${esc(inv.code)}</strong> — <a href="#" onclick="copyText('${inv.code}');return false">salin</a>`;
+        await Promise.all([loadOwnerInvites(), loadAudit()]);
+      }catch(err){ devAlert('err', 'Gagal buat kode: ' + err.message); }
+    }
+    async function revokeOwnerInvite(id, code){
+      if (!confirm(`Batalkan kode ${code}?`)) return;
+      try{
+        await devFetch(`/invites/${id}/revoke`, {method: 'POST'});
+        devAlert('ok', `✕ Kode ${code} dibatalkan`);
+        await Promise.all([loadOwnerInvites(), loadAudit()]);
+      }catch(err){ devAlert('err', 'Gagal batalkan: ' + err.message); }
+    }
+
+    // ---------- 2. reset password ----------
+    let _usersCache = [];
+    async function loadResetUsers(){
+      const sel = document.getElementById('resetUser');
+      try{
+        const [users, stores] = await Promise.all([devFetch('/auth/users'), devFetch('/stores')]);
+        _usersCache = users.filter(u => u.role !== 'superadmin');
+        const ownerOf = {};
+        stores.forEach(s => { if (s.owner_username) (ownerOf[s.owner_username] = ownerOf[s.owner_username] || []).push(`${s.nama} (${s.kode})`); });
+        sel.innerHTML = _usersCache.map(u => {
+          const owns = ownerOf[u.username] ? ' — owner: ' + ownerOf[u.username].join(', ') : '';
+          return `<option value="${u.id}">${esc(u.username)} [${esc(u.role)}]${esc(owns)}${u.is_active ? '' : ' (nonaktif)'}</option>`;
+        }).join('') || '<option>Belum ada user</option>';
+      }catch(err){ sel.innerHTML = '<option>Gagal load</option>'; }
+    }
+    function genPassword(){
+      const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      let p = '';
+      for (let i = 0; i < 10; i++) p += abc[Math.floor(Math.random() * abc.length)];
+      document.getElementById('resetPass').value = p;
+    }
+    async function doResetPassword(){
+      const id = document.getElementById('resetUser').value;
+      const pw = document.getElementById('resetPass').value;
+      const u = _usersCache.find(x => String(x.id) === String(id));
+      if (!u) return devAlert('err', 'Pilih akun dulu');
+      if (!pw || pw.length < 6) return devAlert('err', 'Password minimal 6 karakter');
+      if (!confirm(`Reset password "${u.username}" jadi "${pw}"?`)) return;
+      try{
+        // kirim password saja (tanpa role) agar owner tidak kena validasi role global
+        await devFetch(`/auth/users/${id}`, {method: 'PUT', body: JSON.stringify({password: pw})});
+        document.getElementById('resetInfo').textContent = `✅ Password ${u.username} sudah direset. Sampaikan password baru via jalur aman, minta user ganti di Atur Profil.`;
+        document.getElementById('resetPass').value = '';
+        devAlert('ok', `✅ Password ${u.username} direset (tercatat di log)`);
+        loadAudit();
+      }catch(err){ devAlert('err', 'Gagal reset: ' + err.message); }
+    }
+
+    // ---------- 3. audit log ----------
+    async function loadAudit(){
+      const tb = document.getElementById('tbodyAudit');
+      const action = document.getElementById('auditAction').value;
+      const q = document.getElementById('auditQ').value.trim();
+      tb.innerHTML = '<tr><td colspan="4">Memuat...</td></tr>';
+      try{
+        let path = '/audit?limit=100';
+        if (action) path += '&action=' + encodeURIComponent(action);
+        if (q) path += '&q=' + encodeURIComponent(q);
+        const rows = await devFetch(path);
+        document.getElementById('auditCount').textContent = rows.length + ' baris terakhir.';
+        tb.innerHTML = rows.length ? rows.map(r => `
+          <tr>
+            <td class="mini" style="white-space:nowrap">${r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : '-'}</td>
+            <td><strong>${esc(r.actor_username || '(sistem/publik)')}</strong></td>
+            <td><code style="font-size:11px;cursor:default">${esc(r.action)}</code></td>
+            <td><strong>${esc(r.target || '-')}</strong><div class="mini">${esc(r.detail || '')}</div></td>
+          </tr>`).join('')
+          : '<tr><td colspan="4">Belum ada log — aksi baru (invite/reset/anggota) akan muncul di sini.</td></tr>';
+      }catch(err){ tb.innerHTML = `<tr><td colspan="4">Gagal: ${esc(err.message)}</td></tr>`; }
+    }
+  </script>
+</body>
+</html>

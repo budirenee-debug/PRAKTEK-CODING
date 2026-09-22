@@ -168,3 +168,17 @@ class Invite(Base):
     used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
+
+
+class AuditLog(Base):
+    """Jejak aksi penting platform (dev dashboard). Ditulis setelah aksi sukses commit."""
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=func.now(), index=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_username = Column(String(50), nullable=True)
+    action = Column(String(50), nullable=False, index=True)  # mis. invite.create_owner
+    target = Column(String(120), nullable=True)  # mis. kode invite / username
+    detail = Column(Text, nullable=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)

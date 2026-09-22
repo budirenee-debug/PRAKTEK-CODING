@@ -7,6 +7,7 @@ from datetime import datetime
 
 from ..database import get_db
 from .. import models, schemas
+from ..audit import log_action
 from ..auth import authenticate_user, create_access_token, decode_token, get_user_by_username, ensure_superadmin
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -187,6 +188,7 @@ def approve_user(user_id: int, db: Session = Depends(get_db), current = Depends(
     user.is_active = True
     db.commit()
     db.refresh(user)
+    log_action(db, "user.approve", target=user.username, detail=f"role={user.role}", actor=current)
     return user
 
 @router.post("/reject/{user_id}")
@@ -196,9 +198,11 @@ def reject_user(user_id: int, db: Session = Depends(get_db), current = Depends(r
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
     if user.role == "superadmin":
         raise HTTPException(status_code=400, detail="Tidak bisa hapus superadmin")
+    uname = user.username
     db.delete(user)
     db.commit()
-    return {"message": f"User {user.username} ditolak & dihapus"}
+    log_action(db, "user.reject", target=uname, actor=current)
+    return {"message": f"User {uname} ditolak & dihapus"}
 
 @router.post("/register", response_model=schemas.RegisterOut, status_code=201)
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
@@ -253,6 +257,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
             inv.used_by = user.id
             db.commit()
             db.refresh(user)
+            log_action(db, "auth.register_owner", target=username,
+                       detail=f"toko={store.nama} kode={store.kode} invite={inv.code}",
+                       store_id=store.id)
             return {"id": user.id, "username": user.username, "role": user.role,
                     "is_active": user.is_active, "nama": user.nama,
                     "store_id": store.id, "store_nama": store.nama, "store_kode": store.kode,
@@ -268,6 +275,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
             s = db.query(models.Store).filter(models.Store.id == inv.store_id).first()
+            log_action(db, "auth.register_member", target=username,
+                       detail=f"toko={s.nama if s else '?'} role={inv.role} invite={inv.code}",
+                       store_id=inv.store_id)
             return {"id": user.id, "username": user.username, "role": user.role,
                     "is_active": user.is_active, "nama": user.nama,
                     "store_id": s.id if s else None, "store_nama": s.nama if s else None,
@@ -286,6 +296,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    log_action(db, "auth.register_legacy", target=username, detail=f"role={role} (pending)")
     return {"id": user.id, "username": user.username, "role": user.role,
             "is_active": user.is_active, "nama": user.nama,
             "store_id": None, "store_nama": None, "store_kode": None,
@@ -352,8 +363,11 @@ def update_user(user_id: int, payload: UpdateUserIn, db: Session = Depends(get_d
             raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
         from ..auth import hash_password
         user.password_hash = hash_password(payload.password)
+    is_reset = payload.password is not None and payload.password != ""
     db.commit()
     db.refresh(user)
+    log_action(db, "user.reset_password" if is_reset else "user.update", target=user.username,
+               detail=f"role={user.role} is_active={user.is_active}", actor=current)
     return user
 
 @router.post("/toggle/{user_id}", response_model=UserOut)
@@ -368,6 +382,8 @@ def toggle_user(user_id: int, db: Session = Depends(get_db), current = Depends(r
     user.is_active = not user.is_active
     db.commit()
     db.refresh(user)
+    log_action(db, "user.toggle", target=user.username,
+               detail=f"is_active={user.is_active}", actor=current)
     return user
 
 @router.delete("/users/{user_id}")
@@ -379,9 +395,11 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current = Depends(r
         raise HTTPException(status_code=400, detail="Tidak bisa hapus superadmin")
     if user.id == current.id:
         raise HTTPException(status_code=400, detail="Tidak bisa hapus akun sendiri")
+    uname = user.username
     db.delete(user)
     db.commit()
-    return {"message": f"User {user.username} dihapus"}
+    log_action(db, "user.delete", target=uname, actor=current)
+    return {"message": f"User {uname} dihapus"}
 
 @router.post("/seed-superadmin")
 def seed_superadmin(db: Session = Depends(get_db)):

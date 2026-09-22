@@ -1068,6 +1068,148 @@ async function rejectUser(userId, username){
   }catch(e){ showToast('Gagal tolak: '+e.message); }
 }
 
+// ---------- BOS Fase 3: Kelola Tim per toko ----------
+let _teamLastCode = '';
+let _teamLastLink = '';
+async function loadTeamData(){
+  const tbodyM = document.getElementById('tbodyTeamMembers');
+  const tbodyI = document.getElementById('tbodyTeamInvites');
+  const nameEl = document.getElementById('teamStoreName');
+  const countEl = document.getElementById('teamMemberCount');
+  const roleEl = document.getElementById('teamMyRole');
+  const invCount = document.getElementById('teamInviteCount');
+  const sid = getActiveStoreId();
+  if(!sid){
+    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#dc2626">Belum ada toko aktif — login dulu</td></tr>`;
+    if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">-</td></tr>`;
+    return;
+  }
+  if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat anggota...</td></tr>`;
+  if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat kode...</td></tr>`;
+  try{
+    const [store, members, invites] = await Promise.all([
+      apiFetch(`/stores/${sid}`),
+      apiFetch(`/stores/${sid}/members`),
+      apiFetch(`/stores/${sid}/invites`),
+    ]);
+    if(nameEl) nameEl.textContent = `${store.nama} (${store.kode})`;
+    if(roleEl) roleEl.textContent = store.role_saya ? `Peran saya: ${store.role_saya}` : '';
+    const activeMembers = members.filter(m=>m.is_active);
+    if(countEl) countEl.textContent = `${activeMembers.length} anggota aktif • ${members.length} total`;
+    const me = localStorage.getItem('username');
+    tbodyM.innerHTML = members.map(m=>{
+      const isMe = m.username === me;
+      const roleOpts = ['owner','admin','kasir','teknisi'].map(r=>
+        `<option value="${r}" ${m.role===r?'selected':''}>${r}</option>`).join('');
+      const statusBadge = m.is_active
+        ? '<span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px;font-size:11px">Aktif</span>'
+        : '<span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Nonaktif</span>';
+      return `<tr style="${!m.is_active?'background:#fffbeb':''}">
+        <td><strong>${escapeHtml(m.username||'-')}</strong>${isMe?' <span style="font-size:10px;background:#111;color:#fff;padding:2px 6px;border-radius:8px">Anda</span>':''}</td>
+        <td><select onchange="changeMemberRole(${m.id}, this.value)" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;text-transform:capitalize" ${isMe?'disabled title="Tidak bisa ubah role sendiri"':''}>${roleOpts}</select></td>
+        <td>${statusBadge}</td>
+        <td style="font-size:11px;color:#6b7280">${m.created_at?new Date(m.created_at).toLocaleDateString('id-ID'):'-'}</td>
+        <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+          ${m.is_active
+            ? `<button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#b45309;border-color:#fde68a" onclick="toggleMemberActive(${m.id}, false)" ${isMe?'disabled style="opacity:.45"':''}>❄ Nonaktifkan</button>`
+            : `<button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#059669;border-color:#a7f3d0" onclick="toggleMemberActive(${m.id}, true)">✓ Aktifkan</button>
+               <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="removeMember(${m.id}, '${escapeHtml(m.username||'')}')">🗑 Keluarkan</button>`}
+        </div></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Belum ada anggota</td></tr>`;
+    const activeInv = invites.filter(i=>!i.is_used);
+    if(invCount) invCount.textContent = `${activeInv.length} kode aktif`;
+    tbodyI.innerHTML = activeInv.length ? activeInv.map(i=>`
+      <tr>
+        <td><code style="font-weight:700;letter-spacing:.5px;cursor:pointer" onclick="copyText('${i.code}')" title="Klik untuk salin">${escapeHtml(i.code)}</code><div style="font-size:10px;color:#8a8f98">role: ${escapeHtml(i.role||'-')}</div></td>
+        <td style="text-transform:capitalize;font-size:12px">${escapeHtml(i.role||'-')}</td>
+        <td><span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px;font-size:11px">Aktif</span></td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px" onclick="copyText('${i.code}')">📋</button>
+          <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px" onclick="copyText('${location.origin}/frontend/register.html?invite=${i.code}')">🔗</button>
+          <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="revokeTeamInvite(${i.id})">✕</button>
+        </td>
+      </tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center;padding:16px;color:#059669">✅ Tidak ada kode aktif — buat kode baru di kiri</td></tr>`;
+  }catch(e){
+    const msg = (e.message||'').slice(0,300);
+    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#dc2626">Gagal: ${escapeHtml(msg)}${String(msg).includes('403')?' — hanya owner/admin toko':''}</td></tr>`;
+    if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">Gagal load kode</td></tr>`;
+  }
+}
+async function createTeamInvite(){
+  const sid = getActiveStoreId();
+  if(!sid) return showToast('Belum ada toko aktif');
+  const role = document.getElementById('teamInviteRole')?.value || 'kasir';
+  const expires_days = parseInt(document.getElementById('teamInviteExpiry')?.value || '30', 10);
+  try{
+    const inv = await apiFetch(`/stores/${sid}/invites`, {method:'POST', body: JSON.stringify({role, expires_days})});
+    _teamLastCode = inv.code;
+    _teamLastLink = `${location.origin}/frontend/register.html?invite=${inv.code}`;
+    const box = document.getElementById('teamInviteResult');
+    if(box) box.style.display = 'block';
+    const codeEl = document.getElementById('teamInviteCode');
+    if(codeEl) codeEl.textContent = inv.code;
+    const linkEl = document.getElementById('teamInviteLink');
+    if(linkEl) linkEl.textContent = _teamLastLink;
+    showToast(`✅ Kode ${inv.code} (${role}) dibuat`);
+    await loadTeamData();
+    // tampilkan lagi kode baru setelah reload (loadTeamData tidak reset box)
+    if(box) box.style.display = 'block';
+    if(codeEl) codeEl.textContent = _teamLastCode;
+    if(linkEl) linkEl.textContent = _teamLastLink;
+  }catch(e){ showToast('Gagal buat kode: '+String(e.message).slice(0,200)); }
+}
+function copyTeamInviteCode(){ if(_teamLastCode) copyText(_teamLastCode); }
+function copyTeamInviteLink(){ if(_teamLastLink) copyText(_teamLastLink); }
+function copyText(t){
+  try{
+    navigator.clipboard.writeText(t).then(()=>showToast('📋 Disalin: '+t), ()=>fallbackCopy(t));
+  }catch{ fallbackCopy(t); }
+}
+function fallbackCopy(t){
+  const ta = document.createElement('textarea');
+  ta.value = t; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); showToast('📋 Disalin: '+t); }catch{ showToast(t); }
+  ta.remove();
+}
+async function revokeTeamInvite(inviteId){
+  const sid = getActiveStoreId();
+  if(!confirm('Batalkan kode invite ini? Kode tidak bisa dipakai daftar lagi.')) return;
+  try{
+    await apiFetch(`/stores/${sid}/invites/${inviteId}/revoke`, {method:'POST'});
+    showToast('✕ Kode dibatalkan');
+    await loadTeamData();
+  }catch(e){ showToast('Gagal batalkan: '+e.message); }
+}
+async function changeMemberRole(membershipId, newRole){
+  const sid = getActiveStoreId();
+  if(!confirm(`Ubah role anggota ini jadi "${newRole}"?`)) { loadTeamData(); return; }
+  try{
+    await apiFetch(`/stores/${sid}/members/${membershipId}`, {method:'PATCH', body: JSON.stringify({role: newRole})});
+    showToast(`✎ Role → ${newRole}`);
+    await loadTeamData();
+  }catch(e){ showToast('Gagal ubah role: '+e.message); loadTeamData(); }
+}
+async function toggleMemberActive(membershipId, toActive){
+  const sid = getActiveStoreId();
+  if(!toActive && !confirm('Nonaktifkan anggota ini? Dia tidak bisa akses toko ini sampai diaktifkan lagi.')) return;
+  try{
+    await apiFetch(`/stores/${sid}/members/${membershipId}`, {method:'PATCH', body: JSON.stringify({is_active: toActive})});
+    showToast(toActive ? '✓ Anggota diaktifkan' : '❄ Anggota dinonaktifkan');
+    await loadTeamData();
+  }catch(e){ showToast('Gagal: '+e.message); }
+}
+async function removeMember(membershipId, username){
+  const sid = getActiveStoreId();
+  if(!confirm(`Keluarkan "${username}" dari toko ini? (nonaktif, riwayat service tetap)`)) return;
+  try{
+    await apiFetch(`/stores/${sid}/members/${membershipId}`, {method:'DELETE'});
+    showToast(`🗑 ${username} dikeluarkan`);
+    await loadTeamData();
+  }catch(e){ showToast('Gagal keluarkan: '+e.message); }
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', async ()=>{
   updateSidebarUser();
@@ -1289,6 +1431,7 @@ function switchView(view, clearSearch){
     'laporan-teknisi':['Laporan Teknisi','Performa teknisi — avatar sesuai foto profil'],
     'laporan-penjualan':['Laporan Penjualan','Pendapatan & penjualan'],
     'profil':['Atur Profil','Kelola username & password akun Anda — avatar sinkron dengan sidebar'],
+    'kelola-tim':['Kelola Tim','Undang kasir/teknisi/admin via kode invite toko — owner/admin only'],
     'approval-akun':['Persetujuan Akun','Kelola persetujuan admin & teknisi — superadmin only']
   };
   if(titles[view]){
@@ -1311,6 +1454,7 @@ function switchView(view, clearSearch){
   if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); }
   if(view==='laporan-teknisi') renderLaporanTeknisi();
   if(view==='profil') loadProfil();
+  if(view==='kelola-tim') loadTeamData();
   if(view==='approval-akun') loadApprovalData();
   // +Service Baru hanya di 3 tab
   const btnBaru=document.getElementById('btnServiceBaru');
@@ -3514,3 +3658,4 @@ window.loadAlat=loadAlat; window.saveAlat=saveAlat; window.renderAlat=renderAlat
 window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.showStokSparepart=showStokSparepart; window.openSparepartLog=openSparepartLog; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;
 window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoPendapatan=statGoPendapatan; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan; window.statGoMenungguKonfirmasi=statGoMenungguKonfirmasi;
 window.formatRupiah=formatRupiah; window.formatAngka=formatAngka; window.parseRupiah=parseRupiah; window.attachRupiahLive=attachRupiahLive;
+window.loadTeamData=loadTeamData; window.createTeamInvite=createTeamInvite; window.copyTeamInviteCode=copyTeamInviteCode; window.copyTeamInviteLink=copyTeamInviteLink; window.copyText=copyText; window.revokeTeamInvite=revokeTeamInvite; window.changeMemberRole=changeMemberRole; window.toggleMemberActive=toggleMemberActive; window.removeMember=removeMember; window.switchActiveStore=switchActiveStore;

@@ -5,6 +5,7 @@ from typing import Optional
 
 from ..database import get_db
 from .. import models, schemas
+from ..audit import log_action
 from .auth import require_superadmin
 from ..auth import generate_invite_code
 
@@ -75,6 +76,9 @@ def create_invite(payload: schemas.InviteCreate, db: Session = Depends(get_db), 
     db.add(inv)
     db.commit()
     db.refresh(inv)
+    log_action(db, "invite.create_owner" if inv.kind == "owner" else "invite.create_member",
+               target=inv.code, detail=f"kind={inv.kind} role={inv.role} store_id={inv.store_id}",
+               actor=current, store_id=inv.store_id)
     return _invite_to_out(db, inv)
 
 
@@ -106,4 +110,7 @@ def revoke_invite(invite_id: int, db: Session = Depends(get_db), current=Depends
     inv.is_used = True
     db.commit()
     db.refresh(inv)
+    log_action(db, "invite.revoke", target=inv.code,
+               detail=f"kind={inv.kind} store_id={inv.store_id}", actor=current,
+               store_id=inv.store_id)
     return _invite_to_out(db, inv)

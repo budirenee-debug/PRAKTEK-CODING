@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import Base, engine, get_db
-from .routers import services, customers, technicians, stats, auth, inventory, stores, invites
+from .routers import services, customers, technicians, stats, auth, inventory, stores, invites, audit
 from . import models
 from .seed import seed
 from .auth import ensure_superadmin
@@ -289,6 +289,7 @@ async def no_cache_html(request: Request, call_next):
 app.include_router(auth.router, prefix="/api")
 app.include_router(stores.router, prefix="/api")
 app.include_router(invites.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(services.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(technicians.router, prefix="/api")

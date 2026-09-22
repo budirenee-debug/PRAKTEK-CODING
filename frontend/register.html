@@ -24,21 +24,22 @@
 
   <div class="auth-wrap">
     <div class="auth-card">
-      <h1>Daftar sebagai Owner</h1>
-      <p class="tagline">Invite-only — pendaftaran butuh <strong>kode undangan</strong> dari admin BOS SERVICE. Toko pertamamu langsung dibuatkan.</p>
+      <h1 id="regTitle">Daftar sebagai Owner</h1>
+      <p class="tagline" id="regTagline">Invite-only — pendaftaran butuh <strong>kode undangan</strong> dari admin BOS SERVICE. Toko pertamamu langsung dibuatkan.</p>
 
       <div id="alert" class="alert"></div>
+      <div id="inviteInfo" class="alert info" style="display:none"></div>
 
       <form id="registerForm" onsubmit="handleBosRegister(event)" autocomplete="off">
         <div class="field">
           <label>Kode Undangan *</label>
-          <input id="r-invite" required placeholder="contoh: BOS-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <input id="r-invite" required placeholder="contoh: BOS-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="debouncedCheckInvite()">
           <span class="hint">Belum punya? Minta ke admin / pemilik toko mitra.</span>
         </div>
         <div class="field"><label>Nama Lengkap *</label><input id="r-nama" required placeholder="nama pemilik usaha" autocomplete="off"></div>
         <div class="field"><label>Username *</label><input id="r-username" required placeholder="min. 3 karakter, tanpa spasi" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div class="field"><label>No. WA *</label><input id="r-wa" required placeholder="contoh: 081234567890" inputmode="tel" autocomplete="off"></div>
-        <div class="field"><label>Nama Toko Pertama *</label><input id="r-toko" required placeholder="contoh: B_gadget Ngawi" autocomplete="off"></div>
+        <div class="field" id="tokoField"><label>Nama Toko Pertama *</label><input id="r-toko" required placeholder="contoh: B_gadget Ngawi" autocomplete="off"></div>
         <div class="field"><label>Password *</label><input id="r-password" type="password" required placeholder="minimal 6 karakter" autocomplete="new-password"></div>
         <div class="field"><label>Konfirmasi Password *</label><input id="r-confirm" type="password" required placeholder="ulang password" autocomplete="new-password"></div>
         <button class="btn btn-accent btn-block" style="margin-top:6px" type="submit">Daftar →</button>
@@ -65,6 +66,49 @@
       a.className = 'alert ' + kind; a.textContent = msg; a.style.display = 'block';
     }
 
+    // ---------- BOS Fase 3: deteksi invite owner vs member ----------
+    let _inviteKind = null; // 'owner' | 'member' | null
+    let _inviteTimer = null;
+    function debouncedCheckInvite(){
+      clearTimeout(_inviteTimer);
+      _inviteTimer = setTimeout(checkInviteKind, 500);
+    }
+    async function checkInviteKind(){
+      const code = document.getElementById('r-invite').value.trim().toUpperCase();
+      const info = document.getElementById('inviteInfo');
+      const title = document.getElementById('regTitle');
+      const tagline = document.getElementById('regTagline');
+      const tokoField = document.getElementById('tokoField');
+      const tokoInput = document.getElementById('r-toko');
+      if(!code || code.length < 8){ _inviteKind = null; if(info) info.style.display='none'; return null; }
+      try{
+        const res = await fetch(`${BOS_API}/invites/validate?code=${encodeURIComponent(code)}`);
+        const data = await res.json().catch(() => ({}));
+        if(!res.ok || !data.valid){
+          _inviteKind = null;
+          if(info){ info.className='alert err'; info.textContent='⚠️ '+(data.reason||'Kode tidak valid'); info.style.display='block'; }
+          return null;
+        }
+        _inviteKind = data.kind;
+        if(data.kind === 'member'){
+          if(title) title.textContent = 'Gabung Tim Toko';
+          if(tagline) tagline.innerHTML = `Kode member valid — kamu akan gabung ke <strong>${data.store_nama||''}</strong> sebagai <strong>${data.role||''}</strong>.`;
+          if(tokoField) tokoField.style.display = 'none';
+          if(tokoInput){ tokoInput.required = false; tokoInput.value=''; }
+          if(info){ info.className='alert ok'; info.textContent=`✅ Undangan ${data.role} — ${data.store_nama}`; info.style.display='block'; }
+        } else {
+          if(title) title.textContent = 'Daftar sebagai Owner';
+          if(tagline) tagline.innerHTML = 'Invite-only — pendaftaran butuh <strong>kode undangan</strong> dari admin BOS SERVICE. Toko pertamamu langsung dibuatkan.';
+          if(tokoField) tokoField.style.display = '';
+          if(tokoInput) tokoInput.required = true;
+          if(info){ info.className='alert ok'; info.textContent='✅ Kode owner valid — isi nama toko pertamamu'; info.style.display='block'; }
+        }
+        return data;
+      }catch{
+        return null;
+      }
+    }
+
     async function handleBosRegister(e){
       e.preventDefault();
       const invite = document.getElementById('r-invite').value.trim().toUpperCase();
@@ -79,17 +123,32 @@
       if (username.length < 3 || /\s/.test(username)) return bosAlert('err', 'Username minimal 3 karakter tanpa spasi');
       if (!/^[0-9+]{9,16}$/.test(wa)) return bosAlert('err', 'No. WA tidak valid (9–16 digit angka)');
 
-      // Kontrak API Fase backend: POST /api/auth/register
-      // {invite_code, nama, username, wa, password, nama_toko} -> 201 {username, role:"owner", store}
+      // Kontrak API BOS: POST /api/auth/register
+      // owner: {invite_code, nama, username, wa, password, nama_toko}
+      // member: {invite_code, nama, username, wa, password} -> 201 {username, role, store}
+      const body = {invite_code: invite, nama, username, wa, password: p1};
+      // jika invite member, jangan kirim nama_toko; jika owner wajib
+      if(_inviteKind === 'member'){
+        // tanpa nama_toko
+      } else {
+        if(toko) body.nama_toko = toko;
+        else if(_inviteKind !== 'member'){
+          // biarkan backend validasi (owner wajib nama_toko)
+        }
+      }
       try{
         const res = await fetch(`${BOS_API}/auth/register`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({invite_code: invite, nama, username, wa, password: p1, nama_toko: toko})
+          body: JSON.stringify(body)
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Pendaftaran ditolak server');
-        bosAlert('ok', `✅ Berhasil! Akun "${data.username || username}" terdaftar sebagai Owner. Silakan masuk.`);
+        if(data.store_nama){
+          bosAlert('ok', `✅ Berhasil! Akun "${data.username || username}" terdaftar sebagai ${data.role} di ${data.store_nama}. Silakan masuk.`);
+        } else {
+          bosAlert('ok', `✅ Berhasil! Akun "${data.username || username}" terdaftar sebagai Owner. Silakan masuk.`);
+        }
         document.getElementById('registerForm').reset();
         setTimeout(() => location.href = 'login.html', 2000);
       }catch(err){
@@ -101,10 +160,10 @@
       }
     }
 
-    // prefill kode invite dari link landing: register.html?invite=BOS-XXXX
+    // prefill kode invite dari link: register.html?invite=BOS-XXXX (+ auto-cek kind)
     window.addEventListener('load', () => {
       const code = new URLSearchParams(location.search).get('invite');
-      if (code) document.getElementById('r-invite').value = code.trim().toUpperCase();
+      if (code){ document.getElementById('r-invite').value = code.trim().toUpperCase(); checkInviteKind(); }
     });
   </script>
 </body>

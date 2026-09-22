@@ -325,6 +325,45 @@ class MembershipOut(BaseModel):
     class Config:
         from_attributes = True
 
+# ---------- BOS Fase 3: undang tim per toko ----------
+class StoreInviteCreate(BaseModel):
+    role: str = Field(..., description="admin/kasir/teknisi")
+    expires_days: Optional[int] = Field(default=30, description="masa berlaku hari, 0 = tanpa batas")
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v):
+        v = (v or "").strip().lower()
+        if v not in ["admin", "kasir", "teknisi"]:
+            raise ValueError('role harus admin/kasir/teknisi')
+        return v
+
+class MembershipUpdate(BaseModel):
+    role: Optional[str] = Field(None, description="owner/admin/kasir/teknisi")
+    is_active: Optional[bool] = None
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v):
+        if v is None:
+            return v
+        v = v.strip().lower()
+        if v not in ["owner", "admin", "kasir", "teknisi"]:
+            raise ValueError('role harus owner/admin/kasir/teknisi')
+        return v
+
+# ---------- BOS dev dashboard: audit log ----------
+class AuditLogOut(BaseModel):
+    id: int
+    created_at: Optional[dt] = None
+    actor_username: Optional[str] = None
+    action: str
+    target: Optional[str] = None
+    detail: Optional[str] = None
+    store_id: Optional[int] = None
+    class Config:
+        from_attributes = True
+
 class InviteCreate(BaseModel):
     kind: str = Field(..., description="owner | member")
     store_id: Optional[int] = Field(None, description="wajib jika kind=member")

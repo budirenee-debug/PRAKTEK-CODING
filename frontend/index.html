@@ -101,6 +101,9 @@
                     </button>
 
                     <div class="menu-category">AKUN</div>
+                    <button class="menu-item" data-view="kelola-tim">
+                        <span class="mi">👥</span> Kelola Tim
+                    </button>
                     <button class="menu-item" data-view="profil">
                         <span class="mi">👤</span> Atur Profil
                     </button>
@@ -625,6 +628,72 @@
                 <div class="stats"><div class="stat-card"><div class="stat-head"><span>Total Penjualan</span></div><h3>Rp 0</h3><p class="trend">Belum ada penjualan</p></div><div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3>-</h3><p class="trend">Belum ada data</p></div></div></div>
             </section>
 
+            <!-- AKUN: KELOLA TIM (BOS Fase 3) -->
+            <section class="view" id="view-kelola-tim">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left">
+                            <h3>👥 Kelola Tim — <span id="teamStoreName">-</span></h3>
+                            <span class="count-pill" id="teamMemberCount">0 anggota</span>
+                            <span class="muted" id="teamMyRole">-</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-ghost small" onclick="loadTeamData()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Undang kasir / teknisi / admin via <strong>kode invite toko</strong>. Hanya <strong>owner/admin</strong> toko aktif yang bisa buat kode & kelola anggota. Kode dipakai daftar di <code>register.html?invite=KODE</code> (1 kode = 1 akun).</p>
+                    <div class="grid-2" style="margin-bottom:16px">
+                        <div class="card" style="box-shadow:none;border:1px solid #ececec">
+                            <h3 style="font-size:14px;margin-bottom:10px">➕ Buat Kode Invite Member</h3>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                                <div class="field"><label>Role</label>
+                                    <select id="teamInviteRole" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec">
+                                        <option value="kasir">Kasir</option>
+                                        <option value="teknisi">Teknisi</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                                <div class="field"><label>Berlaku</label>
+                                    <select id="teamInviteExpiry" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec">
+                                        <option value="30">30 hari</option>
+                                        <option value="7">7 hari</option>
+                                        <option value="1">1 hari</option>
+                                        <option value="0">Tanpa batas</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-dark" style="width:100%" onclick="createTeamInvite()">Buat Kode Invite →</button>
+                            <div id="teamInviteResult" style="display:none;margin-top:12px;padding:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px">
+                                <div style="font-size:11px;color:#065f46;margin-bottom:4px">KODE BARU — klik untuk salin:</div>
+                                <div id="teamInviteCode" onclick="copyTeamInviteCode()" style="font-family:monospace;font-size:18px;font-weight:700;color:#065f46;cursor:pointer;letter-spacing:1px" title="Klik untuk salin">-</div>
+                                <div style="font-size:11px;color:#065f46;margin-top:6px;word-break:break-all">Link daftar: <span id="teamInviteLink">-</span></div>
+                                <div style="display:flex;gap:8px;margin-top:10px">
+                                    <button class="btn btn-dark small" style="flex:1" onclick="copyTeamInviteCode()">📋 Salin Kode</button>
+                                    <button class="btn btn-ghost small" style="flex:1" onclick="copyTeamInviteLink()">🔗 Salin Link</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card" style="box-shadow:none;border:1px solid #ececec">
+                            <h3 style="font-size:14px;margin-bottom:10px">🎟️ Kode Aktif Toko Ini</h3>
+                            <div class="table-wrap">
+                                <table class="table compact" id="tableTeamInvites">
+                                    <thead><tr><th>Kode</th><th>Role</th><th>Status</th><th></th></tr></thead>
+                                    <tbody id="tbodyTeamInvites"><tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
+                                </table>
+                            </div>
+                            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Kode yang sudah dipakai / dibatalkan otomatis hilang dari list aktif. <span id="teamInviteCount">0 kode aktif</span>.</p>
+                        </div>
+                    </div>
+                    <div class="card-head" style="margin-bottom:10px"><h3>Anggota Toko</h3><span class="muted">Role & status bisa diubah owner/admin — perubahan tersimpan otomatis</span></div>
+                    <div class="table-wrap">
+                        <table class="table" id="tableTeamMembers">
+                            <thead><tr><th>Username</th><th>Role di Toko</th><th>Status</th><th>Bergabung</th><th style="text-align:center">Aksi</th></tr></thead>
+                            <tbody id="tbodyTeamMembers"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- AKUN: ATUR PROFIL -->
             <section class="view" id="view-profil">
                 <div class="card" style="max-width:640px;margin:0 auto">
@@ -671,6 +740,7 @@
                         </div>
                         <div class="toolbar-right">
                             <button class="btn btn-ghost small" onclick="loadApprovalData()">↻ Refresh</button>
+                            <a class="btn btn-ghost small" href="dev.html" title="Panel developer (superadmin)">🛠️ Dev</a>
                             <button class="btn btn-dark small" onclick="switchView('dashboard')">← Dashboard</button>
                         </div>
                     </div>
@@ -776,6 +846,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=multistore-fase2"></script>
+    <script src="assets/js/script.js?v=multistore-fase3"></script>
 </body>
 </html>
