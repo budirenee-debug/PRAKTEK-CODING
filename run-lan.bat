@@ -1,15 +1,17 @@
 @echo off
 setlocal
 chcp 65001 >nul
-title B_gadget POS - Localhost Only
+title B_gadget POS - LAN Review (satu jaringan)
 
 :: ==========================================================
-::  B_gadget POS - Localhost Runner (LOKAL SAJA)
-::  - Backend : FastAPI http://127.0.0.1:8000
-::  - Tanpa Tunnel / Cloudflare
-::  - Untuk dev lokal Windows
-::  - Butuh tunnel? pakai run-tunnel.bat (Windows)
-::    atau run-tunnel.sh (Ubuntu Server)
+::  B_gadget POS - LAN Review Runner (SATU JARINGAN)
+::  - Backend : FastAPI http://0.0.0.0:8000 (bisa diakses HP/
+::              laptop lain yang konek WiFi/LAN yang SAMA)
+::  - Tanpa Tunnel / Cloudflare (tidak publik ke internet)
+::  - Tanpa Deploy ke Ubuntu (server tidak tersentuh, DB lokal)
+::  - Untuk coding review sebelum deploy
+::  - Ngoding sendiri? pakai run.bat (localhost only)
+::  - Butuh publik? pakai run-tunnel.bat / run-tunnel.sh
 :: ==========================================================
 
 set "ROOT=%~dp0"
@@ -18,9 +20,9 @@ set "PORT=8000"
 set "LOGIN_PATH=/frontend/login.html"
 
 echo ========================================
-echo  B_gadget POS - Localhost Only
+echo  B_gadget POS - LAN Review
 echo  Root   : %ROOT%
-echo  Mode   : LOKAL (tanpa tunnel)
+echo  Mode   : LAN (satu jaringan, tanpa tunnel)
 echo ========================================
 echo.
 
@@ -80,22 +82,64 @@ if not errorlevel 1 (
   set "PORT_BUSY=1"
   echo [WARN] Port %PORT% sudah LISTENING ^(server mungkin sudah jalan^).
   echo        Cek: http://127.0.0.1:%PORT%/health
-  echo        -^> Browser akan tetap dibuka^, backend tidak di-start ulang.
+  echo        -^> Browser akan tetap dibuka, backend tidak di-start ulang.
   echo.
 )
 
-:: ---------- 5. Info ----------
-echo [INFO] Mode: LOKAL ONLY - tanpa cloudflared/tunnel
-echo [INFO] Akses lokal: http://127.0.0.1:%PORT%%LOGIN_PATH%
-echo [INFO] Butuh akses publik? Jalankan run-tunnel.bat
+:: ---------- 5. Deteksi IP LAN (murni ipconfig, tanpa PowerShell) ----------
+echo [INFO] Deteksi IP LAN PC ini (untuk dibuka dari HP/laptop lain):
+echo ----------------------------------------------------------------
+ipconfig | findstr /c:"IPv4"
+echo ----------------------------------------------------------------
+set "LAN_IP="
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+  for /f "tokens=* delims= " %%b in ("%%a") do (
+    echo %%b | findstr /b /c:"192.168." /c:"10." >nul 2>nul
+    if not errorlevel 1 if not defined LAN_IP set "LAN_IP=%%b"
+    echo %%b | findstr /r /b /c:"172\.1[6-9]\." /c:"172\.2[0-9]\." /c:"172\.3[0-1]\." >nul 2>nul
+    if not errorlevel 1 if not defined LAN_IP set "LAN_IP=%%b"
+  )
+)
+if defined LAN_IP (
+  echo.
+  echo  ==================================================
+  echo   REVIEW DARI HP/LAPTOP LAIN ^(WiFi yang SAMA^):
+  echo   http://%LAN_IP%:%PORT%%LOGIN_PATH%
+  echo  ==================================================
+  echo   Docs  : http://%LAN_IP%:%PORT%/docs
+  echo   Health: http://%LAN_IP%:%PORT%/health
+) else (
+  echo.
+  echo [WARN] IP LAN 192.168.x.x / 10.x.x.x tidak ketemu.
+  echo        - Pastikan WiFi/LAN konek, lalu jalankan lagi.
+  echo        - Atau pakai salah satu IP di daftar atas:
+  echo          http://IP-TADI:%PORT%%LOGIN_PATH%
+)
+echo.
+echo [INFO] Akses dari PC ini tetap: http://127.0.0.1:%PORT%%LOGIN_PATH%
+echo [INFO] Server Ubuntu TIDAK tersentuh (tanpa tunnel, tanpa deploy).
 echo.
 
-:: ---------- 6. Auto-buka browser ----------
-echo [INFO] Menjalankan backend di http://127.0.0.1:%PORT%
+:: ---------- 6. Cek firewall ----------
+netsh advfirewall firewall show rule name="B_gadget POS 8000" 2>nul | findstr /i "Allow" >nul 2>nul
+if errorlevel 1 (
+  echo [WARN] Rule firewall "B_gadget POS 8000" belum ada.
+  echo        Kalau HP lain tidak bisa buka, jalankan CMD Admin sekali:
+  echo        netsh advfirewall firewall add rule name="B_gadget POS 8000" dir=in action=allow protocol=TCP localport=%PORT% profile=private
+  echo        Lalu pastikan pilih Network Private, bukan Public.
+  echo.
+) else (
+  echo [INFO] Firewall rule port %PORT% OK.
+  echo.
+)
+
+:: ---------- 7. Auto-buka browser lokal ----------
+echo [INFO] Menjalankan backend di http://0.0.0.0:%PORT% (semua interface, satu jaringan^)
 echo        Docs  : http://127.0.0.1:%PORT%/docs
 echo        Health: http://127.0.0.1:%PORT%/health
 echo.
 echo [TIPS] Biarkan window ini terbuka. Ctrl+C untuk stop.
+echo        Syarat review: HP/laptop lain konek WiFi yang SAMA dengan PC ini.
 echo.
 
 if "%PORT_BUSY%"=="1" goto BROWSER_BUSY
@@ -111,7 +155,7 @@ goto BROWSER_DONE
 
 :BROWSER_DONE
 
-:: ---------- 7. Jalankan backend ----------
+:: ---------- 8. Jalankan backend ----------
 if not "%PORT_BUSY%"=="1" goto SKIP_BUSY_CHECK
 echo.
 echo [INFO] Backend sudah berjalan di port %PORT% - tidak start ulang.
@@ -124,9 +168,9 @@ exit /b 0
 :SKIP_BUSY_CHECK
 cd /d "%BACKEND%"
 if "%ENV%"=="production" (
-  "%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT%
+  "%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port %PORT%
 ) else (
-  "%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT% --reload
+  "%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port %PORT% --reload
 )
 
 echo.
