@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=navy1">
+    <link rel="stylesheet" href="assets/css/style.css?v=010142">
 </head>
 <body>
     <div class="app">
@@ -723,7 +723,7 @@
                             <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
                         </div>
                     </div>
-                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code>. Kosongkan + Simpan = kembali ke default.</p>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code> <code>{lacak}</code>. Kosongkan + Simpan = kembali ke default.</p>
                     <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
                 </div>
             </section>
@@ -997,12 +997,12 @@
         </div>
     </div>
 
-    <!-- MODAL NOTA DIGITAL (muncul setelah service tersimpan) -->
+    <!-- MODAL NOTA DIGITAL (preview nota + cetak / kirim WA, dari Detail maupun setelah simpan) -->
     <div class="modal" id="notaModal">
         <div class="modal-box" style="max-width:460px">
             <button class="modal-close" onclick="closeNotaModal()">×</button>
             <div class="hasil-icon">🧾</div>
-            <h3>Nota Digital Tersimpan</h3>
+            <h3>Nota Digital</h3>
             <p class="hasil-sub" id="notaSub">—</p>
             <pre id="notaPreview" style="text-align:left;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:12px;font-size:12px;white-space:pre-wrap;font-family:Inter,system-ui,sans-serif;max-height:260px;overflow:auto"></pre>
             <p style="font-size:11px;color:#8a8f98;margin-top:8px">WA tidak terkirim otomatis — tekan <strong>Kirim via WA</strong>, chat pelanggan terbuka dengan nota sudah tertulis, tinggal tekan kirim di WhatsApp.</p>
@@ -1027,6 +1027,6 @@
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/script.js?v=nota3"></script>
+    <script src="assets/js/script.js?v=lacak4"></script>
 </body>
 </html>

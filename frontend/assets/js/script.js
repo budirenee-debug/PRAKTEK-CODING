@@ -264,8 +264,19 @@ function activeStoreInfo(){
   }catch{}
   return {};
 }
+function trackBase(){
+  try{
+    const s=localStorage.getItem('TRACK_BASE');
+    if(s && s.trim()) return s.trim().replace(/\/+$/,'');
+  }catch{}
+  const h=location.hostname||'';
+  if(h && h!=='localhost' && h!=='127.0.0.1' && !/^192\.168\./.test(h) && !/^10\./.test(h) && !/^172\.(1[6-9]|2\d|3[01])\./.test(h))
+    return location.origin;
+  return 'https://service.reneepsl.my.id';
+}
 function notaVars(d){
   const st=activeStoreInfo();
+  const inv=d.id||'';
   return {
     nama: d.nama||'Pelanggan', device: d.device||'-', imei: d.imei||'-',
     invoice: d.id||'', tanggal: formatTanggal(d.date),
@@ -275,12 +286,17 @@ function notaVars(d){
     teknisi: d.teknisi||'-', penerima: d.penerima||'-', status: displayStatus(d.status),
     toko: st.nama||storeDisplayName(), alamat_toko: st.alamat||'-', wa_toko: st.wa||'-',
     garansi_dari: d.garansi_dari||'',
+    lacak: trackBase()+'/frontend/lacak.html?q='+encodeURIComponent(inv),
   };
 }
 function buildNotaWA(d){
   const tpl=waTemplateFor('nota_digital');
   const vars=notaVars(d);
-  return tpl.replace(/\{(\w+)\}/g, (_,k)=> (k in vars ? vars[k] : ''));
+  let msg=tpl.replace(/\{(\w+)\}/g, (_,k)=> (k in vars ? vars[k] : ''));
+  if(!/lacak/i.test(tpl)){
+    msg+=`\n🔍 Klik link ini untuk lacak status HP anda:\n${vars.lacak}`;
+  }
+  return msg;
 }
 let _notaId=null;
 let _notaSize='t80';
@@ -299,8 +315,12 @@ function closeNotaModal(){
   _notaId=null;
   document.getElementById('notaModal').classList.remove('show');
 }
+let _lastNotaSend={inv:null,t:0};
 function sendNotaWA(id){
   const inv=id||_notaId;
+  const now=Date.now();
+  if(_lastNotaSend.inv===inv && now-_lastNotaSend.t<8000) return showToast('Nota ini baru saja dibuka di WA — cek tab WhatsApp, jangan kirim 2x');
+  _lastNotaSend={inv,t:now};
   const d=data.find(x=>x.id===inv);
   if(!d) return showToast('Pilih dulu notasinya');
   const clean=cleanWA(d.wa);
@@ -313,7 +333,8 @@ function buildNotaHTML(d){
   const row=(k,val)=>`<tr><td style="vertical-align:top;white-space:nowrap">${k}</td><td style="padding:0 4px">:</td><td>${escapeHtml(val)}</td></tr>`;
   return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
     + `<hr><table>${row('Invoice',v.invoice)}${row('Tanggal',v.tanggal)}${row('Pelanggan',v.nama)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Kondisi awal',v.keterangan)}${row('Kelengkapan',v.kelengkapan)}${row('Estimasi',v.estimasi)}${row('Teknisi',v.teknisi)}${row('Penerima',v.penerima)}</table><hr>`
-    + `<div class="nota-total"><span>Total Biaya</span><span>${escapeHtml(v.biaya)}</span></div><hr>`
+    + `<div class="nota-total"><span>Total Biaya</span><span>${escapeHtml(v.biaya)}</span></div>`
+    + `<div style="margin-top:6px;font-size:11px">🔍 Lacak status: ${escapeHtml(v.lacak)}</div><hr>`
     + `<div class="nota-foot">Terima kasih 🙏<br>Komplain? Hubungi WA di atas</div>`;
 }
 function printNota(id){
@@ -337,7 +358,7 @@ const DEFAULT_WA_TPL = {
   gagal: "Halo {nama} 🙏\nMohon maaf, HP {device} belum bisa diperbaiki (gratis, tidak ada biaya).\nInvoice: {invoice}\nSilakan diambil kembali di {toko}.",
   sudah_diambil: "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
   klaim_garansi: "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
-  nota_digital: "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
+  nota_digital: "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n🔍 Klik link ini untuk lacak status HP anda:\n{lacak}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
 };
 const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', nota_digital:'Nota Digital 🧾', umum:'Umum 💬'};
 function storeDisplayName(){
@@ -3462,7 +3483,7 @@ function toggleInlineDetail(invoice){
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn small" style="background:#dcfce7;border:1px solid #bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')">${WA_ICON} Direct WhatsApp</button>
-      <button class="btn btn-dark small" onclick="printNota('${escapeHtml(d.id)}')">🖨 Cetak Nota</button>
+      <button class="btn btn-dark small" onclick="openNotaModal('${escapeHtml(d.id)}')">🧾 Nota / Cetak</button>
       <button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">↗ Modal Lengkap</button>
       <button class="btn btn-ghost small" onclick="toggleInlineDetail('${escapeHtml(d.id)}')">▲ Tutup</button>
     </div>
@@ -4418,8 +4439,7 @@ function openDetail(id, opts){
       <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''} <span style="font-size:11px;color:#6b7280">otomatis mengikuti Estimasi Selesai</span></div>
     </div>
     <div style="margin-top:18px;display:flex;gap:10px">
-      <button class="btn btn-dark" style="flex:1" onclick="printNota('${escapeHtml(d.id)}')">Cetak Nota</button>
-      <button class="btn btn-ghost" style="flex:1" onclick="sendNotaWA('${escapeHtml(d.id)}')">🧾 Nota WA</button>
+      <button class="btn btn-dark" style="flex:1" onclick="openNotaModal('${escapeHtml(d.id)}')">🧾 Nota (Preview + Cetak / WA)</button>
       <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Tutup</button>
     </div>
   `;

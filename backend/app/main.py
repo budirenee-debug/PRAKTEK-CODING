@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import Base, engine, get_db
-from .routers import services, customers, technicians, stats, auth, inventory, stores, invites, audit
+from .routers import services, customers, technicians, stats, auth, inventory, stores, invites, audit, track
 from . import models
 from .seed import seed
 from .auth import ensure_superadmin
@@ -361,6 +361,7 @@ app.include_router(customers.router, prefix="/api")
 app.include_router(technicians.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
+app.include_router(track.router, prefix="/api")
 
 # Serve frontend static (rapi: frontend/assets/*) — single source, hapus mount /root ambigu (fix P0-2)
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
@@ -397,7 +398,8 @@ def root(request: Request):
             "customers": "/api/customers",
             "technicians": "/api/technicians",
             "stats": "/api/stats",
-            "dashboard": "/api/stats/dashboard"
+            "dashboard": "/api/stats/dashboard",
+            "track": "/api/track?q=REN-2026-0001 (publik, tanpa login)"
         }
     }
 

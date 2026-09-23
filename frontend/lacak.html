@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lacak Status Service — BOS SERVICE</title>
+  <meta name="description" content="Lacak status service HP & laptop via kode nota atau nomor IMEI. Tanpa login.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/bos.css?v=navy1">
+  <style>
+    .track-steps{display:flex;gap:6px;margin:14px 0}
+    .track-step{flex:1;text-align:center;font-size:11px;font-weight:600;padding:8px 4px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280}
+    .track-step.done{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+    .track-step.current{background:#04074a;border-color:#04074a;color:#fff}
+    .track-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:12px}
+    .track-meta div{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px}
+    .track-meta small{display:block;color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+    .track-card{border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-top:14px;background:#fff}
+    .track-status{display:inline-block;font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;background:#eff6ff;color:#1e40af;margin:8px 0}
+    .track-status.ok{background:#ecfdf5;color:#065f46}
+    .track-status.bad{background:#fef2f2;color:#991b1b}
+  </style>
+</head>
+<body>
+  <nav class="bos-nav">
+    <div class="wrap">
+      <a class="bos-brand" href="landing.html">
+        <span class="bos-mark">BOS</span>
+        <span>BOS SERVICE<small>Bisnis Operasional System</small></span>
+      </a>
+      <div class="bos-links">
+        <a href="landing.html">← Beranda</a>
+        <a href="login.html">Masuk</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="auth-wrap">
+    <div class="auth-card" style="max-width:560px">
+      <h1>🔍 Lacak Status Service</h1>
+      <p class="tagline">Masukkan <strong>kode nota</strong> (contoh: REN-2026-0001) atau <strong>nomor IMEI</strong> dari struk. Tanpa login.</p>
+
+      <div id="alert" class="alert" style="display:none"></div>
+
+      <form onsubmit="handleTrack(event)">
+        <div class="field">
+          <label>Kode Nota / IMEI *</label>
+          <input id="t-q" required placeholder="contoh: REN-2026-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <span class="hint">Kode nota ada di struk / nota WA dari toko.</span>
+        </div>
+        <button class="btn btn-accent btn-block" type="submit">Lacak →</button>
+      </form>
+
+      <div id="hasil"></div>
+
+      <p class="auth-foot">Punya kode undangan? <a href="register.html">Daftar</a> • <a href="landing.html">Kembali ke Beranda</a></p>
+    </div>
+  </div>
+
+  <script>
+    const BOS_API = (() => {
+      const stored = localStorage.getItem('API_BASE');
+      if (stored) return stored;
+      const proto = location.protocol;
+      const host = location.hostname;
+      if (proto === 'file:' || !host || host === 'null' || host === 'localhost' || host === '127.0.0.1')
+        return 'http://127.0.0.1:8000/api';
+      return location.origin + '/api';
+    })();
+
+    function showAlert(msg, kind) {
+      const el = document.getElementById('alert');
+      el.style.display = 'block';
+      el.className = 'alert ' + (kind || '');
+      el.textContent = msg;
+    }
+    function hideAlert() {
+      const el = document.getElementById('alert');
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+
+    function statusClass(st) {
+      if (['Service Sukses', 'Selesai', 'Bisa Diambil', 'Sudah Diambil'].includes(st)) return 'track-status ok';
+      if (['Service Failed', 'Dibatalkan'].includes(st)) return 'track-status bad';
+      return 'track-status';
+    }
+
+    function fmtDate(d) {
+      if (!d) return '-';
+      try { return new Date(d + 'T00:00:00').toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}); }
+      catch (e) { return d; }
+    }
+
+    function renderRows(rows) {
+      const box = document.getElementById('hasil');
+      box.innerHTML = rows.map(r => {
+        const steps = (r.steps || []).map(s =>
+          `<div class="track-step ${s.state}">${s.state === 'done' ? '✓ ' : ''}${s.label}</div>`
+        ).join('');
+        return `<div class="track-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong style="font-size:15px">${r.invoice}</strong>
+            <small style="color:#6b7280">${r.toko || ''}</small>
+          </div>
+          <div class="${statusClass(r.status)}">${r.status} — ${r.status_label}</div>
+          <div class="track-steps">${steps}</div>
+          <div style="font-size:13px"><strong>${r.device}</strong> • ${r.keluhan || ''}</div>
+          <div class="track-meta">
+            <div><small>Atas Nama</small>${r.nama_masked || '-'}</div>
+            <div><small>Tgl Masuk</small>${fmtDate(r.tgl_masuk)}</div>
+            <div><small>Estimasi Selesai</small>${fmtDate(r.estimasi_selesai)}</div>
+            <div><small>Garansi Sampai</small>${fmtDate(r.garansi_sampai)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function doTrack(q) {
+      hideAlert();
+      document.getElementById('hasil').innerHTML = '<p class="tagline">Mencari...</p>';
+      try {
+        const res = await fetch(BOS_API + '/track?q=' + encodeURIComponent(q));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || ('Gagal melacak (' + res.status + ')'));
+        renderRows(data);
+      } catch (e) {
+        document.getElementById('hasil').innerHTML = '';
+        showAlert(e.message || 'Gagal melacak', 'error');
+      }
+    }
+
+    function handleTrack(ev) {
+      ev.preventDefault();
+      const q = document.getElementById('t-q').value.trim();
+      if (!q) return;
+      const url = new URL(location.href);
+      url.searchParams.set('q', q);
+      history.replaceState(null, '', url);
+      doTrack(q);
+    }
+
+    // dukung link langsung: lacak.html?q=REN-2026-0001 (mis. QR di nota)
+    (() => {
+      const q = new URLSearchParams(location.search).get('q');
+      if (q) {
+        document.getElementById('t-q').value = q;
+        doTrack(q);
+      }
+    })();
+  </script>
+</body>
+</html>
