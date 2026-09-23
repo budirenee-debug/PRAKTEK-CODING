@@ -1753,6 +1753,7 @@ function switchView(view, clearSearch){
   if(view==='inventory-alat') renderAlat();
   if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); }
   if(view==='laporan-teknisi') renderLaporanTeknisi();
+  if(view==='laporan-service') renderLaporanService();
   if(view==='profil') loadProfil();
   if(view==='pengaturan') loadWaSettings();
   if(view==='kelola-tim') loadTeamData();
@@ -1795,6 +1796,7 @@ function renderAll(){
   renderDashboard(); renderQueue(); renderPelanggan(); renderKanban(); updateStats();
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
   if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();
+  if(document.getElementById('view-laporan-service')?.classList.contains('active')) renderLaporanService();
 }
 
 function escapeHtml(s){
@@ -1973,6 +1975,98 @@ function renderHitsIndicators(){
     </div>`;
   }).join('') || '<p style="font-size:12px;color:#8a8f98">Belum ada data</p>';
   if(kelEmpty) kelEmpty.style.display = kelSorted.length ? 'none' : 'block';
+}
+// === Laporan Service: total Masuk/Sukses/Failed/Garansi per tgl masuk (tanpa teknisi) ===
+let lapSvcTab='harian';
+function setLapSvcTab(t){
+  lapSvcTab=t;
+  document.querySelectorAll('[data-lapsvc]').forEach(b=> b.classList.toggle('active', b.dataset.lapsvc===t));
+  renderLaporanService();
+}
+function _lapSvcMonday(iso){
+  const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return null;
+  const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _lapSvcIsoLocal(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _lapSvcBuckets(){
+  // bangun daftar periode + label sesuai tab aktif
+  const out=[];
+  if(lapSvcTab==='harian'){
+    for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const k=_lapSvcIsoLocal(d); out.push({key:k, label:formatTanggal(k)}); }
+  } else if(lapSvcTab==='mingguan'){
+    const thisMon=_lapSvcMonday(todayISO());
+    for(let i=7;i>=0;i--){ const d=new Date(thisMon+'T00:00:00'); d.setDate(d.getDate()-i*7); const k=_lapSvcIsoLocal(d);
+      const end=new Date(d); end.setDate(end.getDate()+6);
+      out.push({key:k, label:`${formatTanggal(k)} — ${formatTanggal(_lapSvcIsoLocal(end))}`}); }
+  } else {
+    const now=new Date();
+    for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      out.push({key:k, label:d.toLocaleDateString('id-ID',{month:'long',year:'numeric'})}); }
+  }
+  return out;
+}
+function _lapSvcKey(dateStr){
+  if(!dateStr) return null;
+  const k=String(dateStr).slice(0,10); if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) return null;
+  if(lapSvcTab==='harian') return k;
+  if(lapSvcTab==='mingguan') return _lapSvcMonday(k);
+  return k.slice(0,7);
+}
+function renderLaporanService(){
+  const tbody=document.getElementById('tbodyLaporanService');
+  if(!tbody) return;
+  const isSukses=(s)=> ['Service Sukses','Selesai'].includes(s);
+  const masuk=data.length;
+  const sukses=data.filter(d=> isSukses(d.status)).length;
+  const failed=data.filter(d=> d.status==='Service Failed').length;
+  const garansi=data.filter(d=> d.status==='Garansi').length;
+  const rate= masuk? Math.round(sukses/masuk*100):0;
+  const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+  set('lapSvcTotal', masuk+' masuk'); set('lapSvcRate', rate+'% sukses');
+  set('lapSvcMasuk', masuk); set('lapSvcMasukSub', 'total barang');
+  set('lapSvcSukses', sukses); set('lapSvcSuksesSub', rate+'% dari masuk');
+  set('lapSvcFailed', failed); set('lapSvcFailedSub', (masuk?Math.round(failed/masuk*100):0)+'% dari masuk');
+  set('lapSvcGaransi', garansi);
+  const buckets=_lapSvcBuckets();
+  const map={}; buckets.forEach(b=> map[b.key]={masuk:0,sukses:0,failed:0,garansi:0});
+  data.forEach(d=>{
+    const k=_lapSvcKey(d.date); if(!k || !map[k]) return;
+    map[k].masuk++;
+    if(isSukses(d.status)) map[k].sukses++;
+    else if(d.status==='Service Failed') map[k].failed++;
+    else if(d.status==='Garansi') map[k].garansi++;
+  });
+  const rows = lapSvcTab==='harian' ? buckets : [...buckets].reverse();
+  tbody.innerHTML=rows.map(b=>{
+    const v=map[b.key];
+    return `<tr>
+      <td><strong style="font-size:12px">${escapeHtml(b.label)}</strong></td>
+      <td style="text-align:center"><span style="background:#eff6ff;color:#1d4ed8;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${v.masuk}</span></td>
+      <td style="text-align:center"><span style="background:#ecfdf5;color:#065f46;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${v.sukses}</span></td>
+      <td style="text-align:center"><span style="background:#fef2f2;color:#991b1b;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${v.failed}</span></td>
+      <td style="text-align:center"><span style="background:#f5f3ff;color:#5b21b6;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${v.garansi}</span></td>
+    </tr>`;
+  }).join('');
+}
+function exportLaporanServiceCSV(){
+  const buckets=_lapSvcBuckets();
+  const map={}; buckets.forEach(b=> map[b.key]={masuk:0,sukses:0,failed:0,garansi:0});
+  data.forEach(d=>{
+    const k=_lapSvcKey(d.date); if(!k || !map[k]) return;
+    map[k].masuk++;
+    if(['Service Sukses','Selesai'].includes(d.status)) map[k].sukses++;
+    else if(d.status==='Service Failed') map[k].failed++;
+    else if(d.status==='Garansi') map[k].garansi++;
+  });
+  const header=['Periode','Masuk','Sukses','Failed','Garansi'];
+  const csv=[header.join(',')].concat(buckets.map(b=> [`"${b.label}"`,map[b.key].masuk,map[b.key].sukses,map[b.key].failed,map[b.key].garansi].join(','))).join('\n');
+  const blob=new Blob([csv], {type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`laporan_service_${lapSvcTab}_${todayISO()}.csv`; a.click(); URL.revokeObjectURL(url);
+  showToast(`⬇ Export laporan ${lapSvcTab} (${buckets.length} periode)`);
 }
 function renderLaporanTeknisi(){
   const tbody=document.getElementById('tbodyLaporanTeknisi');
@@ -3499,6 +3593,7 @@ function renderStatusView(targetId, statusName){
   // update transaksi tab jika sedang aktif
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
   if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();
+  if(document.getElementById('view-laporan-service')?.classList.contains('active')) renderLaporanService();
 }
 let bayarFilter='all';
 function setBayarFilter(f){
@@ -3547,6 +3642,54 @@ function renderTransaksiPembayaran(){
       <td style="font-size:11px">${escapeHtml(formatTanggal(d.estimasi_selesai||d.date))}</td>
       <td><button class="btn btn-ghost small" style="padding:4px 6px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}', {readonly:true})">Detail</button></td>
     </tr>`).join('');
+}
+// pagination generik tabel rekap (10 baris terbaru per halaman)
+const REKAP_PER=10;
+const _rekap={h7:{arr:[],page:1},mg:{arr:[],page:1},bl:{arr:[],page:1}};
+const REKAP_TB={h7:'tbodyRekap7Hari',mg:'tbodyRekapMinggu',bl:'tbodyRekapBulan'};
+const REKAP_PG={h7:'pgRekap7Hari',mg:'pgRekapMinggu',bl:'pgRekapBulan'};
+function setRekap(k,arr){
+  _rekap[k].arr=arr;
+  const max=Math.max(1,Math.ceil(arr.length/REKAP_PER));
+  if(_rekap[k].page>max) _rekap[k].page=max;
+  drawRekap(k);
+}
+function rekapGo(k,d){
+  const max=Math.max(1,Math.ceil(_rekap[k].arr.length/REKAP_PER));
+  _rekap[k].page=Math.min(max,Math.max(1,_rekap[k].page+d));
+  drawRekap(k);
+}
+function drawRekap(k){
+  const tb=document.getElementById(REKAP_TB[k]);
+  const pg=document.getElementById(REKAP_PG[k]);
+  const {arr,page}=_rekap[k];
+  const max=Math.max(1,Math.ceil(arr.length/REKAP_PER));
+  const slice=arr.slice((page-1)*REKAP_PER,page*REKAP_PER);
+  if(tb) tb.innerHTML=slice.join('')||`<tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Belum ada data</td></tr>`;
+  if(pg){
+    if(max<=1){ pg.innerHTML=`<span style="color:#8a8f98">${arr.length} baris</span>`; return; }
+    pg.innerHTML=`<button class="btn btn-ghost small" style="padding:4px 10px" ${page<=1?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="rekapGo('${k}',-1)">‹</button><span style="color:#6b7280">Hal ${page}/${max}</span><button class="btn btn-ghost small" style="padding:4px 10px" ${page>=max?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="rekapGo('${k}',1)">›</button>`;
+  }
+}
+// pagination tabel utama Pendapatan (10 baris terbaru per halaman)
+const PEND_PER=10;
+let _pendRows=[], _pendPage=1, _pendEmpty='';
+function pendGo(d){
+  const max=Math.max(1,Math.ceil(_pendRows.length/PEND_PER));
+  _pendPage=Math.min(max,Math.max(1,_pendPage+d));
+  drawPend();
+}
+function drawPend(){
+  const tb=document.getElementById('tbodyPendapatan');
+  const pg=document.getElementById('pgPendapatan');
+  const max=Math.max(1,Math.ceil(_pendRows.length/PEND_PER));
+  if(_pendPage>max) _pendPage=max;
+  const slice=_pendRows.slice((_pendPage-1)*PEND_PER,_pendPage*PEND_PER);
+  if(tb) tb.innerHTML=slice.join('')||`<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a8f98">${_pendEmpty||'Belum ada data'}</td></tr>`;
+  if(pg){
+    if(max<=1){ pg.innerHTML=`<span style="color:#8a8f98">${_pendRows.length} baris</span>`; return; }
+    pg.innerHTML=`<button class="btn btn-ghost small" style="padding:4px 10px" ${_pendPage<=1?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="pendGo(-1)">‹</button><span style="color:#6b7280">Hal ${_pendPage}/${max}</span><button class="btn btn-ghost small" style="padding:4px 10px" ${_pendPage>=max?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="pendGo(1)">›</button>`;
+  }
 }
 function renderTransaksiPendapatan(){
   const tbody=document.getElementById('tbodyPendapatan');
@@ -3601,16 +3744,57 @@ function renderTransaksiPendapatan(){
   const elRange=document.getElementById('rekap7HariRange'); if(elRange) elRange.textContent = `${formatTanggal(last7[0])} — ${formatTanggal(last7[6])}`;
   const tbody7=document.getElementById('tbodyRekap7Hari');
   if(tbody7){
-    tbody7.innerHTML = last7.map(dt=>{
+    setRekap('h7', [...last7].reverse().map(dt=>{
       const v=map7[dt];
       const isToday = dt===todayStr;
       return `<tr style="${isToday?'background:#ecfdf5':''}"><td>${escapeHtml(formatTanggal(dt))} ${isToday?'<span style="background:#059669;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">HARI INI</span>':''}</td><td><span style="background:#f3f4f6;padding:4px 8px;border-radius:20px;font-size:11px">${v.count}</span></td><td style="text-align:right;font-weight:700;color:${v.total?'#059669':'#8a8f98'}">${formatRupiah(v.total)}</td><td style="text-align:right;color:#b45309">${formatRupiah(v.sp)}</td><td style="text-align:right;font-weight:700;color:${v.profit<0?'#dc2626':'#059669'}">${formatRupiah(v.profit)}</td><td style="text-align:right">${v.count?formatRupiah(Math.round(v.total/v.count)):'-'}</td></tr>`;
-    }).join('');
+    }));
+  }
+  // rekap mingguan (8 minggu kalender Senin–Minggu) + bulanan (12 bulan) — basis tgl masuk
+  const accRow=(o,d)=>{
+    const sp=getSpCost(d.id);
+    o.count++; o.total+=Number(d.biaya)||0; o.sp+=sp; o.profit+=(Number(d.biaya)||0)-sp;
+  };
+  const rowHtml=(label,v,hl)=>{
+    return `<tr style="${hl?'background:#ecfdf5':''}"><td>${label} ${hl?'<span style="background:#059669;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">INI</span>':''}</td><td><span style="background:#f3f4f6;padding:4px 8px;border-radius:20px;font-size:11px">${v.count}</span></td><td style="text-align:right;font-weight:700;color:${v.total?'#059669':'#8a8f98'}">${formatRupiah(v.total)}</td><td style="text-align:right;color:#b45309">${formatRupiah(v.sp)}</td><td style="text-align:right;font-weight:700;color:${v.profit<0?'#dc2626':'#059669'}">${formatRupiah(v.profit)}</td><td style="text-align:right">${v.count?formatRupiah(Math.round(v.total/v.count)):'-'}</td></tr>`;
+  };
+  const tbodyW=document.getElementById('tbodyRekapMinggu');
+  if(tbodyW){
+    const thisMon=_lapSvcMonday(todayStr) || todayStr;
+    const weeks=[];
+    for(let i=7;i>=0;i--){ const d=new Date(thisMon+'T00:00:00'); d.setDate(d.getDate()-i*7); weeks.push(_lapSvcIsoLocal(d)); }
+    const mapW={}; weeks.forEach(k=> mapW[k]={count:0,total:0,sp:0,profit:0});
+    filtered.forEach(d=>{
+      const dt=String(d.date||'').slice(0,10); if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)) return;
+      const k=_lapSvcMonday(dt); if(k && mapW[k]) accRow(mapW[k],d);
+    });
+    const elW=document.getElementById('rekapMingguRange');
+    if(elW && weeks.length) elW.textContent=`${formatTanggal(weeks[0])} — ${formatTanggal(weeks[weeks.length-1])}`;
+    setRekap('mg', [...weeks].reverse().map(k=>{
+      const end=new Date(k+'T00:00:00'); end.setDate(end.getDate()+6);
+      return rowHtml(`${escapeHtml(formatTanggal(k))} — ${escapeHtml(formatTanggal(_lapSvcIsoLocal(end)))}`, mapW[k], k===thisMon);
+    }));
+  }
+  const tbodyB=document.getElementById('tbodyRekapBulan');
+  if(tbodyB){
+    const now=new Date(); const months=[];
+    for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+    const mapB={}; months.forEach(k=> mapB[k]={count:0,total:0,sp:0,profit:0});
+    filtered.forEach(d=>{
+      const k=String(d.date||'').slice(0,7); if(mapB[k]) accRow(mapB[k],d);
+    });
+    const curM=String(todayStr).slice(0,7);
+    const mName=(k)=>{ const [y,m]=k.split('-'); return new Date(+y,+m-1,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'}); };
+    const elB=document.getElementById('rekapBulanRange');
+    if(elB && months.length) elB.textContent=`${mName(months[0])} — ${mName(months[months.length-1])}`;
+    setRekap('bl', [...months].reverse().map(k=> rowHtml(escapeHtml(mName(k)), mapB[k], k===curM)));
   }
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a8f98">Belum ada HP Service Sukses${q?` untuk "${escapeHtml(q)}"`:''} — Harga tercatat otomatis saat status diubah ke Sukses</td></tr>`;
+    _pendRows=[]; _pendEmpty=`Belum ada HP Service Sukses${q?` untuk "${escapeHtml(q)}"`:''} — Harga tercatat otomatis saat status diubah ke Sukses`;
+    drawPend();
   } else {
-    tbody.innerHTML=filtered.map(d=>{
+    _pendEmpty='';
+    _pendRows=filtered.map(d=>{
       const arr=serviceSpareparts[d.id]||[];
       const spHtml = !arr.length ? '<span style="color:#8a8f98;font-size:11px">— Tidak Ada —</span>' : arr.map(u=> `<div style="font-size:11px"><strong>${escapeHtml(u.merk)}</strong> ${escapeHtml(u.nama)} <span style="color:#6b7280">x${u.qty}</span> <span style="color:#b45309">${formatRupiah(u.harga*u.qty)}</span></div>`).join('');
       const spTotal = arr.reduce((s,u)=> s + (Number(u.harga)||0)*(Number(u.qty)||0), 0);
@@ -3627,7 +3811,8 @@ function renderTransaksiPendapatan(){
         <td style="font-size:11px">${escapeHtml(formatTanggal(d.estimasi_selesai||d.date))}</td>
         <td><button class="btn btn-ghost small" style="padding:4px 6px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}', {readonly:true})">Detail</button></td>
       </tr>
-    `;}).join('');
+    `;});
+    drawPend();
   }
   // ringkasan per teknisi
   if(tbodyTeknisi){

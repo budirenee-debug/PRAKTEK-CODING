@@ -339,3 +339,8 @@ mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;p
 #view-dashboard .tech span{font-size:11px}
 #view-dashboard #brandHitsList,#view-dashboard #keluhanHitsList{gap:6px !important;font-size:12px}
 #view-dashboard .card{padding:10px 12px}
+/* LIPATAN REKAP — hemat scroll */
+details.card summary{list-style:none}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary .darrow{display:inline-block;transition:transform .15s;color:#8a8f98;font-size:12px}
+details[open].card summary .darrow{transform:rotate(90deg)}
