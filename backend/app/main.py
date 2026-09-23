@@ -117,6 +117,20 @@ def _migrate_diambil():
         print("migrate diambil fail:", e)
 _migrate_diambil()
 
+def _migrate_bayar():
+    """Metode pembayaran: tambah services.metode_bayar untuk DB lama."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(services)")).fetchall()]
+            if "metode_bayar" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN metode_bayar VARCHAR(20)"))
+                print("migrated: metode_bayar")
+            conn.commit()
+    except Exception as e:
+        print("migrate bayar fail:", e)
+_migrate_bayar()
+
 def _migrate_profil():
     """Foto profil: tambah users.foto untuk DB lama."""
     try:

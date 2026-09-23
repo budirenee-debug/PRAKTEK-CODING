@@ -67,6 +67,7 @@ class Service(Base):
     garansi_hari = Column(Integer, nullable=True)  # lama garansi hari (opsional, editable)
     garansi_sampai = Column(Date, nullable=True)  # batas klaim (auto = tgl diambil + hari, editable)
     garansi_dari = Column(String(20), nullable=True)  # invoice asal jika ini hasil klaim garansi
+    metode_bayar = Column(String(20), nullable=True)  # Tunai / Transfer / QRIS (diisi saat Sukses via popup garansi)
     diambil_at = Column(DateTime, nullable=True)  # kapan status jadi Sukses/Sudah Diambil (auto, untuk tgl pengambilan & basis garansi)
 
     created_at = Column(DateTime, default=func.now())

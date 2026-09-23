@@ -256,6 +256,7 @@ def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, s
         biaya=payload.biaya,
         teknisi=payload.teknisi,
         penerima=payload.penerima,
+        metode_bayar=getattr(payload, 'metode_bayar', None),
         status=payload.status or "Antri",
         date=date.today(),
         estimasi_selesai=payload.estimasi_selesai,

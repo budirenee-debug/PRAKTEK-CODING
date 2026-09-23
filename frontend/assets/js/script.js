@@ -308,6 +308,16 @@ async function loadWaSettings(){
     ]);
     if(nameEl) nameEl.textContent = `${store.nama} (${store.kode})`;
     if(roleEl) roleEl.textContent = store.role_saya ? `Peran saya: ${store.role_saya}` : '';
+    const inpNama=document.getElementById('storeNama');
+    const inpKode=document.getElementById('storeKode');
+    const inpWa=document.getElementById('storeWa');
+    const inpAlamat=document.getElementById('storeAlamat');
+    if(inpNama) inpNama.value = store.nama || '';
+    if(inpKode) inpKode.value = store.kode || '';
+    if(inpWa) inpWa.value = store.wa || '';
+    if(inpAlamat) inpAlamat.value = store.alamat || '';
+    const msgEl=document.getElementById('storeProfileMsg');
+    if(msgEl){ msgEl.style.display='none'; msgEl.textContent=''; }
     const map = {};
     (rows||[]).forEach(r=>{ map[r.key] = r; });
     wrap.innerHTML = Object.keys(WA_TPL_LABELS).map(k=>{
@@ -344,6 +354,38 @@ async function resetWaTemplate(key){
   const ta = document.getElementById(`wa-tpl-${key}`);
   if(ta) ta.value = DEFAULT_WA_TPL[key] || '';
   await saveWaTemplate(key);
+}
+async function saveStoreProfile(){
+  const sid = getActiveStoreId();
+  if(!sid) return showToast('Belum ada toko aktif');
+  const nama = document.getElementById('storeNama')?.value.trim() || '';
+  const wa = document.getElementById('storeWa')?.value.trim() || '';
+  const alamat = document.getElementById('storeAlamat')?.value.trim() || '';
+  const msgEl = document.getElementById('storeProfileMsg');
+  if(nama.length < 2) return showToast('Nama toko minimal 2 karakter');
+  if(!wa) return showToast('No. WA pelayanan wajib diisi');
+  const digits = wa.replace(/[\s\-\+]/g,'');
+  if(!/^\d+$/.test(digits) || digits.length < 9) return showToast('No. WA harus angka minimal 9 digit');
+  try{
+    const updated = await apiFetch(`/stores/${sid}`, {method:'PATCH', body: JSON.stringify({nama, wa, alamat})});
+    showToast(`✅ Profil toko disimpan — WA: ${updated.wa || wa}`);
+    if(msgEl){ msgEl.style.display='block'; msgEl.style.color='#059669'; msgEl.textContent=`✅ Tersimpan: ${updated.nama} • WA ${updated.wa || '-'} • ${new Date().toLocaleTimeString('id-ID')}`; }
+    updateStoreBrand();
+    await initStoreContext();
+    await loadWaSettings();
+  }catch(e){
+    if(msgEl){ msgEl.style.display='block'; msgEl.style.color='#dc2626'; msgEl.textContent='Gagal: '+String(e.message).slice(0,200); }
+    showToast('Gagal simpan profil: '+e.message);
+  }
+}
+function testStoreWa(){
+  const wa = document.getElementById('storeWa')?.value.trim() || '';
+  if(!wa) return showToast('Isi No. WA dulu');
+  const clean = cleanWA(wa);
+  if(!clean) return showToast('No WA tidak valid');
+  const nama = storeDisplayName();
+  const msg = `Halo ${nama} 👋\nTest nomor pelayanan konsumen — nomor ini aktif 🙏`;
+  window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 function normalize(item){
   // backend -> frontend shape — deadline sekarang = estimasi_selesai jika ada (jatuh tempo = estimasi)
@@ -389,6 +431,7 @@ function normalize(item){
     garansi_hari: item.garansi_hari ?? null,
     garansi_sampai: item.garansi_sampai ? String(item.garansi_sampai).slice(0,10) : null,
     garansi_dari: item.garansi_dari || null,
+    metode_bayar: item.metode_bayar || null,
     updated_at: item.updated_at || null,
     created_at: item.created_at || null,
     diambil_at: item.diambil_at || null
@@ -1558,6 +1601,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   const ss=document.getElementById('searchSemua'); if(ss) ss.addEventListener('input', renderSemuaService);
   const fs=document.getElementById('filterStatusSemua'); if(fs) fs.addEventListener('change', renderSemuaService);
   const spPend=document.getElementById('searchPendapatan'); if(spPend) spPend.addEventListener('input', renderTransaksiPendapatan);
+  const sBayar=document.getElementById('searchBayar'); if(sBayar) sBayar.addEventListener('input', renderTransaksiPembayaran);
   const sSudah=document.getElementById('searchSudahDiambil'); if(sSudah) sSudah.addEventListener('input', ()=> renderStatusView('kanbanSudahDiambil','Sudah Diambil'));
   // sparepart inventory listeners
   const sps=document.getElementById('searchSparepart'); if(sps) sps.addEventListener('input', renderSparepart);
@@ -1629,6 +1673,21 @@ function clearAllSearch(){
     const el=document.getElementById(id);
     if(el) el.value='';
   });
+  // reset filter tab Semua Service agar klik menu = refresh full, tidak nyangkut
+  const fs=document.getElementById('filterStatusSemua');
+  if(fs) fs.value='';
+  const ft=document.getElementById('filterTeknisiSemua');
+  if(ft) ft.value='';
+  currentPageSemua=1;
+  // reset deadline global ke all + update UI tab deadline
+  if(typeof deadlineFilter!=='undefined' && deadlineFilter!=='all'){
+    deadlineFilter='all';
+    try{
+      document.querySelectorAll('[data-deadline]').forEach(b=>{
+        b.classList.toggle('active', b.dataset.deadline==='all');
+      });
+    }catch{}
+  }
 }
 function switchView(view, clearSearch){
   // teknisi tidak boleh buka modul pelanggan
@@ -1675,13 +1734,21 @@ function switchView(view, clearSearch){
   else document.getElementById('sidebar').classList.remove('open');
   if(view==='dashboard') renderDashboard();
   if(view==='proses') renderKanban();
-  if(view==='semua-service'){ if(!availableTechs.length) loadAvailableTechs().then(renderSemuaService); else renderSemuaService(); }
+  if(view==='semua-service'){
+    // klik menu = reset total + refresh dari server agar tidak nyangkut filter lama
+    if(clearSearch){
+      renderSemuaService();
+      if(USE_API) loadData(true).then(()=>renderSemuaService()).catch(()=>{});
+    } else if(!availableTechs.length) loadAvailableTechs().then(renderSemuaService);
+    else renderSemuaService();
+  }
   if(view==='service-masuk'){ if(!availableTechs.length) loadAvailableTechs(); else populateTeknisiSelect(); }
   if(view==='bisa-diambil') renderStatusView('kanbanBisaDiambil','Bisa Diambil');
   if(view==='sudah-diambil') renderStatusView('kanbanSudahDiambil','Sudah Diambil');
   if(view==='service-failed') renderStatusView('kanbanFailed','Service Failed');
   if(view==='status-garansi') renderStatusView('kanbanGaransi','Garansi');
   if(view==='transaksi-pendapatan') renderTransaksiPendapatan();
+  if(view==='transaksi-pembayaran') renderTransaksiPembayaran();
   if(view==='inventory-sparepart') renderSparepart();
   if(view==='inventory-alat') renderAlat();
   if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); }
@@ -1727,6 +1794,7 @@ function setupChips(){
 function renderAll(){
   renderDashboard(); renderQueue(); renderPelanggan(); renderKanban(); updateStats();
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
+  if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();
 }
 
 function escapeHtml(s){
@@ -3170,7 +3238,7 @@ function renderSemuaService(){
         })()}
       </td>
       <td style="text-align:center"><button class="btn btn-ghost small" style="padding:5px 7px;font-size:11px;background:#dcfce7;border-color:#bbf7d0;color:#166534;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:8px" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" title="Direct WhatsApp ke ${escapeHtml(d.wa)} (pakai WA yang login di PC)">${WA_ICON}</button></td>
-      <td style="font-size:11px">Rp ${Number(d.biaya).toLocaleString('id-ID')}</td>
+      <td style="font-size:11px">Rp ${Number(d.biaya).toLocaleString('id-ID')}<div style="margin-top:4px">${bayarBadgeHtml(d.metode_bayar)}</div></td>
       <td>
         <select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" title="Ubah status" style="padding:5px 6px;border-radius:8px;border:1px solid #ececec;font-size:11px;min-width:110px;font-weight:600;${statusStyle}">
           ${statusOptionsHtml}
@@ -3421,7 +3489,7 @@ function renderStatusView(targetId, statusName){
       ${garansiBadge}
       <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kwStatus)}</p>
       ${d.keterangan ? `<p>${ketLabel}${hl(d.keterangan, kwStatus)}</p>` : ''}
-      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${deadlineBadge(d)}${(isSudahTab && d.diambil_at) ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46" title="Tanggal HP diambil pelanggan">📥 Diambil ${fmtDiambil(d.diambil_at)}</span>` : ''}</div>
+      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${bayarBadgeHtml(d.metode_bayar)}${deadlineBadge(d)}${(isSudahTab && d.diambil_at) ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46" title="Tanggal HP diambil pelanggan">📥 Diambil ${fmtDiambil(d.diambil_at)}</span>` : ''}</div>
       ${garansiBox}
       <div class="card-actions">${aksi}</div>
     </div>
@@ -3430,6 +3498,55 @@ function renderStatusView(targetId, statusName){
   if(isBisa) document.querySelectorAll('[data-bisa]').forEach(b=> b.classList.toggle('active', b.dataset.bisa===bisaFilter));
   // update transaksi tab jika sedang aktif
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
+  if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();
+}
+let bayarFilter='all';
+function setBayarFilter(f){
+  bayarFilter=f;
+  document.querySelectorAll('[data-bayar-tab]').forEach(b=> b.classList.toggle('active', b.dataset.bayarTab===f));
+  renderTransaksiPembayaran();
+}
+function renderTransaksiPembayaran(){
+  const tbody=document.getElementById('tbodyBayar');
+  if(!tbody) return;
+  const q=(document.getElementById('searchBayar')?.value||'').toLowerCase();
+  let rows=data.filter(d=> ['Service Sukses','Selesai'].includes(d.status));
+  const sum=(m)=> rows.filter(d=> (d.metode_bayar||'')===m).reduce((s,d)=> s+(Number(d.biaya)||0),0);
+  const cnt=(m)=> rows.filter(d=> (d.metode_bayar||'')===m).length;
+  const tTunai=sum('Tunai'), tTransfer=sum('Transfer'), tQris=sum('QRIS');
+  const cTunai=cnt('Tunai'), cTransfer=cnt('Transfer'), cQris=cnt('QRIS');
+  const lunas=cTunai+cTransfer+cQris, totalLunas=tTunai+tTransfer+tQris;
+  const belum=rows.filter(d=> !(d.metode_bayar||'')).length;
+  const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+  set('bayarTunaiTotal', formatRupiah(tTunai)); set('bayarTunaiCount', cTunai+' service');
+  set('bayarTransferTotal', formatRupiah(tTransfer)); set('bayarTransferCount', cTransfer+' service');
+  set('bayarQrisTotal', formatRupiah(tQris)); set('bayarQrisCount', cQris+' service');
+  set('bayarCount', lunas+' lunas'); set('bayarTotal', formatRupiah(totalLunas));
+  const pct=(v)=> totalLunas? Math.round(v/totalLunas*100):0;
+  const bT=document.getElementById('bayarTunaiBar'); if(bT) bT.style.width=pct(tTunai)+'%';
+  const bTr=document.getElementById('bayarTransferBar'); if(bTr) bTr.style.width=pct(tTransfer)+'%';
+  const bQ=document.getElementById('bayarQrisBar'); if(bQ) bQ.style.width=pct(tQris)+'%';
+  const belumMsg=document.getElementById('bayarBelumMsg'); if(belumMsg) belumMsg.hidden = !belum;
+  set('bayarBelumCount', belum);
+  let filtered=[...rows];
+  if(bayarFilter==='Belum') filtered=filtered.filter(d=> !(d.metode_bayar||''));
+  else if(bayarFilter!=='all') filtered=filtered.filter(d=> (d.metode_bayar||'')===bayarFilter);
+  if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.teknisi).toLowerCase().includes(q));
+  filtered.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')));
+  if(!filtered.length){
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:24px;color:#8a8f98">Belum ada data${bayarFilter!=='all'?' untuk filter '+escapeHtml(bayarFilter):''} — pilih metode di popup Sukses</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=filtered.map(d=>`
+    <tr>
+      <td><strong style="font-size:11px">${escapeHtml(d.id)}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(formatTanggal(d.date))}</span></td>
+      <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(d.nama)}</strong><span style="font-size:11px;color:#4b5563">${escapeHtml(d.device)}</span><span style="font-size:10px;color:#8a8f98">${escapeHtml(d.wa)}</span></div></td>
+      <td><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span></td>
+      <td>${bayarBadgeHtml(d.metode_bayar)}</td>
+      <td style="text-align:right;font-weight:700;color:#059669">${formatRupiah(d.biaya)}</td>
+      <td style="font-size:11px">${escapeHtml(formatTanggal(d.estimasi_selesai||d.date))}</td>
+      <td><button class="btn btn-ghost small" style="padding:4px 6px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}', {readonly:true})">Detail</button></td>
+    </tr>`).join('');
 }
 function renderTransaksiPendapatan(){
   const tbody=document.getElementById('tbodyPendapatan');
@@ -3491,7 +3608,7 @@ function renderTransaksiPendapatan(){
     }).join('');
   }
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:24px;color:#8a8f98">Belum ada HP Service Sukses${q?` untuk "${escapeHtml(q)}"`:''} — Harga tercatat otomatis saat status diubah ke Sukses</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a8f98">Belum ada HP Service Sukses${q?` untuk "${escapeHtml(q)}"`:''} — Harga tercatat otomatis saat status diubah ke Sukses</td></tr>`;
   } else {
     tbody.innerHTML=filtered.map(d=>{
       const arr=serviceSpareparts[d.id]||[];
@@ -3504,6 +3621,7 @@ function renderTransaksiPendapatan(){
         <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(d.nama)}</strong><span style="font-size:11px;color:#4b5563">${escapeHtml(d.device)}</span><span style="font-size:10px;color:#8a8f98">${escapeHtml(d.wa)}</span></div></td>
         <td><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span></td>
         <td><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></td>
+        <td>${bayarBadgeHtml(d.metode_bayar)}</td>
         <td style="min-width:140px">${spHtml}<div style="font-size:10px;color:#6b7280;margin-top:3px">Total sp: ${formatRupiah(spTotal)}</div></td>
         <td style="text-align:right;font-weight:700;color:#059669">${formatRupiah(d.biaya)}</td>
         <td style="font-size:11px">${escapeHtml(formatTanggal(d.estimasi_selesai||d.date))}</td>
@@ -3662,8 +3780,8 @@ function renderTransaksiPendapatan(){
 function exportPendapatanCSV(){
   const rows=data.filter(d=> ['Service Sukses'].includes(d.status));
   if(!rows.length) return showToast('Belum ada data Sukses untuk export');
-  const header=['Invoice','Pelanggan','WA','Device','Teknisi','Status','Biaya','Tanggal','Estimasi'];
-  const csv=[header.join(',')].concat(rows.map(d=> [d.id, `"${d.nama.replace(/"/g,'""')}"`, d.wa, `"${d.device.replace(/"/g,'""')}"`, d.teknisi, d.status, d.biaya, d.date||'', d.estimasi_selesai||''].join(','))).join('\n');
+  const header=['Invoice','Pelanggan','WA','Device','Teknisi','Status','MetodeBayar','Biaya','Tanggal','Estimasi'];
+  const csv=[header.join(',')].concat(rows.map(d=> [d.id, `"${d.nama.replace(/"/g,'""')}"`, d.wa, `"${d.device.replace(/"/g,'""')}"`, d.teknisi, d.status, d.metode_bayar||'', d.biaya, d.date||'', d.estimasi_selesai||''].join(','))).join('\n');
   const blob=new Blob([csv], {type:'text/csv'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download=`pendapatan_sukses_${todayISO()}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -3743,12 +3861,28 @@ function closeHasilModal(){
   if(r) r(null);
 }
 let _garansiResolver=null;
+let _bayarPick='';
+function bayarBadgeHtml(m){
+  if(m==='Tunai') return `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;font-weight:700">💵 Tunai</span>`;
+  if(m==='Transfer') return `<span class="meta-pill" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;font-weight:700">🏦 Transfer</span>`;
+  if(m==='QRIS') return `<span class="meta-pill" style="background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6;font-weight:700">📱 QRIS</span>`;
+  return `<span class="meta-pill" style="background:#f3f4f6;border-color:#e5e7eb;color:#6b7280">⏳ Belum Bayar</span>`;
+}
+function setBayarPick(m){
+  _bayarPick = m || '';
+  document.querySelectorAll('#bayar-pick [data-bayar]').forEach(b=>{
+    const on = (b.dataset.bayar||'')===_bayarPick;
+    b.classList.toggle('btn-dark', on);
+    b.classList.toggle('btn-ghost', !on);
+  });
+}
 function askGaransi(id){
   const d=data.find(x=>x.id===id);
   return new Promise(resolve=>{
     _garansiResolver=resolve;
     document.getElementById('garansiSub').textContent = d ? `${d.id} • ${d.device} • ${d.nama} — berhasil & siap diambil` : id;
     document.getElementById('garansi-hari-input').value = (d && d.garansi_hari) || '';
+    setBayarPick((d && d.metode_bayar) || '');
     document.getElementById('garansiModal').classList.add('show');
     setTimeout(()=>document.getElementById('garansi-hari-input')?.focus(),100);
   });
@@ -3760,9 +3894,10 @@ function confirmGaransiModal(){
     hari=parseInt(v,10);
     if(isNaN(hari)||hari<0) return showToast('Masa garansi harus angka ≥ 0');
   }
+  const bayar=_bayarPick||null;
   const r=_garansiResolver; _garansiResolver=null;
   document.getElementById('garansiModal').classList.remove('show');
-  if(r) r({hari});
+  if(r) r({hari, bayar});
 }
 function closeGaransiModal(){
   const r=_garansiResolver; _garansiResolver=null;
@@ -3779,6 +3914,7 @@ async function updateStatus(id, newStatus){
   const oldKet=item0.keterangan||null;
   const oldGaransiHari=item0.garansi_hari??null;
   const oldGaransiSampai=item0.garansi_sampai||null;
+  const oldBayar=item0.metode_bayar||null;
   const fromProses=PROSES_STATUSES.includes(oldStatus);
 
   // === Flow hasil: diputuskan saat HP selesai diproses ===
@@ -3811,10 +3947,12 @@ async function updateStatus(id, newStatus){
   // === Popup masa garansi: Bisa Diambil (Berhasil/JADI) -> Sukses ===
   // Tanya dulu sebelum pindah; Batal = status tidak jadi diubah.
   let garansiPatch = undefined; // undefined = jangan sentuh; number = hari
+  let bayarPatch = undefined; // undefined = jangan sentuh; string|null = metode
   if(oldStatus==='Bisa Diambil' && (hasil||'JADI')==='JADI' && ['Service Sukses','Selesai','Sudah Diambil'].includes(newStatus)){
     const g = await askGaransi(id);
     if(!g){ renderStatusView('kanbanBisaDiambil','Bisa Diambil'); renderSemuaService(); return; }
     garansiPatch = g.hari;
+    bayarPatch = g.bayar;
   }
   const resetHasil = !['Garansi','Dibatalkan'].includes(newStatus);
 
@@ -3831,6 +3969,7 @@ async function updateStatus(id, newStatus){
     if(ketPatch!==null) item0.keterangan=ketPatch;
     if(biayaPatch!==null) item0.biaya=biayaPatch;
     if(garansiPatch!==undefined && garansiPatch!==null) item0.garansi_hari=garansiPatch;
+    if(bayarPatch!==undefined) item0.metode_bayar=bayarPatch;
     updateStats(); renderSemuaService(); renderKanban(); refreshStatusViews();
   }
   try{
@@ -3842,6 +3981,7 @@ async function updateStatus(id, newStatus){
       if(ketPatch!==null) patch.keterangan=ketPatch;
       if(biayaPatch!==null) patch.biaya=biayaPatch;
       if(garansiPatch!==undefined && garansiPatch!==null) patch.garansi_hari=garansiPatch;
+      if(bayarPatch!==undefined) patch.metode_bayar=bayarPatch;
       if(Object.keys(patch).length) await apiFetch(`/services/${id}`, {method:'PATCH', body: JSON.stringify(patch)});
       await loadData();
     }
@@ -3851,7 +3991,7 @@ async function updateStatus(id, newStatus){
     else showToast(`Status ${id} → ${newStatus}`);
   }catch(e){
     // rollback jika gagal
-    if(item0) { item0.status=oldStatus; item0.hasil=oldHasil; item0.biaya=oldBiaya; item0.keterangan=oldKet; item0.garansi_hari=oldGaransiHari; item0.garansi_sampai=oldGaransiSampai; updateStats(); renderSemuaService(); renderKanban(); }
+    if(item0) { item0.status=oldStatus; item0.hasil=oldHasil; item0.biaya=oldBiaya; item0.keterangan=oldKet; item0.garansi_hari=oldGaransiHari; item0.garansi_sampai=oldGaransiSampai; item0.metode_bayar=oldBayar; updateStats(); renderSemuaService(); renderKanban(); }
     showToast('Gagal update: '+ e.message);
   }
 }
@@ -4006,6 +4146,7 @@ function openDetail(id, opts){
         <button class="btn btn-ghost small" onclick="assignPenerimaFromModal('${escapeHtml(d.id)}')">Simpan</button>`}
       </div>
       <div><strong>Status:</strong> <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
+      <div><strong>Pembayaran:</strong> ${bayarBadgeHtml(d.metode_bayar)}</div>
       <div><strong>Estimasi Selesai:</strong> ${escapeHtml(formatTanggal(d.estimasi_selesai))} <span style="font-size:11px;color:#8a8f98">(jatuh tempo = estimasi)</span></div>
       ${ro ? '' : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="modalEstimasi" type="date" value="${escapeHtml(d.estimasi_selesai||'')}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px">

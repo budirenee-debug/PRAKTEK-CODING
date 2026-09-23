@@ -85,29 +85,29 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .view.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-/* STATS */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+/* STATS — compact padat agar dashboard muat 1 layar */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
 .stat-card.dark{background:#111;color:#fff;border-color:#111}
-.stat-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500}
+.stat-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500;gap:6px;white-space:nowrap;overflow:hidden}
 .stat-card.dark .stat-head{color:#9aa0a6}
-.stat-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px}
+.stat-icon{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;flex-shrink:0}
 .stat-icon.blue{background:#eff6ff}
 .stat-icon.amber{background:#fffbeb}
 .stat-icon.green{background:#ecfdf5}
 .stat-icon.dark-icon{background:rgba(255,255,255,.12);color:#fff}
-.stat-card h3{font-size:26px;font-weight:700;margin-bottom:4px}
-.trend{font-size:12px;color:var(--muted)}
+.stat-card h3{font-size:19px;font-weight:700;margin-bottom:1px;line-height:1.2}
+.trend{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .trend.up{color:#059669}
 .stat-card[onclick]{transition:.15s; user-select:none}
 .stat-card[onclick]:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.10);border-color:#d1d5db}
 .stat-card[onclick]:active{transform:translateY(0);box-shadow:var(--shadow)}
 
 /* CARDS & GRID */
-.grid-2{display:grid;grid-template-columns:1.35fr .85fr;gap:16px}
-.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
-.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.card-head h3{font-size:14px;font-weight:700}
+.grid-2{display:grid;grid-template-columns:1.35fr .85fr;gap:10px}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-head h3{font-size:13px;font-weight:700}
 .link{border:0;background:transparent;font-size:12px;font-weight:600;cursor:pointer}
 .muted{font-size:12px;color:var(--muted)}
 .table-wrap{overflow:auto}
@@ -326,3 +326,16 @@ mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;p
 @media(max-width:360px){
   .sidebar{width:100vw;max-width:100vw}
 }
+/* DASHBOARD 1-LAYAR — padatkan khusus dashboard */
+#view-dashboard .stats{margin-bottom:8px}
+#view-dashboard .grid-2{margin-top:8px}
+#view-dashboard .grid-2 + .grid-2{margin-top:8px}
+#view-dashboard .table td{padding:6px 8px;font-size:12px}
+#view-dashboard .table th{padding:6px 8px;font-size:10px}
+#view-dashboard .tech-list{gap:8px}
+#view-dashboard .tech{font-size:12px;gap:8px}
+#view-dashboard .tech img{width:28px;height:28px}
+#view-dashboard .tech strong{font-size:12px}
+#view-dashboard .tech span{font-size:11px}
+#view-dashboard #brandHitsList,#view-dashboard #keluhanHitsList{gap:6px !important;font-size:12px}
+#view-dashboard .card{padding:10px 12px}

@@ -127,6 +127,38 @@ def get_store(store_id: int, db: Session = Depends(get_db), current=Depends(get_
     return _store_to_out(db, s, role_saya=m.role)
 
 
+@router.patch("/{store_id}", response_model=schemas.StoreOut)
+def update_store(store_id: int, payload: schemas.StoreUpdate,
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Edit profil toko (nama/alamat/WA pelayanan). Owner/admin toko atau superadmin."""
+    s, my_role = _require_store_manager(db, current, store_id)
+    changed = []
+    if payload.nama is not None:
+        nama = payload.nama.strip()
+        if len(nama) < 2:
+            raise HTTPException(status_code=400, detail="Nama toko minimal 2 karakter")
+        if nama != s.nama:
+            s.nama = nama
+            changed.append("nama")
+    if payload.alamat is not None:
+        alamat = (payload.alamat or "").strip() or None
+        if alamat != s.alamat:
+            s.alamat = alamat
+            changed.append("alamat")
+    if payload.wa is not None:
+        wa = (payload.wa or "").strip() or None
+        if wa != s.wa:
+            s.wa = wa
+            changed.append("wa")
+    if not changed:
+        return _store_to_out(db, s, role_saya=my_role)
+    db.commit()
+    db.refresh(s)
+    log_action(db, "store.update", target=s.kode,
+               detail=f"ubah: {','.join(changed)}", actor=current, store_id=s.id)
+    return _store_to_out(db, s, role_saya=my_role)
+
+
 @router.get("/{store_id}/members", response_model=list[schemas.MembershipOut])
 def list_members(store_id: int, db: Session = Depends(get_db), current=Depends(get_current_user)):
     if not current:

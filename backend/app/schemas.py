@@ -66,6 +66,18 @@ class ServiceBase(BaseModel):
     deadline: Optional[datetime.date] = None  # auto hitung dari estimasi_selesai jika kosong
     garansi_hari: Optional[int] = Field(default=None, ge=0, description="masa garansi hari, opsional/editable")
     garansi_sampai: Optional[datetime.date] = Field(default=None, description="batas klaim garansi (auto dari tgl diambil + hari, editable)")
+    metode_bayar: Optional[str] = Field(default=None, max_length=20, description="Tunai / Transfer / QRIS")
+
+    @field_validator('metode_bayar')
+    @classmethod
+    def validate_bayar(cls, v):
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        allowed = ["Tunai", "Transfer", "QRIS"]
+        if v not in allowed:
+            raise ValueError(f'metode_bayar harus salah satu: {allowed}')
+        return v
 
     @field_validator('hasil')
     @classmethod
@@ -127,6 +139,7 @@ class ServiceUpdate(BaseModel):
     deadline: Optional[datetime.date] = None
     garansi_hari: Optional[int] = Field(None, ge=0)
     garansi_sampai: Optional[datetime.date] = None
+    metode_bayar: Optional[str] = Field(None, max_length=20)
 
     @field_validator('hasil')
     @classmethod
@@ -161,6 +174,17 @@ class ServiceUpdate(BaseModel):
             raise ValueError(f'deadline_type harus {allowed}')
         return v
 
+    @field_validator('metode_bayar')
+    @classmethod
+    def validate_bayar_upd(cls, v):
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        allowed = ["Tunai", "Transfer", "QRIS"]
+        if v not in allowed:
+            raise ValueError(f'metode_bayar harus salah satu: {allowed}')
+        return v
+
 class ServiceOut(BaseModel):
     invoice: str
     nama: str
@@ -184,6 +208,7 @@ class ServiceOut(BaseModel):
     garansi_hari: Optional[int] = None
     garansi_sampai: Optional[datetime.date] = None
     garansi_dari: Optional[str] = None  # invoice asal jika hasil klaim garansi
+    metode_bayar: Optional[str] = None  # Tunai / Transfer / QRIS
     diambil_at: Optional[dt] = None  # kapan jadi Sukses/Sudah Diambil (auto)
     created_at: Optional[dt] = None
     updated_at: Optional[dt] = None
@@ -338,6 +363,26 @@ class MembershipOut(BaseModel):
     created_at: Optional[dt] = None
     class Config:
         from_attributes = True
+
+class StoreUpdate(BaseModel):
+    nama: Optional[str] = Field(None, min_length=2, max_length=120)
+    alamat: Optional[str] = Field(None, max_length=255)
+    wa: Optional[str] = Field(None, max_length=20)
+
+    @field_validator('wa')
+    @classmethod
+    def validate_wa(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if v == "":
+            return None
+        cleaned = v.replace(" ", "").replace("-", "").replace("+", "")
+        if not cleaned.isdigit():
+            raise ValueError('No WA toko harus angka')
+        if len(cleaned) < 9:
+            raise ValueError('No WA toko minimal 9 digit')
+        return v
 
 # ---------- BOS Fase 3: undang tim per toko ----------
 class StoreInviteCreate(BaseModel):

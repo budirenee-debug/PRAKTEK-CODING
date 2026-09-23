@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=9585847-nocache">
+    <link rel="stylesheet" href="assets/css/style.css?v=dash-compact1">
 </head>
 <body>
     <div class="app">
@@ -546,8 +546,27 @@
                 <div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Status Bayar</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;padding:24px;color:#8a8f98">Belum ada transaksi — data akan muncul setelah ada penjualan</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-transaksi-pembayaran">
-                <div class="card"><div class="card-head"><h3>Pembayaran</h3><span class="muted">Metode & konfirmasi</span></div>
-                <div class="grid-2"><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Tunai</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div><div class="card" style="box-shadow:none"><h3 style="font-size:14px">Transfer / QRIS</h3><p style="font-size:12px;color:#8a8f98">Rp 0</p><div class="progress" style="margin-top:8px"><div style="width:0%"></div></div></div></div><p style="text-align:center;padding:12px;color:#8a8f98;font-size:12px">Belum ada pembayaran</p></div>
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>💳 Pembayaran</h3><span class="count-pill" id="bayarCount">0 lunas</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="bayarTotal">Rp 0</span></div>
+                        <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchBayar" placeholder="Cari invoice, pelanggan, device..."></div></div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>Service Sukses</strong> per metode pembayaran — diisi otomatis dari popup Sukses (Tunai / Transfer / QRIS).</p>
+                    <div class="grid-2" style="grid-template-columns:repeat(3,1fr)">
+                        <div class="card" style="box-shadow:none;border-left:4px solid #059669"><h3 style="font-size:14px">💵 Tunai</h3><p style="font-size:16px;font-weight:800;color:#059669" id="bayarTunaiTotal">Rp 0</p><p style="font-size:11px;color:#8a8f98" id="bayarTunaiCount">0 service</p><div class="progress" style="margin-top:8px"><div id="bayarTunaiBar" style="width:0%"></div></div></div>
+                        <div class="card" style="box-shadow:none;border-left:4px solid #2563eb"><h3 style="font-size:14px">🏦 Transfer</h3><p style="font-size:16px;font-weight:800;color:#1d4ed8" id="bayarTransferTotal">Rp 0</p><p style="font-size:11px;color:#8a8f98" id="bayarTransferCount">0 service</p><div class="progress" style="margin-top:8px"><div id="bayarTransferBar" style="width:0%;background:#2563eb"></div></div></div>
+                        <div class="card" style="box-shadow:none;border-left:4px solid #7c3aed"><h3 style="font-size:14px">📱 QRIS</h3><p style="font-size:16px;font-weight:800;color:#5b21b6" id="bayarQrisTotal">Rp 0</p><p style="font-size:11px;color:#8a8f98" id="bayarQrisCount">0 service</p><div class="progress" style="margin-top:8px"><div id="bayarQrisBar" style="width:0%;background:#7c3aed"></div></div></div>
+                    </div>
+                    <p style="font-size:11px;color:#b45309;margin:8px 0" id="bayarBelumMsg" hidden>⏳ <span id="bayarBelumCount">0</span> service Sukses belum isi metode — badge ⏳ Belum Bayar.</p>
+                    <div class="tabs" style="margin:10px 0">
+                        <button class="tab active" data-bayar-tab="all" onclick="setBayarFilter('all')">Semua</button>
+                        <button class="tab" data-bayar-tab="Tunai" onclick="setBayarFilter('Tunai')">💵 Tunai</button>
+                        <button class="tab" data-bayar-tab="Transfer" onclick="setBayarFilter('Transfer')">🏦 Transfer</button>
+                        <button class="tab" data-bayar-tab="QRIS" onclick="setBayarFilter('QRIS')">📱 QRIS</button>
+                        <button class="tab" data-bayar-tab="Belum" onclick="setBayarFilter('Belum')">⏳ Belum Bayar</button>
+                    </div>
+                    <div class="table-wrap"><table class="table compact" id="tableBayar"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Metode</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyBayar"><tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
             </section>
             <!-- TRANSAKSI: PENDAPATAN SUKSES (Service Sukses saja) -->
             <section class="view" id="view-transaksi-pendapatan">
@@ -557,7 +576,7 @@
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchPendapatan" placeholder="Cari invoice, pelanggan, device..."></div><select id="filterTeknisiPendapatan" onchange="renderTransaksiPendapatan()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select><button class="btn btn-dark small" onclick="exportPendapatanCSV()">⬇ Export CSV</button></div>
                     </div>
                     <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>harga tercatat</strong> untuk HP <strong>Service Sukses</strong> saja — otomatis sinkron saat Harga diubah di tab Bisa Diambil/Sudah Diambil. Total = sum `biaya`.</p>
-                    <div class="table-wrap"><table class="table compact" id="tablePendapatan"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Status</th><th>Sparepart Dipakai</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyPendapatan"><tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table class="table compact" id="tablePendapatan"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Status</th><th>Bayar</th><th>Sparepart Dipakai</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyPendapatan"><tr><td colspan="9" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px">
                         <span id="pendapatanSummary" style="color:#8a8f98">0 service • Rp 0</span>
                         <span style="font-size:11px;color:#059669">💡 Harga editable di Bisa Diambil/Sudah Diambil → otomatis update di sini</span>
@@ -638,11 +657,33 @@
 
             <!-- AKUN: PENGATURAN TOKO (template WA per status) -->
             <section class="view" id="view-pengaturan">
+                <div class="card" style="max-width:760px;margin:0 auto 14px">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left">
+                            <h3>🏪 Profil Toko — <span id="waStoreName">-</span></h3>
+                            <span class="muted" id="waMyRole">-</span>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:12px">Nama, alamat & <strong>nomor WA pelayanan konsumen</strong> — tampil di nota / info toko. Khusus owner/admin toko aktif.</p>
+                    <div class="form-grid">
+                        <div class="field"><label>Nama Toko *</label><input id="storeNama" placeholder="B_gadget"></div>
+                        <div class="field"><label>Kode Toko</label><input id="storeKode" disabled style="background:#f3f4f6;color:#6b7280" title="Kode tidak bisa diubah (prefix invoice)"></div>
+                        <div class="field"><label>No. WA Pelayanan Konsumen *</label><input id="storeWa" placeholder="08xxxxxxxxxx" inputmode="tel"><span style="font-size:10px;color:#8a8f98">Contoh: 081234567890 — tombol Test di kanan untuk cek chat</span></div>
+                        <div class="field"><label>Alamat Toko</label><input id="storeAlamat" placeholder="Jl. ..."></div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                        <button class="btn btn-dark" style="flex:1;min-width:160px" onclick="saveStoreProfile()">💾 Simpan Profil Toko</button>
+                        <button class="btn btn-ghost" onclick="testStoreWa()">💬 Test WA</button>
+                    </div>
+                    <p id="storeProfileMsg" style="font-size:11px;color:#059669;margin-top:8px;display:none"></p>
+                </div>
                 <div class="card" style="max-width:760px;margin:0 auto">
                     <div class="card-head toolbar">
                         <div class="toolbar-left">
-                            <h3>⚙ Pengaturan Toko — <span id="waStoreName">-</span></h3>
-                            <span class="muted" id="waMyRole">-</span>
+                            <h3>💬 Template WhatsApp</h3>
                         </div>
                         <div class="toolbar-right">
                             <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
@@ -905,6 +946,16 @@
                 <label>Masa garansi (hari, dari tanggal diambil)</label>
                 <input id="garansi-hari-input" type="number" min="0" placeholder="Contoh: 7 — kosongkan = tanpa garansi">
             </div>
+            <div class="field" style="text-align:left;margin-top:10px">
+                <label>💳 Metode pembayaran</label>
+                <div id="bayar-pick" style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button type="button" class="btn small" data-bayar="" onclick="setBayarPick('')">⏳ Belum Bayar</button>
+                    <button type="button" class="btn small" data-bayar="Tunai" onclick="setBayarPick('Tunai')">💵 Tunai</button>
+                    <button type="button" class="btn small" data-bayar="Transfer" onclick="setBayarPick('Transfer')">🏦 Transfer</button>
+                    <button type="button" class="btn small" data-bayar="QRIS" onclick="setBayarPick('QRIS')">📱 QRIS</button>
+                </div>
+                <span style="font-size:10px;color:#8a8f98">Badge tersimpan permanen & tampil di kartu + Pendapatan.</span>
+            </div>
             <div class="hasil-actions">
                 <button class="btn btn-ghost" onclick="closeGaransiModal()">Batal</button>
                 <button class="btn btn-dark" onclick="confirmGaransiModal()">Simpan & Lanjut →</button>
@@ -915,6 +966,6 @@
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=multistore-keluhan-besar"></script>
+    <script src="assets/js/script.js?v=bayar2"></script>
 </body>
 </html>
