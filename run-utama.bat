@@ -1,13 +1,13 @@
 @echo off
 setlocal
 chcp 65001 >nul
-title B_gadget POS - Localhost Only
+title BOS SERVICE - Halaman Utama (Localhost)
 
 :: ==========================================================
-::  B_gadget POS - Localhost Runner (LOKAL SAJA)
+::  BOS SERVICE - Halaman Utama / Landing (LOKAL SAJA)
 ::  - Backend : FastAPI http://127.0.0.1:8000
+::  - Browser otomatis buka halaman utama (landing publik)
 ::  - Tanpa Tunnel / Cloudflare
-::  - Untuk dev lokal Windows
 ::  - Butuh tunnel? pakai run-tunnel.bat (Windows)
 ::    atau run-tunnel.sh (Ubuntu Server)
 :: ==========================================================
@@ -15,10 +15,10 @@ title B_gadget POS - Localhost Only
 set "ROOT=%~dp0"
 set "BACKEND=%ROOT%backend"
 set "PORT=8000"
-set "LOGIN_PATH=/frontend/dev.html"
+set "LOGIN_PATH=/frontend/landing.html"
 
 echo ========================================
-echo  B_gadget POS - Localhost Only
+echo  BOS SERVICE - Halaman Utama (Landing)
 echo  Root   : %ROOT%
 echo  Mode   : LOKAL (tanpa tunnel)
 echo ========================================
@@ -86,7 +86,7 @@ if not errorlevel 1 (
 
 :: ---------- 5. Info ----------
 echo [INFO] Mode: LOKAL ONLY - tanpa cloudflared/tunnel
-echo [INFO] Akses lokal: http://127.0.0.1:%PORT%%LOGIN_PATH%
+echo [INFO] Halaman utama: http://127.0.0.1:%PORT%%LOGIN_PATH%
 echo [INFO] Butuh akses publik? Jalankan run-tunnel.bat
 echo.
 

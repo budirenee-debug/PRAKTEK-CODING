@@ -22,6 +22,10 @@
     .row-flex{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
     .row-flex .field{flex:1;min-width:160px;margin-bottom:0}
     .mini{font-size:11px;color:var(--bos-muted)}
+    .stat-row{display:flex;gap:10px;flex-wrap:wrap}
+    .stat-box{flex:1;min-width:110px;background:#f9fafb;border:1px solid var(--bos-line);border-radius:12px;padding:10px 12px;text-align:center}
+    .stat-box b{display:block;font-size:22px;line-height:1.1}
+    .stat-box span{font-size:11px;color:var(--bos-muted);font-weight:600}
     #guardMsg{text-align:center;padding:60px 20px;color:var(--bos-muted)}
   </style>
 </head>
@@ -33,6 +37,7 @@
         <span>BOS SERVICE<small>Developer Dashboard</small></span>
       </a>
       <div class="bos-links">
+        <a href="landing.html">Beranda</a>
         <a href="index.html">← Dashboard Toko</a>
         <a href="#" onclick="devLogout(event)">Keluar</a>
       </div>
@@ -43,6 +48,31 @@
 
   <div class="dev-wrap" id="devWrap" style="display:none">
     <div id="alert" class="alert"></div>
+
+    <!-- 0. RINGKASAN PLATFORM -->
+    <div class="dev-card">
+      <h2>📊 Ringkasan Platform</h2>
+      <p class="sub">Monitoring member sekilas: toko, akun per peran, dan pendaftar baru 7 hari terakhir.</p>
+      <div class="stat-row" id="statRow">
+        <div class="stat-box"><b id="stToko">-</b><span>🏪 Toko</span></div>
+        <div class="stat-box"><b id="stAkun">-</b><span>👥 Akun</span></div>
+        <div class="stat-box"><b id="stOwner">-</b><span>Owner</span></div>
+        <div class="stat-box"><b id="stAdmin">-</b><span>Admin</span></div>
+        <div class="stat-box"><b id="stKasir">-</b><span>Kasir</span></div>
+        <div class="stat-box"><b id="stTeknisi">-</b><span>Teknisi</span></div>
+        <div class="stat-box"><b id="stBaru">-</b><span>🆕 Baru 7 hari</span></div>
+      </div>
+    </div>
+
+    <!-- 0b. TOKO × ANGGOTA -->
+    <div class="dev-card">
+      <h2>🏪 Toko × Anggota</h2>
+      <p class="sub">Tiap toko + pemilik + komposisi peran anggotanya. <span id="storeCount"></span></p>
+      <table class="dev-table">
+        <thead><tr><th>Toko</th><th>Owner</th><th>Anggota</th><th>Status</th><th>Terdaftar</th></tr></thead>
+        <tbody id="tbodyStores"><tr><td colspan="5">Memuat...</td></tr></tbody>
+      </table>
+    </div>
 
     <!-- 1. INVITE OWNER -->
     <div class="dev-card">
@@ -169,11 +199,57 @@
         }
         document.getElementById('guardMsg').style.display = 'none';
         document.getElementById('devWrap').style.display = 'block';
-        await Promise.all([loadOwnerInvites(), loadResetUsers(), loadAudit()]);
+        await Promise.all([loadOverview(), loadOwnerInvites(), loadResetUsers(), loadAudit()]);
       }catch(err){
         document.getElementById('guardMsg').innerHTML = 'Gagal verifikasi akses: ' + esc(err.message) + '<br><br><a href="login.html">Login ulang →</a>';
       }
     })();
+
+    // ---------- 0. ringkasan + toko × anggota ----------
+    async function loadOverview(){
+      const tb = document.getElementById('tbodyStores');
+      tb.innerHTML = '<tr><td colspan="5">Memuat...</td></tr>';
+      try{
+        const [stores, users] = await Promise.all([devFetch('/stores'), devFetch('/auth/users')]);
+        const akun = users.filter(u => u.role !== 'superadmin');
+        // pendaftar baru 7 hari
+        const weekAgo = Date.now() - 7 * 864e5;
+        const baru = akun.filter(u => u.created_at && new Date(u.created_at).getTime() >= weekAgo).length;
+        document.getElementById('stToko').textContent = stores.length;
+        document.getElementById('stAkun').textContent = akun.length;
+        document.getElementById('stBaru').textContent = baru;
+        // anggota per toko (superadmin boleh intip semua via /stores/{id}/members)
+        const perStore = await Promise.all(stores.map(async s => {
+          try { return {store: s, members: await devFetch(`/stores/${s.id}/members`)}; }
+          catch (e) { return {store: s, members: null}; }
+        }));
+        const roleCount = {owner: 0, admin: 0, kasir: 0, teknisi: 0};
+        tb.innerHTML = perStore.length ? perStore.map(({store: s, members}) => {
+          let anggota = '<span class="mini">gagal load</span>';
+          if (members) {
+            const aktif = members.filter(m => m.is_active);
+            aktif.forEach(m => { if (roleCount[m.role] !== undefined) roleCount[m.role]++; });
+            const sum = r => aktif.filter(m => m.role === r).length;
+            anggota = `<span class="pill ok">${aktif.length} aktif</span> <span class="mini">O:${sum('owner')} A:${sum('admin')} K:${sum('kasir')} T:${sum('teknisi')}</span>`
+              + (members.length - aktif.length ? ` <span class="pill used">${members.length - aktif.length} nonaktif</span>` : '');
+          }
+          return `<tr>
+            <td><strong>${esc(s.nama)}</strong> <span class="mini">(${esc(s.kode)})</span></td>
+            <td>${esc(s.owner_username || '-')}</td>
+            <td>${anggota}</td>
+            <td>${s.is_active ? '<span class="pill ok">Aktif</span>' : '<span class="pill used">Nonaktif</span>'}</td>
+            <td class="mini" style="white-space:nowrap">${s.created_at ? new Date(s.created_at).toLocaleDateString('id-ID') : '-'}</td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="5">Belum ada toko.</td></tr>';
+        document.getElementById('storeCount').textContent = perStore.length + ' toko.';
+        document.getElementById('stOwner').textContent = roleCount.owner;
+        document.getElementById('stAdmin').textContent = roleCount.admin;
+        document.getElementById('stKasir').textContent = roleCount.kasir;
+        document.getElementById('stTeknisi').textContent = roleCount.teknisi;
+      }catch(err){
+        tb.innerHTML = `<tr><td colspan="5">Gagal: ${esc(err.message)}</td></tr>`;
+      }
+    }
 
     // ---------- 1. invite owner ----------
     async function loadOwnerInvites(){

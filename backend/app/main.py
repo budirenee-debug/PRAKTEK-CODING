@@ -377,13 +377,14 @@ if os.path.exists(FRONTEND_DIR):
 
 @app.get("/", tags=["Root"])
 def root(request: Request):
-    # Jika akses via browser (ketik reneepsl.my.id) -> redirect ke halaman login
+    # Jika akses via browser (ketik domain) -> landing publik (wajah platform).
+    # Login/dashboard tetap via /frontend/login.html & /frontend/index.html.
     # API client tetap dapat JSON via Accept: application/json
     try:
         accept = request.headers.get("accept", "")
-        # browser minta html -> redirect ke login
+        # browser minta html -> landing
         if "text/html" in accept:
-            return RedirectResponse(url="/frontend/login.html", status_code=302)
+            return RedirectResponse(url="/frontend/landing.html", status_code=302)
     except Exception:
         pass
     return {
@@ -391,6 +392,7 @@ def root(request: Request):
         "version": "1.0.0",
         "docs": "/docs",
         "redoc": "/redoc",
+        "landing": "/frontend/landing.html",
         "login": "/frontend/login.html",
         "endpoints": {
             "auth": "/api/auth/login (superadmin/bismillah)",
