@@ -1966,7 +1966,7 @@ function renderHitsIndicators(){
   // render keluhan
   kelWrap.innerHTML = kelSorted.map(([cat,cnt])=>{
     const pct = Math.round((cnt/maxKel)*100);
-    const color = pct>=80 ? '#ef4444' : pct>=50 ? '#f59e0b' : '#111';
+    const color = pct>=80 ? '#ef4444' : pct>=50 ? '#f59e0b' : '#04074a';
     return `<div style="display:flex;align-items:center;gap:10px">
       <span style="flex:1;font-size:13px;font-weight:600">${escapeHtml(cat)}</span>
       <div class="progress" style="flex:1.2;max-width:140px;height:8px;background:#f3f4f6"><div style="width:${pct}%;background:${color}"></div></div>
@@ -2114,7 +2114,7 @@ function renderLaporanTeknisi(){
 }
 // ---------- Sparepart Inventory (editable Merk/Masuk/Keluar/Stok Akhir/Harga) ----------
 function merkBadgeStyle(m){
-  const s={IPHONE:'background:#111;color:#fff;border-color:#111', SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe', XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa', OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe', INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a', LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'};
+  const s={IPHONE:'background:#04074a;color:#fff;border-color:#04074a', SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe', XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa', OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe', INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a', LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'};
   return s[m]||s['LAIN'];
 }
 function renderSparepart(){

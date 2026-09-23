@@ -1,11 +1,13 @@
 :root{
   --bg:#f6f6f7;
-  --sidebar:#111214;
+  --sidebar:#04074a;
+  --brand:#04074a;
+  --brand-dark:#02063c;
   --card:#ffffff;
   --border:#ececec;
   --text:#111214;
   --muted:#8a8f98;
-  --primary:#111214;
+  --primary:#04074a;
   --blue:#eff6ff;
   --amber:#fffbeb;
   --green:#ecfdf5;
@@ -20,10 +22,10 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .sidebar{width:250px;background:var(--sidebar);color:#fff;display:flex;flex-direction:column;justify-content:space-between;position:sticky;top:0;height:100vh;padding:16px 12px;overflow:hidden}
 .sidebar-top{flex:1;overflow-y:auto;overflow-x:hidden;margin-right:-4px;padding-right:4px}
 .sidebar-top::-webkit-scrollbar{width:3px}
-.sidebar-top::-webkit-scrollbar-thumb{background:#2a2c2f;border-radius:4px}
+.sidebar-top::-webkit-scrollbar-thumb{background:#2b36a8;border-radius:4px}
 .sidebar-top::-webkit-scrollbar-track{background:transparent}
 .brand{display:flex;gap:10px;align-items:center;margin-bottom:14px}
-.brand-icon{width:36px;height:36px;background:#fff;color:#111;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:16px}
+.brand-icon{width:36px;height:36px;background:#fff;color:var(--brand);border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:16px}
 .brand h2{font-size:15px;line-height:1}
 .brand p{font-size:11px;color:#9aa0a6;letter-spacing:.04em}
 .menu{display:flex;flex-direction:column;gap:1px;padding-bottom:6px}
@@ -31,23 +33,23 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .menu-category:first-of-type{margin-top:6px}
 .menu-item{width:100%;display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;border:1px solid transparent;background:transparent;color:#b8bec4;cursor:pointer;font-size:12.5px;font-weight:500;transition:.2s;text-align:left;line-height:1.2;position:relative}
 .menu-item .mi{width:18px;height:18px;display:grid;place-items:center;background:rgba(255,255,255,.08);border-radius:4px;font-size:10px;flex-shrink:0;transition:.2s}
-.menu-item:hover{transform:translateX(4px) scale(1.02);background:#1e2023;border-color:#2a2c2f;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25);z-index:2}
+.menu-item:hover{transform:translateX(4px) scale(1.02);background:#141b6b;border-color:#2b36a8;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25);z-index:2}
 .menu-item:hover .mi{background:rgba(255,255,255,.18);transform:scale(1.08)}
 .menu-item:hover .badge{transform:scale(1.05)}
 .menu-item.active{background:#fff;color:#111;border-color:#fff;box-shadow:0 4px 14px rgba(255,255,255,.15)}
 .menu-item.active:hover{transform:translateX(3px) scale(1.015);background:#fff;box-shadow:0 8px 20px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.2)}
-.menu-item.active .mi{background:#111;color:#fff}
+.menu-item.active .mi{background:var(--brand);color:#fff}
 .menu-item:active{transform:translateX(2px) scale(.99)}
-.badge{margin-left:auto;background:#2a2c2f;color:#fff;font-size:10px;padding:2px 6px;border-radius:20px}
-.menu-item.active .badge{background:#111;color:#fff}
-.sidebar-bottom{border-top:1px solid #232528;padding-top:10px;margin-top:10px}
-.user-card{display:flex;gap:8px;align-items:center;background:#1b1d1f;border-radius:10px;padding:8px}
+.badge{margin-left:auto;background:#1a2290;color:#fff;font-size:10px;padding:2px 6px;border-radius:20px}
+.menu-item.active .badge{background:var(--brand);color:#fff}
+.sidebar-bottom{border-top:1px solid #232a7a;padding-top:10px;margin-top:10px}
+.user-card{display:flex;gap:8px;align-items:center;background:#0a1054;border-radius:10px;padding:8px}
 .user-card img{width:32px;height:32px;border-radius:50%}
 .user-card strong{font-size:12px;display:block}
 .user-card span{font-size:10px;color:#9aa0a6}
 .icon-btn{margin-left:auto;background:transparent;border:0;color:#fff;cursor:pointer;font-size:12px}
 .store-info{display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:#6b7280}
-.btn-logout{width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border-radius:8px;border:1px solid #2a2c2f;background:#1b1d1f;color:#e5e7eb;cursor:pointer;font-size:12px;font-weight:600;transition:.2s}
+.btn-logout{width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border-radius:8px;border:1px solid #2a3290;background:#0d1358;color:#e5e7eb;cursor:pointer;font-size:12px;font-weight:600;transition:.2s}
 .btn-logout:hover{background:#ef4444;border-color:#ef4444;color:#fff}
 .btn-logout:active{transform:scale(.98)}
 .logout-icon{font-size:14px;line-height:1}
@@ -64,8 +66,8 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .search-box input{border:0;outline:0;width:100%;font-size:13px}
 .search-box.small{min-width:240px;padding:8px 12px}
 .btn{border:0;border-radius:12px;padding:11px 18px;font-weight:600;cursor:pointer;font-size:13px}
-.btn-dark{background:#111;color:#fff}
-.btn-dark:hover{background:#000}
+.btn-dark{background:var(--brand);color:#fff}
+.btn-dark:hover{background:var(--brand-dark)}
 .btn-ghost{background:#fff;border:1px solid var(--border)}
 .btn.small{padding:8px 14px}
 .notif{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:#fff;position:relative;cursor:pointer;display:grid;place-items:center}
@@ -88,7 +90,7 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 /* STATS — compact padat agar dashboard muat 1 layar */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
-.stat-card.dark{background:#111;color:#fff;border-color:#111}
+.stat-card.dark{background:var(--brand);color:#fff;border-color:var(--brand)}
 .stat-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500;gap:6px;white-space:nowrap;overflow:hidden}
 .stat-card.dark .stat-head{color:#9aa0a6}
 .stat-icon{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;flex-shrink:0}
@@ -135,7 +137,7 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .tech strong{display:block;font-size:13px}
 .tech span{font-size:12px;color:var(--muted)}
 .progress{width:80px;height:6px;background:#f3f4f6;border-radius:20px;overflow:hidden}
-.progress div{height:100%;background:#111;border-radius:20px}
+.progress div{height:100%;background:var(--brand);border-radius:20px}
 
 /* FORM VIEW */
 .grid-form{display:grid;grid-template-columns:1.6fr .7fr;gap:16px}
@@ -146,10 +148,10 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .field label{font-size:12px;font-weight:600}
 .field input,.field select,.field textarea{padding:11px 12px;border-radius:2px !important;border:1px solid var(--border);outline:0;font-size:13px;background:#fcfcfc}
 .field textarea{min-height:90px;resize:vertical}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:#111;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);background:#fff}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:7px 12px;border-radius:2px !important;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer}
-.chip.active{background:#111;color:#fff;border-color:#111}
+.chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
 .info-card h4{font-size:13px;margin-bottom:8px}
 .info-card ul{padding-left:16px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
@@ -159,7 +161,7 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .queue-item strong{font-size:13px}
 .queue-item span{font-size:11px;color:var(--muted)}
 .queue-item .price{margin-left:auto;font-weight:700;font-size:13px}
-.badge-count{background:#111;color:#fff;font-size:11px;padding:4px 8px;border-radius:20px}
+.badge-count{background:var(--brand);color:#fff;font-size:11px;padding:4px 8px;border-radius:20px}
 
 /* PELANGGAN */
 .toolbar{flex-wrap:wrap;gap:12px}
@@ -167,13 +169,13 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .count-pill{background:#f3f4f6;padding:6px 10px;border-radius:2px !important;font-size:11px;font-weight:600}
 .pagination{display:flex;justify-content:space-between;align-items:center;padding-top:14px;font-size:12px;color:var(--muted)}
 .page-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:#fff;cursor:pointer}
-.page-btn.active{background:#111;color:#fff;border-color:#111}
+.page-btn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 
 /* KANBAN / PROSES */
 .tabs{display:flex;gap:8px;margin-bottom:14px;overflow:auto;padding-bottom:4px}
 .tab{padding:9px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
 .tab span{background:#f3f4f6;padding:2px 7px;border-radius:20px;font-size:11px}
-.tab.active{background:#111;color:#fff;border-color:#111}
+.tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .tab.active span{background:rgba(255,255,255,.15);color:#fff}
 .kanban{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;align-items:stretch;grid-auto-rows:1fr}
 .service-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 7px;box-shadow:0 1px 8px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:4px;height:100%;align-self:stretch;min-width:0;overflow:hidden}
@@ -187,7 +189,7 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 /* HIGHLIGHT keyword search: bayangan tipis hitam + hijau */
 mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;padding:0 2px;box-shadow:0 0 0 1px rgba(17,24,39,.65),0 0 0 3px rgba(16,185,129,.35)}
 /* MODAL HASIL — modern */
-.hasil-box{max-width:430px;text-align:center;padding:26px 22px 22px;border-top:5px solid #111;animation:pop .18s ease}
+.hasil-box{max-width:430px;text-align:center;padding:26px 22px 22px;border-top:5px solid var(--brand);animation:pop .18s ease}
 @keyframes pop{from{transform:scale(.96) translateY(6px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 .hasil-icon{font-size:34px;margin-bottom:6px}
 .hasil-box h3{font-size:17px;margin-bottom:2px}
@@ -226,7 +228,7 @@ mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;p
 .modal.show{display:grid}
 .modal-box{background:#fff;border-radius:18px;padding:22px;max-width:520px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:#fff;cursor:pointer}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;opacity:0;transition:.3s;z-index:30}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;opacity:0;transition:.3s;z-index:30}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
 /* MOBILE OVERLAY */
