@@ -255,6 +255,80 @@ function openWhatsApp(wa, nama, device, invoice, keluhan, key){
   const url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
 }
+// ---------- Nota digital via WA (kasir tekan kirim di WA, tidak otomatis) ----------
+function activeStoreInfo(){
+  try{
+    const arr=getMyStores();
+    const cur=arr.find(s=>s.id===getActiveStoreId());
+    if(cur) return cur;
+  }catch{}
+  return {};
+}
+function notaVars(d){
+  const st=activeStoreInfo();
+  return {
+    nama: d.nama||'Pelanggan', device: d.device||'-', imei: d.imei||'-',
+    invoice: d.id||'', tanggal: formatTanggal(d.date),
+    keluhan: d.keluhan||'-', kelengkapan: (d.kelengkapan||[]).join(', ')||'-',
+    keterangan: d.keterangan||'-',
+    biaya: formatRupiah(Number(d.biaya)||0), estimasi: formatTanggal(d.estimasi_selesai||d.deadline)||'-',
+    teknisi: d.teknisi||'-', penerima: d.penerima||'-', status: displayStatus(d.status),
+    toko: st.nama||storeDisplayName(), alamat_toko: st.alamat||'-', wa_toko: st.wa||'-',
+    garansi_dari: d.garansi_dari||'',
+  };
+}
+function buildNotaWA(d){
+  const tpl=waTemplateFor('nota_digital');
+  const vars=notaVars(d);
+  return tpl.replace(/\{(\w+)\}/g, (_,k)=> (k in vars ? vars[k] : ''));
+}
+let _notaId=null;
+let _notaSize='t80';
+try{ _notaSize=localStorage.getItem('nota_size')||'t80'; }catch{}
+function openNotaModal(id){
+  const d=data.find(x=>x.id===id);
+  if(!d) return showToast('Data nota tidak ketemu');
+  _notaId=id;
+  document.getElementById('notaSub').textContent=`${d.id} • ${d.device} • ${d.nama}`;
+  document.getElementById('notaPreview').textContent=buildNotaWA(d);
+  const sel=document.getElementById('notaSize');
+  if(sel) sel.value=_notaSize;
+  document.getElementById('notaModal').classList.add('show');
+}
+function closeNotaModal(){
+  _notaId=null;
+  document.getElementById('notaModal').classList.remove('show');
+}
+function sendNotaWA(id){
+  const inv=id||_notaId;
+  const d=data.find(x=>x.id===inv);
+  if(!d) return showToast('Pilih dulu notasinya');
+  const clean=cleanWA(d.wa);
+  if(!clean) return showToast('No WA pelanggan tidak valid');
+  window.open(`https://wa.me/${clean}?text=${encodeURIComponent(buildNotaWA(d))}`, '_blank');
+  showToast('Chat WA pelanggan dibuka — tekan kirim di WhatsApp');
+}
+function buildNotaHTML(d){
+  const v=notaVars(d);
+  const row=(k,val)=>`<tr><td style="vertical-align:top;white-space:nowrap">${k}</td><td style="padding:0 4px">:</td><td>${escapeHtml(val)}</td></tr>`;
+  return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
+    + `<hr><table>${row('Invoice',v.invoice)}${row('Tanggal',v.tanggal)}${row('Pelanggan',v.nama)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Kondisi awal',v.keterangan)}${row('Kelengkapan',v.kelengkapan)}${row('Estimasi',v.estimasi)}${row('Teknisi',v.teknisi)}${row('Penerima',v.penerima)}</table><hr>`
+    + `<div class="nota-total"><span>Total Biaya</span><span>${escapeHtml(v.biaya)}</span></div><hr>`
+    + `<div class="nota-foot">Terima kasih 🙏<br>Komplain? Hubungi WA di atas</div>`;
+}
+function printNota(id){
+  const inv=id||_notaId;
+  const d=data.find(x=>x.id===inv);
+  if(!d) return showToast('Pilih dulu notasinya');
+  const sel=document.getElementById('notaSize');
+  const size=sel ? sel.value : _notaSize;
+  _notaSize=size;
+  try{ localStorage.setItem('nota_size',size); }catch{}
+  const area=document.getElementById('printArea');
+  if(!area) return showToast('Area cetak tidak ketemu');
+  area.innerHTML=`<div class="nota-paper ${size}">${buildNotaHTML(d)}</div>`;
+  window.print();
+}
 // ---------- Template WA per status (per toko, editable di Pengaturan) ----------
 const DEFAULT_WA_TPL = {
   umum: "Halo {nama} 👋\nDari {toko}\nInvoice: {invoice}\nDevice: {device}\nKeluhan: {keluhan}\n\nTerima kasih 🙏",
@@ -263,8 +337,9 @@ const DEFAULT_WA_TPL = {
   gagal: "Halo {nama} 🙏\nMohon maaf, HP {device} belum bisa diperbaiki (gratis, tidak ada biaya).\nInvoice: {invoice}\nSilakan diambil kembali di {toko}.",
   sudah_diambil: "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
   klaim_garansi: "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
+  nota_digital: "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
 };
-const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', umum:'Umum 💬'};
+const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', nota_digital:'Nota Digital 🧾', umum:'Umum 💬'};
 function storeDisplayName(){
   try{
     const stores = getMyStores();
@@ -3387,7 +3462,7 @@ function toggleInlineDetail(invoice){
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn small" style="background:#dcfce7;border:1px solid #bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')">${WA_ICON} Direct WhatsApp</button>
-      <button class="btn btn-dark small" onclick="window.print()">🖨 Cetak Nota</button>
+      <button class="btn btn-dark small" onclick="printNota('${escapeHtml(d.id)}')">🖨 Cetak Nota</button>
       <button class="btn btn-ghost small" onclick="openDetail('${escapeHtml(d.id)}')">↗ Modal Lengkap</button>
       <button class="btn btn-ghost small" onclick="toggleInlineDetail('${escapeHtml(d.id)}')">▲ Tutup</button>
     </div>
@@ -4215,6 +4290,7 @@ async function handleServiceSubmit(e){
   const device=document.getElementById('f-device').value.trim();
   const imei=document.getElementById('f-imei').value.trim();
   const keluhan=document.getElementById('f-keluhan').value.trim();
+  const keterangan=document.getElementById('f-keterangan')?.value.trim()||null;
   const biaya=parseRupiah(document.getElementById('f-biaya').value);
   const teknisi=document.getElementById('f-teknisi').value;
   const estimasi=document.getElementById('f-estimasi').value || null;
@@ -4229,6 +4305,7 @@ async function handleServiceSubmit(e){
     device: device,
     imei: imei || null,
     keluhan,
+    keterangan,
     kelengkapan: [...selectedKelengkapan],
     biaya,
     teknisi,
@@ -4244,6 +4321,7 @@ async function handleServiceSubmit(e){
     else data.unshift(created);
     renderAll(); resetForm(); showToast('Service berhasil disimpan! '+(created.invoice||created.id));
     switchView('proses');
+    openNotaModal(created.invoice||created.id); // nota digital: preview + kirim via WA
   }catch(err){
     showToast('Gagal simpan: '+ err.message);
   }
@@ -4340,7 +4418,8 @@ function openDetail(id, opts){
       <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''} <span style="font-size:11px;color:#6b7280">otomatis mengikuti Estimasi Selesai</span></div>
     </div>
     <div style="margin-top:18px;display:flex;gap:10px">
-      <button class="btn btn-dark" style="flex:1" onclick="window.print()">Cetak Nota</button>
+      <button class="btn btn-dark" style="flex:1" onclick="printNota('${escapeHtml(d.id)}')">Cetak Nota</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="sendNotaWA('${escapeHtml(d.id)}')">🧾 Nota WA</button>
       <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Tutup</button>
     </div>
   `;

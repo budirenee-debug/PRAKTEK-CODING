@@ -133,7 +133,7 @@
                 </button>
                 <div class="store-info">
                     <span>● Sistem Online</span>
-                    <span id="app-ver">vBOS3-navy1</span>
+                    <span id="app-ver">vBOS3-nota3</span>
                 </div>
             </div>
         </aside>
@@ -277,6 +277,7 @@
                                 <div class="field"><label>Tipe HP / Device *</label><input id="f-device" required placeholder="iPhone 11 / Samsung A54"></div>
                                 <div class="field"><label>IMEI / Serial (opsional)</label><input id="f-imei" placeholder="8899 / 35xxxxxxxxxxxx" minlength="4" maxlength="30"><span style="font-size:10px;color:#8a8f98">Minimal 4 digit — akan muncul di setiap kartu seperti tipe HP</span></div>
                                 <div class="field full"><label>Keluhan / Kerusakan *</label><textarea id="f-keluhan" required placeholder="Deskripsi keluhan: mati total, LCD pecah, baterai drop..."></textarea></div>
+                                <div class="field full"><label>Keterangan / Kondisi Awal <span style="color:#8a8f98;font-weight:400">(opsional — konfirmasi ke pelanggan)</span></label><textarea id="f-keterangan" placeholder="Contoh: LCD retak pojok kanan, tombol volume lepas, baterai kembung — sudah dikonfirmasi ke pelanggan"></textarea></div>
                                 <div class="field"><label>Kelengkapan</label>
                                     <div class="chips" id="chips">
                                         <button type="button" class="chip" data-value="HP Saja">HP Saja</button>
@@ -722,7 +723,7 @@
                             <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
                         </div>
                     </div>
-                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{invoice}</code> <code>{keluhan}</code> <code>{toko}</code> <code>{biaya}</code> <code>{teknisi}</code> <code>{status}</code> <code>{garansi_dari}</code>. Kosongkan + Simpan = kembali ke default.</p>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code>. Kosongkan + Simpan = kembali ke default.</p>
                     <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
                 </div>
             </section>
@@ -996,9 +997,36 @@
         </div>
     </div>
 
+    <!-- MODAL NOTA DIGITAL (muncul setelah service tersimpan) -->
+    <div class="modal" id="notaModal">
+        <div class="modal-box" style="max-width:460px">
+            <button class="modal-close" onclick="closeNotaModal()">×</button>
+            <div class="hasil-icon">🧾</div>
+            <h3>Nota Digital Tersimpan</h3>
+            <p class="hasil-sub" id="notaSub">—</p>
+            <pre id="notaPreview" style="text-align:left;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:12px;font-size:12px;white-space:pre-wrap;font-family:Inter,system-ui,sans-serif;max-height:260px;overflow:auto"></pre>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">WA tidak terkirim otomatis — tekan <strong>Kirim via WA</strong>, chat pelanggan terbuka dengan nota sudah tertulis, tinggal tekan kirim di WhatsApp.</p>
+            <div class="field" style="text-align:left;margin-top:8px">
+                <label>🖨 Ukuran kertas cetak</label>
+                <select id="notaSize" style="width:100%;padding:10px;border:1px solid #ececec;border-radius:10px;font-size:13px">
+                    <option value="t80">🧾 Thermal 80mm</option>
+                    <option value="t58">🧾 Thermal 58mm</option>
+                    <option value="a4">🖨 Kertas A4</option>
+                </select>
+            </div>
+            <div class="hasil-actions">
+                <button class="btn btn-ghost" onclick="printNota()">🖨 Cetak</button>
+                <button class="btn btn-dark" onclick="sendNotaWA()">Kirim via WA →</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
-    <script src="assets/js/script.js?v=navy1"></script>
+    <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
+    <div id="printArea"></div>
+
+    <script src="assets/js/script.js?v=nota3"></script>
 </body>
 </html>

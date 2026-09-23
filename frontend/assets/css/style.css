@@ -346,3 +346,19 @@ details.card summary{list-style:none}
 details.card summary::-webkit-details-marker{display:none}
 details.card summary .darrow{display:inline-block;transition:transform .15s;color:#8a8f98;font-size:12px}
 details[open].card summary .darrow{transform:rotate(90deg)}
+/* CETAK NOTA — hanya printArea yang keluar di kertas */
+#printArea{display:none}
+@media print{
+  body>*:not(#printArea){display:none !important}
+  #printArea{display:block !important;color:#000;background:#fff}
+  .nota-paper{margin:0 auto;line-height:1.5}
+  .nota-paper table{width:100%;border-collapse:collapse;font-size:inherit}
+  .nota-paper hr{border:0;border-top:1px dashed #000;margin:6px 0}
+  .nota-head{text-align:center;margin-bottom:4px}
+  .nota-toko{font-weight:800;font-size:1.25em}
+  .nota-total{display:flex;justify-content:space-between;font-weight:800;font-size:1.2em}
+  .nota-foot{text-align:center;font-size:.9em}
+  .nota-paper.a4{width:100%;max-width:700px;font-size:14px;font-family:Inter,system-ui,sans-serif}
+  .nota-paper.t80{width:80mm;font-size:11px;font-family:'Courier New',monospace}
+  .nota-paper.t58{width:58mm;font-size:10px;font-family:'Courier New',monospace;word-break:break-word}
+}

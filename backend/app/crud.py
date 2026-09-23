@@ -252,6 +252,7 @@ def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, s
         device=payload.device,
         imei=payload.imei,
         keluhan=payload.keluhan,
+        keterangan=payload.keterangan,
         kelengkapan=kelengkapan_to_str(payload.kelengkapan),
         biaya=payload.biaya,
         teknisi=payload.teknisi,
