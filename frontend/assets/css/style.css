@@ -207,6 +207,9 @@ mark.search-hit,.search-hit{background:#ecfdf5;color:#065f46;border-radius:3px;p
 #hasilAlasan{width:100%;min-height:64px;padding:10px 12px;border:1px solid #ececec;border-radius:10px;font-size:12px;font-family:inherit;resize:vertical}
 .hasil-actions{display:flex;gap:10px;margin-top:14px;position:sticky;bottom:0;background:#fff;padding:10px 0 2px}
 .hasil-actions .btn{flex:1}
+.alert{padding:10px 12px;border-radius:12px;font-size:13px;display:none;margin-bottom:12px}
+.alert.err{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.alert.ok{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
 /* BANNER hasil di kartu Bisa Diambil / Failed */
 .hasil-banner{font-size:11px;font-weight:700;padding:6px 8px;border-radius:8px;line-height:1.35}
 .hasil-banner.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}

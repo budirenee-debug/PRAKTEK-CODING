@@ -116,23 +116,37 @@ def _to_out(svc: models.Service, toko_nama: Optional[str]) -> TrackOut:
 
 @router.get("", response_model=List[TrackOut])
 def track(q: str, db: Session = Depends(get_db)):
-    """Cari service by invoice (exact, case-insensitive) atau IMEI (exact).
+    """Cari service by invoice atau IMEI — boleh sebagian (case-insensitive).
 
-    Contoh: GET /api/track?q=REN-2026-0001  atau  ?q=356938035643809
-    Publik — tanpa token. Return max 5 (IMEI bisa punya banyak riwayat).
+    Contoh: GET /api/track?q=REN-2026-0001 , ?q=356938035643809 , atau ?q=8675
+    (4 digit terakhir IMEI). Exact match diutamakan, lalu terbaru.
+    Publik — tanpa token. Return max 5.
     """
     key = (q or "").strip()
     if len(key) < 3:
         raise HTTPException(status_code=400, detail="Kode nota / IMEI minimal 3 karakter")
-    rows = (
+    like = f"%{key}%"
+    cands = (
         db.query(models.Service)
-        .filter(or_(models.Service.invoice.ilike(key), models.Service.imei == key))
+        .filter(or_(models.Service.invoice.ilike(like), models.Service.imei.ilike(like)))
         .order_by(desc(models.Service.updated_at))
-        .limit(5)
+        .limit(20)
         .all()
     )
-    if not rows:
+    if not cands:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan — cek lagi kode nota / IMEI di struk")
+    low = key.lower()
+
+    def rank(svc: models.Service):
+        if (svc.invoice or "").lower() == low:
+            return 0
+        if (svc.imei or "") == key:
+            return 1
+        if (svc.invoice or "").lower().startswith(low):
+            return 2
+        return 3
+
+    rows = sorted(cands, key=lambda s: (rank(s),))[:5]
     out: List[TrackOut] = []
     for svc in rows:
         toko_nama = None

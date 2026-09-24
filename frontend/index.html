@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=ambil2">
+    <link rel="stylesheet" href="assets/css/style.css?v=ambil3">
 </head>
 <body>
     <div class="app">
@@ -1032,12 +1032,33 @@
         </div>
     </div>
 
+    <!-- MODAL KUNCI OTOMATIS (10 menit tanpa aktivitas → minta password) -->
+    <div class="modal" id="lockModal" style="z-index:50">
+        <div class="modal-box" style="max-width:380px;text-align:center">
+            <div class="hasil-icon">🔒</div>
+            <h3>Layar Terkunci</h3>
+            <p class="hasil-sub">Tidak ada aktivitas 10 menit — masukkan password untuk lanjut</p>
+            <p style="font-size:13px;margin-bottom:12px">👤 <strong id="lockUser">-</strong></p>
+            <div id="lockAlert" class="alert err" style="display:none"></div>
+            <form onsubmit="event.preventDefault();unlockScreen()">
+                <div class="field" style="text-align:left">
+                    <label>Password</label>
+                    <input id="lockPass" type="password" placeholder="Password akun ini" autocomplete="current-password">
+                </div>
+                <div class="hasil-actions">
+                    <button type="button" class="btn btn-ghost" onclick="lockLogout()">Keluar</button>
+                    <button type="submit" class="btn btn-dark">Buka Kunci →</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- TOAST -->
     <div class="toast" id="toast">Berhasil disimpan!</div>
 
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/script.js?v=ambil6"></script>
+    <script src="assets/js/script.js?v=ambil7"></script>
 </body>
 </html>

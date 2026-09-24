@@ -1570,11 +1570,78 @@ async function removeMember(membershipId, username){
   }catch(e){ showToast('Gagal keluarkan: '+e.message); }
 }
 
+// ---------- Auto-lock: kunci layar setelah 10 menit tanpa aktivitas ----------
+const LOCK_AFTER_MS = 10*60*1000;
+let _lastActivity = Date.now();
+let _screenLocked = false;
+function pokeActivity(){ _lastActivity = Date.now(); }
+['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(ev=>{
+  window.addEventListener(ev, ()=>{ pokeActivity(); }, {passive:true});
+});
+function startAutoLock(){
+  pokeActivity();
+  setInterval(()=>{
+    if(_screenLocked) return;
+    if(!localStorage.getItem('access_token')) return;
+    if(Date.now()-_lastActivity >= LOCK_AFTER_MS) lockScreen();
+  }, 30000);
+}
+function lockScreen(){
+  if(_screenLocked) return;
+  _screenLocked = true;
+  document.getElementById('lockUser').textContent = localStorage.getItem('username')||'-';
+  const inp=document.getElementById('lockPass');
+  if(inp) inp.value='';
+  const al=document.getElementById('lockAlert');
+  if(al) al.style.display='none';
+  document.getElementById('lockModal').classList.add('show');
+  setTimeout(()=>{ try{ inp.focus(); }catch{} },150);
+}
+async function unlockScreen(){
+  const u=localStorage.getItem('username')||'';
+  const p=document.getElementById('lockPass')?.value||'';
+  const al=document.getElementById('lockAlert');
+  const fail=(m)=>{ if(al){ al.className='alert err'; al.textContent=m; al.style.display='block'; } };
+  if(!u){ fail('Sesi tidak dikenal — silakan logout lalu login ulang'); return; }
+  if(!p){ fail('Isi password dulu bro'); return; }
+  try{
+    const res=await fetch(`${API_BASE}/auth/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.detail||'Gagal buka kunci');
+    localStorage.setItem('access_token', data.access_token);
+    if(data.role) localStorage.setItem('role', data.role);
+    if(data.stores) localStorage.setItem('bos_stores', JSON.stringify(data.stores));
+    if(data.primary_store_id) localStorage.setItem('active_store_id', String(data.primary_store_id));
+    _screenLocked=false;
+    document.getElementById('lockModal').classList.remove('show');
+    pokeActivity();
+    try{ await loadData(); renderAll(); renderSemuaService(); }catch{}
+    showToast('🔓 Kunci dibuka — lanjut kerja');
+  }catch(e){
+    fail(String((e && e.message)||'Gagal verifikasi — cek koneksi'));
+  }
+}
+function lockLogout(){
+  // keluar dari layar kunci (tanpa confirm) — balik ke login
+  ['access_token','username','role','nama','foto','bos_stores','active_store_id'].forEach(k=>{ try{ localStorage.removeItem(k); }catch{} });
+  location.href='login.html';
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', async ()=>{
   updateSidebarUser();
-  // guard: jika belum login, redirect ke login (optional - aktifkan jika mau proteksi)
-  // if(!localStorage.getItem('access_token')){ location.href='login.html'; return; }
+  // guard: belum login → login dulu (link Dashboard di halaman login otomatis mental ke sini)
+  if(!localStorage.getItem('access_token')){ location.href='login.html'; return; }
+  // verifikasi token masih berlaku: 401 → login; error jaringan → lanjut offline
+  try{
+    await apiFetch('/auth/me');
+  }catch(e){
+    const msg=String((e && e.message)||'');
+    if(/belum login|token tidak valid|401|unauthor|expired/i.test(msg)){
+      localStorage.removeItem('access_token');
+      location.href='login.html'; return;
+    }
+  }
   setupNavigation();
   setupChips();
   await initStoreContext();
@@ -1591,6 +1658,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   renderAlat();
   updateInvoicePreview();
   attachRupiahLive();
+  startAutoLock();
   // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron — hash compare, silent, anti-spam (fix P1-8)
   let lastServiceLen = data.length;
   let lastMenungguCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
@@ -1599,6 +1667,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // init alat hash setelah loadAlat selesai
   setTimeout(()=>{ try{ lastAlatHash = JSON.stringify(alatInventory.map(a=>a.id+':'+a.stok+':'+a.kondisi).sort()); }catch{} }, 500);
   setInterval(async()=>{
+    if(_screenLocked) return; // layar dikunci → jeda sync sampai dibuka
     const prevInventoryHash = JSON.stringify(inventory.map(i=>i.id+':'+i.stok+':'+i.masuk+':'+i.keluar).sort());
     await loadInventory();
     const newInventoryHash = JSON.stringify(inventory.map(i=>i.id+':'+i.stok+':'+i.masuk+':'+i.keluar).sort());
