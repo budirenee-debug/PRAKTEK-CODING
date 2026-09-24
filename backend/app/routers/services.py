@@ -100,6 +100,17 @@ def update_service(
         new_tek = payload.model_dump(exclude_unset=True).get("teknisi")
         if new_tek and new_tek not in scope:
             raise HTTPException(status_code=403, detail="Teknisi hanya bisa oper ke diri sendiri")
+    data = payload.model_dump(exclude_unset=True)
+    # Fix harga: sejak Sudah Diambil / Sukses, biaya dikunci (tidak bisa diubah lagi).
+    # Deal harga + diambil_oleh wajib diisi SEBELUM status jadi diambil (via popup garansi).
+    if existing.status in ("Sudah Diambil", "Service Sukses", "Selesai") and "biaya" in data:
+        try:
+            if int(data["biaya"]) != int(existing.biaya or 0):
+                raise HTTPException(status_code=400, detail="Harga sudah dikunci — service sudah diambil (fix). Hubungi owner/admin untuk revisi.")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
     svc = crud.update_service(db, invoice, payload)
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")

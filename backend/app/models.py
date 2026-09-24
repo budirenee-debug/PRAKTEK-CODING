@@ -69,6 +69,7 @@ class Service(Base):
     garansi_dari = Column(String(20), nullable=True)  # invoice asal jika ini hasil klaim garansi
     metode_bayar = Column(String(20), nullable=True)  # Tunai / Transfer / QRIS (diisi saat Sukses via popup garansi)
     diambil_at = Column(DateTime, nullable=True)  # kapan status jadi Sukses/Sudah Diambil (auto, untuk tgl pengambilan & basis garansi)
+    diambil_oleh = Column(String(120), nullable=True)  # siapa yang ambil HP (default = nama pelanggan, diisi via popup garansi)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

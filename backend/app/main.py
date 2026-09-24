@@ -118,7 +118,7 @@ def _migrate_diambil():
 _migrate_diambil()
 
 def _migrate_bayar():
-    """Metode pembayaran: tambah services.metode_bayar untuk DB lama."""
+    """Metode pembayaran: tambah services.metode_bayar + diambil_oleh untuk DB lama."""
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
@@ -126,6 +126,17 @@ def _migrate_bayar():
             if "metode_bayar" not in cols:
                 conn.execute(text("ALTER TABLE services ADD COLUMN metode_bayar VARCHAR(20)"))
                 print("migrated: metode_bayar")
+            if "diambil_oleh" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN diambil_oleh VARCHAR(120)"))
+                print("migrated: diambil_oleh")
+            # backfill: pengambil kosong pada yg sudah diambil = nama pelanggan
+            try:
+                conn.execute(text(
+                    "UPDATE services SET diambil_oleh = nama "
+                    "WHERE diambil_oleh IS NULL AND nama IS NOT NULL "
+                    "AND status IN ('Sudah Diambil','Service Sukses','Selesai')"))
+            except Exception:
+                pass
             conn.commit()
     except Exception as e:
         print("migrate bayar fail:", e)

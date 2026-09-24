@@ -19,6 +19,7 @@ DEFAULT_WA_TEMPLATES = {
     "sudah_diambil": "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
     "klaim_garansi": "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
     "nota_digital": "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
+    "nota_ambil": "🧾 *NOTA PENGAMBILAN — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal masuk: {tanggal}\nTanggal diambil: {diambil_at}\nPelanggan: {nama}\nDiambil oleh: {diambil_oleh}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nTeknisi: {teknisi}\nGaransi s/d: {garansi_sampai}\nMetode bayar: {metode_bayar}\nBiaya: {biaya} (LUNAS)\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
 }
 WA_TEMPLATE_KEYS = list(DEFAULT_WA_TEMPLATES.keys())
 

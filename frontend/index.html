@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=010142">
+    <link rel="stylesheet" href="assets/css/style.css?v=ambil2">
 </head>
 <body>
     <div class="app">
@@ -593,12 +593,12 @@
                         <div class="toolbar-left"><h3>💰 Pendapatan Sukses</h3><span class="count-pill" id="pendapatanCount">0 service</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="pendapatanTotal">Rp 0</span></div>
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="searchPendapatan" placeholder="Cari invoice, pelanggan, device..."></div><select id="filterTeknisiPendapatan" onchange="renderTransaksiPendapatan()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select><button class="btn btn-dark small" onclick="exportPendapatanCSV()">⬇ Export CSV</button></div>
                     </div>
-                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>harga tercatat</strong> untuk HP <strong>Service Sukses</strong> saja — otomatis sinkron saat Harga diubah di tab Bisa Diambil/Sudah Diambil. Total = sum `biaya`.</p>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Rekap <strong>harga tercatat</strong> untuk HP <strong>Service Sukses</strong> saja — deal harga diisi saat Bisa Diambil → Sukses (popup Deal Pengambilan), lalu 🔒 dikunci setelah diambil. Total = sum `biaya`.</p>
                     <div class="table-wrap"><table class="table compact" id="tablePendapatan"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Status</th><th>Bayar</th><th>Sparepart Dipakai</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyPendapatan"><tr><td colspan="9" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                     <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;font-size:12px" id="pgPendapatan"></div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px">
                         <span id="pendapatanSummary" style="color:#8a8f98">0 service • Rp 0</span>
-                        <span style="font-size:11px;color:#059669">💡 Harga editable di Bisa Diambil/Sudah Diambil → otomatis update di sini</span>
+                        <span style="font-size:11px;color:#059669">🔒 Harga fix setelah diambil — deal di popup Pengambilan</span>
                     </div>
                 </div>
                 <div class="card" style="margin-top:12px">
@@ -723,7 +723,7 @@
                             <button class="btn btn-ghost small" onclick="loadWaSettings()">↻ Refresh</button>
                         </div>
                     </div>
-                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code> <code>{lacak}</code>. Kosongkan + Simpan = kembali ke default.</p>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code> <code>{garansi_sampai}</code> <code>{metode_bayar}</code> <code>{diambil_at}</code> <code>{diambil_oleh}</code> <code>{lacak}</code>. Kosongkan + Simpan = kembali ke default.</p>
                     <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
                 </div>
             </section>
@@ -969,14 +969,23 @@
         </div>
     </div>
 
-    <!-- MODAL MASA GARANSI (muncul saat Bisa Diambil Berhasil → Sukses) -->
+    <!-- MODAL DEAL PENGAMBILAN (muncul saat Bisa Diambil Berhasil → Sukses) -->
     <div class="modal" id="garansiModal">
         <div class="modal-box" style="max-width:420px">
             <button class="modal-close" onclick="closeGaransiModal()">×</button>
             <div class="hasil-icon">🛡️</div>
-            <h3>Masa Garansi</h3>
+            <h3>Deal Pengambilan</h3>
             <p class="hasil-sub" id="garansiSub">—</p>
             <div class="field" style="text-align:left">
+                <label>💰 Deal harga (fix saat diambil, Rp)</label>
+                <input id="garansi-harga-input" inputmode="numeric" placeholder="Contoh: 150.000" oninput="this.value=formatAngka(parseRupiah(this.value))">
+                <span style="font-size:10px;color:#8a8f98">Harga dikunci setelah status jadi Sukses/Diambil.</span>
+            </div>
+            <div class="field" style="text-align:left;margin-top:10px">
+                <label>👤 Diambil oleh</label>
+                <input id="garansi-diambil-input" placeholder="Nama pengambil — kosongkan = nama pelanggan" maxlength="120">
+            </div>
+            <div class="field" style="text-align:left;margin-top:10px">
                 <label>Masa garansi (hari, dari tanggal diambil)</label>
                 <input id="garansi-hari-input" type="number" min="0" placeholder="Contoh: 7 — kosongkan = tanpa garansi">
             </div>
@@ -1013,9 +1022,11 @@
                     <option value="t58">🧾 Thermal 58mm</option>
                     <option value="a4">🖨 Kertas A4</option>
                 </select>
+                <span style="font-size:10px;color:#8a8f98">Tips: di dialog cetak, matikan <strong>Header & footer</strong> agar nama toko tidak tercetak dobel.</span>
             </div>
             <div class="hasil-actions">
                 <button class="btn btn-ghost" onclick="printNota()">🖨 Cetak</button>
+                <button class="btn btn-ghost" onclick="closeNotaModal()">OKE</button>
                 <button class="btn btn-dark" onclick="sendNotaWA()">Kirim via WA →</button>
             </div>
         </div>
@@ -1027,6 +1038,6 @@
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/script.js?v=lacak4"></script>
+    <script src="assets/js/script.js?v=ambil6"></script>
 </body>
 </html>

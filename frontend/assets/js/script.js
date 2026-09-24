@@ -277,6 +277,7 @@ function trackBase(){
 function notaVars(d){
   const st=activeStoreInfo();
   const inv=d.id||'';
+  const ambilNama=(d.diambil_oleh||d.nama||'Pelanggan');
   return {
     nama: d.nama||'Pelanggan', device: d.device||'-', imei: d.imei||'-',
     invoice: d.id||'', tanggal: formatTanggal(d.date),
@@ -286,27 +287,39 @@ function notaVars(d){
     teknisi: d.teknisi||'-', penerima: d.penerima||'-', status: displayStatus(d.status),
     toko: st.nama||storeDisplayName(), alamat_toko: st.alamat||'-', wa_toko: st.wa||'-',
     garansi_dari: d.garansi_dari||'',
+    garansi_sampai: d.garansi_sampai ? formatTanggal(d.garansi_sampai) : '-',
+    metode_bayar: d.metode_bayar||'Belum Bayar',
+    diambil_at: d.diambil_at ? fmtDiambil(d.diambil_at) : formatTanggal(d.date),
+    diambil_oleh: ambilNama,
     lacak: trackBase()+'/frontend/lacak.html?q='+encodeURIComponent(inv),
   };
 }
-function buildNotaWA(d){
-  const tpl=waTemplateFor('nota_digital');
+function buildNotaWA(d, mode){
+  const isAmbil=(mode||_notaMode)==='ambil';
+  const key=isAmbil ? 'nota_ambil' : 'nota_digital';
+  const tpl=waTemplateFor(key);
+  // fallback: jika toko belum punya template nota_ambil custom, pakai default lengkap
   const vars=notaVars(d);
   let msg=tpl.replace(/\{(\w+)\}/g, (_,k)=> (k in vars ? vars[k] : ''));
-  if(!/lacak/i.test(tpl)){
+  // nota pengambilan: tanpa link lacak (sesuai request) — hanya nota masuk yang auto-append
+  if(!isAmbil && !/lacak/i.test(tpl)){
     msg+=`\n🔍 Klik link ini untuk lacak status HP anda:\n${vars.lacak}`;
   }
   return msg;
 }
 let _notaId=null;
+let _notaMode='masuk';
 let _notaSize='t80';
 try{ _notaSize=localStorage.getItem('nota_size')||'t80'; }catch{}
-function openNotaModal(id){
+function openNotaModal(id, mode){
   const d=data.find(x=>x.id===id);
   if(!d) return showToast('Data nota tidak ketemu');
   _notaId=id;
-  document.getElementById('notaSub').textContent=`${d.id} • ${d.device} • ${d.nama}`;
-  document.getElementById('notaPreview').textContent=buildNotaWA(d);
+  _notaMode=(mode==='ambil') ? 'ambil' : 'masuk';
+  const titleEl=document.querySelector('#notaModal h3');
+  if(titleEl) titleEl.textContent = (_notaMode==='ambil') ? 'Nota Pengambilan' : 'Nota Digital';
+  document.getElementById('notaSub').textContent=`${d.id} • ${d.device} • ${d.nama}${_notaMode==='ambil' ? ' • 📥 Pengambilan' : ''}`;
+  document.getElementById('notaPreview').textContent=buildNotaWA(d, _notaMode);
   const sel=document.getElementById('notaSize');
   if(sel) sel.value=_notaSize;
   document.getElementById('notaModal').classList.add('show');
@@ -325,12 +338,20 @@ function sendNotaWA(id){
   if(!d) return showToast('Pilih dulu notasinya');
   const clean=cleanWA(d.wa);
   if(!clean) return showToast('No WA pelanggan tidak valid');
-  window.open(`https://wa.me/${clean}?text=${encodeURIComponent(buildNotaWA(d))}`, '_blank');
+  window.open(`https://wa.me/${clean}?text=${encodeURIComponent(buildNotaWA(d, _notaMode))}`, '_blank');
   showToast('Chat WA pelanggan dibuka — tekan kirim di WhatsApp');
 }
-function buildNotaHTML(d){
+function buildNotaHTML(d, mode){
   const v=notaVars(d);
+  const isAmbil=(mode||_notaMode)==='ambil';
   const row=(k,val)=>`<tr><td style="vertical-align:top;white-space:nowrap">${k}</td><td style="padding:0 4px">:</td><td>${escapeHtml(val)}</td></tr>`;
+  if(isAmbil){
+    return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
+      + `<div style="text-align:center;font-weight:800;margin:6px 0">NOTA PENGAMBILAN</div>`
+      + `<hr><table>${row('Invoice',v.invoice)}${row('Tgl masuk',v.tanggal)}${row('Tgl diambil',v.diambil_at)}${row('Pelanggan',v.nama)}${row('Diambil oleh',v.diambil_oleh)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Teknisi',v.teknisi)}${row('Garansi s/d',v.garansi_sampai)}${row('Bayar',v.metode_bayar)}</table><hr>`
+      + `<div class="nota-total"><span>Total (LUNAS)</span><span>${escapeHtml(v.biaya)}</span></div><hr>`
+      + `<div class="nota-foot">Barang sudah diambil ${escapeHtml(v.diambil_oleh)} 🙏<br>Komplain? Hubungi WA di atas</div>`;
+  }
   return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
     + `<hr><table>${row('Invoice',v.invoice)}${row('Tanggal',v.tanggal)}${row('Pelanggan',v.nama)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Kondisi awal',v.keterangan)}${row('Kelengkapan',v.kelengkapan)}${row('Estimasi',v.estimasi)}${row('Teknisi',v.teknisi)}${row('Penerima',v.penerima)}</table><hr>`
     + `<div class="nota-total"><span>Total Biaya</span><span>${escapeHtml(v.biaya)}</span></div>`
@@ -347,8 +368,15 @@ function printNota(id){
   try{ localStorage.setItem('nota_size',size); }catch{}
   const area=document.getElementById('printArea');
   if(!area) return showToast('Area cetak tidak ketemu');
-  area.innerHTML=`<div class="nota-paper ${size}">${buildNotaHTML(d)}</div>`;
+  area.innerHTML=`<div class="nota-paper ${size}">${buildNotaHTML(d, _notaMode)}</div>`;
+  // Judul tab browser ikut tercetak sebagai header oleh browser (dobel nama toko) —
+  // ganti sementara jadi no. invoice, kembalikan setelah dialog cetak ditutup.
+  const oldTitle=document.title;
+  try{ document.title = ((_notaMode==='ambil') ? 'Nota Pengambilan ' : 'Nota ') + inv; }catch{}
+  const restore=()=>{ try{ document.title=oldTitle; }catch{} window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
   window.print();
+  setTimeout(restore, 1500);
 }
 // ---------- Template WA per status (per toko, editable di Pengaturan) ----------
 const DEFAULT_WA_TPL = {
@@ -359,8 +387,9 @@ const DEFAULT_WA_TPL = {
   sudah_diambil: "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
   klaim_garansi: "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
   nota_digital: "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n🔍 Klik link ini untuk lacak status HP anda:\n{lacak}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
+  nota_ambil: "🧾 *NOTA PENGAMBILAN — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal masuk: {tanggal}\nTanggal diambil: {diambil_at}\nPelanggan: {nama}\nDiambil oleh: {diambil_oleh}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nTeknisi: {teknisi}\nGaransi s/d: {garansi_sampai}\nMetode bayar: {metode_bayar}\nBiaya: {biaya} (LUNAS)\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
 };
-const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', nota_digital:'Nota Digital 🧾', umum:'Umum 💬'};
+const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', nota_digital:'Nota Digital 🧾', nota_ambil:'Nota Pengambilan 📥', umum:'Umum 💬'};
 function storeDisplayName(){
   try{
     const stores = getMyStores();
@@ -530,7 +559,8 @@ function normalize(item){
     metode_bayar: item.metode_bayar || null,
     updated_at: item.updated_at || null,
     created_at: item.created_at || null,
-    diambil_at: item.diambil_at || null
+    diambil_at: item.diambil_at || null,
+    diambil_oleh: item.diambil_oleh || null,
   };
 }
 
@@ -3078,6 +3108,11 @@ function renderPelanggan(){
 function statusOptions(){
   return ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart','Service Sukses','Bisa Diambil','Sudah Diambil','Service Failed','Garansi','Dibatalkan'];
 }
+// Dropdown khusus tab Proses Service: status akhir (Sukses/Diambil/Failed/Garansi)
+// tidak bisa dipilih langsung — wajib lewat alur: Proses → Bisa Diambil (tentukan JADI/TIDAK) → Sukses/Failed.
+function statusOptionsProses(){
+  return ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart','Bisa Diambil','Dibatalkan'];
+}
 // helper untuk badge class — Service Sukses pakai style Selesai (hijau)
 function badgeClassForStatus(s){
   if(s==='Service Sukses' || s==='Selesai') return 'Selesai';
@@ -3133,6 +3168,11 @@ async function updateBiaya(invoice, newBiaya){
   if(n < 0) return showToast('Biaya tidak valid');
   const item = data.find(d=>d.id===invoice);
   if(!item) return;
+  // Fix harga: sejak diambil/sukses, biaya dikunci
+  if(['Sudah Diambil','Service Sukses','Selesai'].includes(item.status)){
+    renderStatusView('kanbanSudahDiambil','Sudah Diambil');
+    return showToast('🔒 Harga sudah fix — service sudah diambil');
+  }
   const old = item.biaya;
   item.biaya = n;
   renderAll();
@@ -3288,7 +3328,7 @@ function renderKanban(){
    filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiProses'));
    // terbaru dulu (aktivitas terakhir di atas) biar habis klik langsung ketemu
    filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
-   const opts = statusOptions().map(s=>`<option>${s}</option>`).join('');
+   const opts = statusOptionsProses().map(s=>`<option>${s}</option>`).join('');
    const kw = pelangganFilter || '';
   wrap.innerHTML = filtered.map(d=>{
     const usedCount = (serviceSpareparts[d.id]||[]).length;
@@ -3657,10 +3697,16 @@ function renderStatusView(targetId, statusName){
         : `<div class="hasil-banner wait">❓ Hasil belum ditandai</div>`)
       : (isFailedView ? `<div class="hasil-banner fail">❌ Gagal — Bahan evaluasi</div>` : '');
     const ketLabel = (isFailedView || (isBisa && gagal)) ? '📋 Alasan: ' : '📋 ';
+    const isLocked = isSudahTab || ['Sudah Diambil','Service Sukses','Selesai'].includes(d.status);
     const biayaCell = (gagal && (isBisa || isFailedView))
       ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;font-weight:700">💰 Gratis</span>`
+      : isLocked
+      ? `<span class="meta-pill" style="background:#f8fafc;border-color:#e2e8f0;color:#0f172a;font-weight:800" title="Harga fix — sudah diambil, tidak bisa diubah">🔒 ${escapeHtml(formatRupiah(Number(d.biaya)||0))}</span>`
       : `<span class="meta-pill" style="display:flex;align-items:center;gap:6px">💰 <input type="text" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" id="biaya-${escapeHtml(d.id)}-${targetId}" style="width:110px;padding:4px 6px;border:1px solid #ececec;border-radius:8px;font-size:11px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateBiaya('${escapeHtml(d.id)}', this.value)"> <button class="btn btn-dark small" style="padding:4px 6px;font-size:10px" onclick="updateBiaya('${escapeHtml(d.id)}', document.getElementById('biaya-${escapeHtml(d.id)}-${targetId}').value)">Simpan</button></span>`;
     let aksi = `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}', {readonly:true})">Detail</button>`;
+    if(isSudahTab){
+      aksi += `<button class="btn btn-dark small" style="flex:none;padding:8px 10px;font-size:11px" onclick="openNotaModal('${escapeHtml(d.id)}', 'ambil')">🧾 Nota Ambil</button>`;
+    }
     if(targetId!=='kanbanSudahDiambil'){
       if(isBisa && gagal) aksi += `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="prosesUlang('${escapeHtml(d.id)}')" title="Kembalikan ke teknisi untuk dikerjakan ulang">🔄 Proses Ulang</button>`;
       aksi += `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${optsHtml}</select>`;
@@ -3679,7 +3725,7 @@ function renderStatusView(targetId, statusName){
       ${garansiBadge}
       <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kwStatus)}</p>
       ${d.keterangan ? `<p>${ketLabel}${hl(d.keterangan, kwStatus)}</p>` : ''}
-      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${bayarBadgeHtml(d.metode_bayar)}${deadlineBadge(d)}${(isSudahTab && d.diambil_at) ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46" title="Tanggal HP diambil pelanggan">📥 Diambil ${fmtDiambil(d.diambil_at)}</span>` : ''}</div>
+      <div class="service-meta"><span class="meta-pill">👨‍🔧 ${escapeHtml(d.teknisi)}</span>${biayaCell}${bayarBadgeHtml(d.metode_bayar)}${deadlineBadge(d)}${(isSudahTab && d.diambil_at) ? `<span class="meta-pill" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46" title="Tanggal HP diambil pelanggan">📥 Diambil ${fmtDiambil(d.diambil_at)}</span>` : ''}${(isSudahTab && (d.diambil_oleh||d.nama)) ? `<span class="meta-pill" style="background:#f0f9ff;border-color:#bae6fd;color:#0369a1" title="Pengambil HP">👤 ${escapeHtml(d.diambil_oleh||d.nama)}</span>` : ''}</div>
       ${garansiBox}
       <div class="card-actions">${aksi}</div>
     </div>
@@ -4163,9 +4209,14 @@ function askGaransi(id){
     _garansiResolver=resolve;
     document.getElementById('garansiSub').textContent = d ? `${d.id} • ${d.device} • ${d.nama} — berhasil & siap diambil` : id;
     document.getElementById('garansi-hari-input').value = (d && d.garansi_hari) || '';
+    // deal harga: prefill biaya saat ini; diambil oleh: default nama pelanggan
+    const hargaEl=document.getElementById('garansi-harga-input');
+    if(hargaEl) hargaEl.value = d ? Number(d.biaya||0).toLocaleString('id-ID') : '0';
+    const ambilEl=document.getElementById('garansi-diambil-input');
+    if(ambilEl) ambilEl.value = (d && (d.diambil_oleh||d.nama)) || '';
     setBayarPick((d && d.metode_bayar) || '');
     document.getElementById('garansiModal').classList.add('show');
-    setTimeout(()=>document.getElementById('garansi-hari-input')?.focus(),100);
+    setTimeout(()=>document.getElementById('garansi-harga-input')?.focus(),100);
   });
 }
 function confirmGaransiModal(){
@@ -4176,9 +4227,26 @@ function confirmGaransiModal(){
     if(isNaN(hari)||hari<0) return showToast('Masa garansi harus angka ≥ 0');
   }
   const bayar=_bayarPick||null;
+  // deal harga final (fix saat diambil)
+  const hargaRaw=document.getElementById('garansi-harga-input')?.value||'0';
+  const biaya=parseRupiah(hargaRaw);
+  if(isNaN(biaya)||biaya<0) return showToast('Deal harga tidak valid');
+  // diambil oleh — kosong otomatis = nama pelanggan
+  const subTxt=document.getElementById('garansiSub')?.textContent||'';
+  let namaPelanggan='';
+  try{
+    const m=subTxt.match(/^(\S+)\s•\s(.+?)\s•\s(.+?)\s—/);
+    if(m) namaPelanggan=m[3].trim();
+  }catch{}
+  let diambilOleh=(document.getElementById('garansi-diambil-input')?.value||'').trim();
+  if(!diambilOleh){
+    const d=data.find(x=>x.id&&subTxt.startsWith(x.id));
+    diambilOleh=(d && d.nama) || namaPelanggan || '';
+  }
+  if(!diambilOleh) return showToast('Diambil oleh wajib diisi (atau kosongkan = nama pelanggan)');
   const r=_garansiResolver; _garansiResolver=null;
   document.getElementById('garansiModal').classList.remove('show');
-  if(r) r({hari, bayar});
+  if(r) r({hari, bayar, biaya, diambil_oleh: diambilOleh});
 }
 function closeGaransiModal(){
   const r=_garansiResolver; _garansiResolver=null;
@@ -4196,6 +4264,7 @@ async function updateStatus(id, newStatus){
   const oldGaransiHari=item0.garansi_hari??null;
   const oldGaransiSampai=item0.garansi_sampai||null;
   const oldBayar=item0.metode_bayar||null;
+  const oldDiambilAt=item0.diambil_at||null;
   const fromProses=PROSES_STATUSES.includes(oldStatus);
 
   // === Flow hasil: diputuskan saat HP selesai diproses ===
@@ -4225,15 +4294,21 @@ async function updateStatus(id, newStatus){
   } else if(PROSES_STATUSES.includes(newStatus)){
     hasil = null; // balik diproses (proses ulang) → keputusan hasil di-reset
   }
-  // === Popup masa garansi: Bisa Diambil (Berhasil/JADI) -> Sukses ===
-  // Tanya dulu sebelum pindah; Batal = status tidak jadi diubah.
+  // === Popup deal pengambilan: Bisa Diambil (Berhasil/JADI) -> Sukses ===
+  // Isi: deal harga (fix) + diambil oleh (default nama pelanggan) + garansi + bayar.
+  // Batal = status tidak jadi diubah.
   let garansiPatch = undefined; // undefined = jangan sentuh; number = hari
   let bayarPatch = undefined; // undefined = jangan sentuh; string|null = metode
+  let dealBiayaPatch = undefined; // deal harga fix saat diambil
+  let diambilOlehPatch = undefined;
+  const oldDiambilOleh=item0.diambil_oleh||null;
   if(oldStatus==='Bisa Diambil' && (hasil||'JADI')==='JADI' && ['Service Sukses','Selesai','Sudah Diambil'].includes(newStatus)){
     const g = await askGaransi(id);
     if(!g){ renderStatusView('kanbanBisaDiambil','Bisa Diambil'); renderSemuaService(); return; }
     garansiPatch = g.hari;
     bayarPatch = g.bayar;
+    dealBiayaPatch = g.biaya;
+    diambilOlehPatch = g.diambil_oleh;
   }
   const resetHasil = !['Garansi','Dibatalkan'].includes(newStatus);
 
@@ -4244,35 +4319,86 @@ async function updateStatus(id, newStatus){
     renderStatusView('kanbanGaransi','Garansi');
   };
 
-  if(item0){
-    item0.status=newStatus;
-    if(resetHasil) item0.hasil=hasil;
-    if(ketPatch!==null) item0.keterangan=ketPatch;
-    if(biayaPatch!==null) item0.biaya=biayaPatch;
-    if(garansiPatch!==undefined && garansiPatch!==null) item0.garansi_hari=garansiPatch;
-    if(bayarPatch!==undefined) item0.metode_bayar=bayarPatch;
+  // Polling 8-detik bisa mengganti array `data` selagi popup deal terbuka —
+  // pakai referensi segar agar mutasi optimistik + rollback kena objek yang tampil.
+  const item = data.find(d=>d.id===id) || item0;
+  // Hitung sendiri agar nota langsung benar + mode offline tetap jalan:
+  // garansi_sampai = hari ini + masa garansi; diambil_at = sekarang.
+  // (Backend PUT menghitung yang sama & hanya mengisi bila kosong — idempoten.)
+  let sampaiPatch = undefined;
+  if(garansiPatch!==undefined && garansiPatch!==null){
+    try{
+      const s=new Date(); s.setDate(s.getDate()+Number(garansiPatch));
+      const pad=n=>String(n).padStart(2,'0');
+      sampaiPatch=`${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`;
+    }catch{}
+  }
+  let diambilAtPatch = undefined;
+  if(['Service Sukses','Selesai','Sudah Diambil'].includes(newStatus)){
+    try{ diambilAtPatch=new Date().toISOString(); }catch{}
+  }
+  if(item){
+    item.status=newStatus;
+    if(resetHasil) item.hasil=hasil;
+    if(ketPatch!==null) item.keterangan=ketPatch;
+    if(biayaPatch!==null) item.biaya=biayaPatch;
+    if(dealBiayaPatch!==undefined) item.biaya=dealBiayaPatch;
+    if(diambilOlehPatch!==undefined) item.diambil_oleh=diambilOlehPatch;
+    if(garansiPatch!==undefined && garansiPatch!==null) item.garansi_hari=garansiPatch;
+    if(sampaiPatch!==undefined) item.garansi_sampai=sampaiPatch;
+    if(diambilAtPatch!==undefined) item.diambil_at=diambilAtPatch;
+    if(bayarPatch!==undefined) item.metode_bayar=bayarPatch;
     updateStats(); renderSemuaService(); renderKanban(); refreshStatusViews();
   }
   try{
-    await apiUpdateStatus(id, newStatus);
     if(!USE_API){ saveLocal(); }
     else {
-      const patch={};
-      if(resetHasil) patch.hasil=hasil;
-      if(ketPatch!==null) patch.keterangan=ketPatch;
-      if(biayaPatch!==null) patch.biaya=biayaPatch;
-      if(garansiPatch!==undefined && garansiPatch!==null) patch.garansi_hari=garansiPatch;
-      if(bayarPatch!==undefined) patch.metode_bayar=bayarPatch;
-      if(Object.keys(patch).length) await apiFetch(`/services/${id}`, {method:'PATCH', body: JSON.stringify(patch)});
+      // Deal harga + pengambil + garansi disimpan DULU selagi status masih Bisa Diambil
+      // (backend mengunci biaya setelah status jadi Sukses/Diambil).
+      const prePatch={};
+      if(resetHasil) prePatch.hasil=hasil;
+      if(ketPatch!==null) prePatch.keterangan=ketPatch;
+      if(biayaPatch!==null) prePatch.biaya=biayaPatch;
+      if(dealBiayaPatch!==undefined) prePatch.biaya=dealBiayaPatch;
+      if(diambilOlehPatch!==undefined) prePatch.diambil_oleh=diambilOlehPatch;
+      if(garansiPatch!==undefined && garansiPatch!==null) prePatch.garansi_hari=garansiPatch;
+      if(sampaiPatch!==undefined) prePatch.garansi_sampai=sampaiPatch;
+      if(bayarPatch!==undefined) prePatch.metode_bayar=bayarPatch;
+      if(Object.keys(prePatch).length){
+        try{
+          await apiFetch(`/services/${id}`, {method:'PATCH', body: JSON.stringify(prePatch)});
+        }catch(pErr){
+          throw new Error('deal gagal tersimpan: '+pErr.message);
+        }
+      }
+      try{
+        await apiUpdateStatus(id, newStatus);
+      }catch(sErr){
+        throw new Error('status gagal pindah: '+sErr.message);
+      }
       await loadData();
+      // Verifikasi: status di server harus sudah pindah, kalau tidak → jangan buka nota basi
+      const expectStatus = (newStatus==='Selesai') ? 'Service Sukses' : newStatus;
+      const check = data.find(d=>d.id===id);
+      if(!check) throw new Error('service tidak ketemu setelah simpan — reload halaman');
+      if(check.status!==expectStatus) throw new Error(`server masih '${check.status}' — kemungkinan koneksi/api gagal, coba lagi`);
     }
     renderAll(); renderSemuaService(); refreshStatusViews();
+    const isAmbilFlow = oldStatus==='Bisa Diambil' && ['Service Sukses','Selesai','Sudah Diambil'].includes(newStatus);
     if(newStatus==='Bisa Diambil' && tanyaHasil) showToast(hasil==='JADI' ? `✅ ${id} → Bisa Diambil (Berhasil)` : `❌ ${id} → Bisa Diambil (Gagal, gratis)`);
     else if(newStatus==='Dikerjakan' && fromProses===false && oldStatus==='Bisa Diambil') showToast(`🔄 ${id} diproses ulang`);
     else showToast(`Status ${id} → ${newStatus}`);
+    // Review nota pengambilan otomatis setelah deal (seperti nota service masuk)
+    if(isAmbilFlow && (hasil||'JADI')==='JADI'){
+      setTimeout(()=>{ try{ openNotaModal(id, 'ambil'); }catch{} }, 350);
+    }
   }catch(e){
-    // rollback jika gagal
-    if(item0) { item0.status=oldStatus; item0.hasil=oldHasil; item0.biaya=oldBiaya; item0.keterangan=oldKet; item0.garansi_hari=oldGaransiHari; item0.garansi_sampai=oldGaransiSampai; item0.metode_bayar=oldBayar; updateStats(); renderSemuaService(); renderKanban(); }
+    // Sinkron ulang dari server (jangan rollback buta — deal mungkin sudah tersimpan).
+    // Best effort: kalau load gagal pun, UI minimal di-render ulang + toast jelas.
+    if(USE_API){ try{ await loadData(); }catch{} }
+    else if(item0) { item0.status=oldStatus; item0.hasil=oldHasil; item0.biaya=oldBiaya; item0.keterangan=oldKet; item0.garansi_hari=oldGaransiHari; item0.garansi_sampai=oldGaransiSampai; item0.metode_bayar=oldBayar; item0.diambil_oleh=oldDiambilOleh; item0.diambil_at=oldDiambilAt; try{ saveLocal(); }catch{} }
+    try{ updateStats(); renderSemuaService(); renderKanban(); refreshStatusViews(); }catch{}
+    console.error('updateStatus gagal:', e);
     showToast('Gagal update: '+ e.message);
   }
 }
@@ -4431,6 +4557,7 @@ function openDetail(id, opts){
       </div>
       <div><strong>Status:</strong> <span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span></div>
       <div><strong>Pembayaran:</strong> ${bayarBadgeHtml(d.metode_bayar)}</div>
+      ${(d.diambil_at||d.diambil_oleh) ? `<div><strong>Pengambilan:</strong> ${d.diambil_at ? escapeHtml(fmtDiambil(d.diambil_at))+' ' : ''}${d.diambil_oleh ? 'oleh <strong>'+escapeHtml(d.diambil_oleh)+'</strong>' : ''} <span style="font-size:11px;color:#065f46">🔒 harga fix</span></div>` : ''}
       <div><strong>Estimasi Selesai:</strong> ${escapeHtml(formatTanggal(d.estimasi_selesai))} <span style="font-size:11px;color:#8a8f98">(jatuh tempo = estimasi)</span></div>
       ${ro ? '' : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="modalEstimasi" type="date" value="${escapeHtml(d.estimasi_selesai||'')}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px">
@@ -4438,8 +4565,9 @@ function openDetail(id, opts){
       </div>`}
       <div><strong>Deadline:</strong> ${dlBadge} ${d.is_overdue?'<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:8px;font-size:10px">OVERDUE</span>':''} <span style="font-size:11px;color:#6b7280">otomatis mengikuti Estimasi Selesai</span></div>
     </div>
-    <div style="margin-top:18px;display:flex;gap:10px">
-      <button class="btn btn-dark" style="flex:1" onclick="openNotaModal('${escapeHtml(d.id)}')">🧾 Nota (Preview + Cetak / WA)</button>
+    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-dark" style="flex:1" onclick="openNotaModal('${escapeHtml(d.id)}')">🧾 Nota Masuk</button>
+      <button class="btn btn-dark" style="flex:1" onclick="openNotaModal('${escapeHtml(d.id)}', 'ambil')">📥 Nota Ambil</button>
       <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Tutup</button>
     </div>
   `;
@@ -4493,6 +4621,10 @@ async function saveDetailEdits(invoice){
   if(biaya<0) return showToast('Harga tidak valid');
   const item=data.find(d=>d.id===invoice);
   if(!item) return;
+  // Fix harga: jika sudah diambil/sukses, biaya ikut terkunci — tolak perubahan harga
+  if(['Sudah Diambil','Service Sukses','Selesai'].includes(item.status) && biaya!==Number(item.biaya||0)){
+    return showToast('🔒 Harga sudah fix — service sudah diambil');
+  }
   const old={keluhan:item.keluhan, keterangan:item.keterangan||'', imei:item.imei||'', biaya:item.biaya};
   item.keluhan=keluhan; item.keterangan=keterangan; item.imei=imei; item.biaya=biaya;
   renderAll(); renderKanban(); renderSemuaService();

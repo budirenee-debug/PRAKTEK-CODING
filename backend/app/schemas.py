@@ -67,6 +67,7 @@ class ServiceBase(BaseModel):
     garansi_hari: Optional[int] = Field(default=None, ge=0, description="masa garansi hari, opsional/editable")
     garansi_sampai: Optional[datetime.date] = Field(default=None, description="batas klaim garansi (auto dari tgl diambil + hari, editable)")
     metode_bayar: Optional[str] = Field(default=None, max_length=20, description="Tunai / Transfer / QRIS")
+    diambil_oleh: Optional[str] = Field(default=None, max_length=120, description="pengambil HP, default nama pelanggan")
 
     @field_validator('metode_bayar')
     @classmethod
@@ -140,6 +141,7 @@ class ServiceUpdate(BaseModel):
     garansi_hari: Optional[int] = Field(None, ge=0)
     garansi_sampai: Optional[datetime.date] = None
     metode_bayar: Optional[str] = Field(None, max_length=20)
+    diambil_oleh: Optional[str] = Field(None, max_length=120)
 
     @field_validator('hasil')
     @classmethod
@@ -210,6 +212,7 @@ class ServiceOut(BaseModel):
     garansi_dari: Optional[str] = None  # invoice asal jika hasil klaim garansi
     metode_bayar: Optional[str] = None  # Tunai / Transfer / QRIS
     diambil_at: Optional[dt] = None  # kapan jadi Sukses/Sudah Diambil (auto)
+    diambil_oleh: Optional[str] = None  # pengambil HP (default nama pelanggan)
     created_at: Optional[dt] = None
     updated_at: Optional[dt] = None
 
