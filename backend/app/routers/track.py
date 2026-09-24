@@ -98,19 +98,24 @@ def _steps(status: str) -> List[TrackStep]:
 
 
 def _to_out(svc: models.Service, toko_nama: Optional[str]) -> TrackOut:
+    # HP yang sudah lewat pengambilan (ada tgl/pengambil) = "Sudah Diambil",
+    # walau status tersimpan "Service Sukses" (dipakai juga untuk pendapatan).
+    status = svc.status
+    if status in ("Service Sukses", "Selesai") and (svc.diambil_at or svc.diambil_oleh):
+        status = "Sudah Diambil"
     return TrackOut(
         invoice=svc.invoice,
         toko=toko_nama,
         device=svc.device,
         keluhan=svc.keluhan,
-        status=svc.status,
-        status_label=STATUS_LABEL.get(svc.status, svc.status),
+        status=status,
+        status_label=STATUS_LABEL.get(status, status),
         nama_masked=_mask_nama(svc.nama),
         tgl_masuk=svc.date,
         estimasi_selesai=svc.estimasi_selesai,
         garansi_sampai=svc.garansi_sampai,
         updated_at=svc.updated_at,
-        steps=_steps(svc.status),
+        steps=_steps(status),
     )
 
 
