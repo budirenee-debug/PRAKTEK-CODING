@@ -75,7 +75,29 @@ def create_service(
             raise HTTPException(status_code=403, detail="Teknisi hanya bisa buat service untuk diri sendiri")
         if not payload.teknisi:
             payload.teknisi = current.username
+    # Business Engine: tentukan kategori dulu untuk cek kuota 2:1 senior
+    from .. import engine_logic
+    kat = (payload.kategori or "").lower() if payload.kategori else None
+    if not kat:
+        sett = engine_logic.get_settings(db, store.id)
+        kat = engine_logic.suggest_kategori(payload.keluhan, sett)
+    engine_logic.check_quota(db, store, payload.teknisi, kat)
+    # modal_asli hanya boleh diisi owner/admin (teknisi/kasir dipaksa 0)
+    role = store_role(db, current, store)
+    modal = int(payload.modal_asli or 0)
+    if role not in ["superadmin", "owner", "admin"]:
+        modal = 0
     svc = crud.create_service(db, payload, store_id=store.id, store=store)
+    try:
+        engine_logic.ensure_engine_row(db, svc, kat, int(payload.harga_part_up or 0), modal)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("engine row fail:", e)
+    try:
+        crud.attach_engine(db, svc)
+    except Exception:
+        pass
     return svc
 
 @router.patch("/{invoice}", response_model=schemas.ServiceOut)
@@ -114,6 +136,18 @@ def update_service(
     svc = crud.update_service(db, invoice, payload)
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    # Business Engine: CAIR jika status berubah jadi Sudah Diambil via PATCH
+    try:
+        data_status = payload.model_dump(exclude_unset=True).get("status")
+        if data_status == "Sudah Diambil":
+            from .. import engine_logic
+            engine_logic.cairkan(db, svc, actor=current)
+    except Exception as e:
+        print("cairkan patch fail:", e)
+    try:
+        crud.attach_engine(db, svc)
+    except Exception:
+        pass
     return svc
 
 @router.put("/{invoice}/status", response_model=schemas.ServiceOut)
@@ -152,6 +186,17 @@ def update_status(
             pass
     db.commit()
     db.refresh(svc)
+    # Business Engine: CAIR hanya saat Sudah Diambil (Sukses masih PENDING)
+    if status == "Sudah Diambil":
+        try:
+            from .. import engine_logic
+            engine_logic.cairkan(db, svc, actor=current)
+        except Exception as e:
+            print("cairkan fail:", e)
+    try:
+        crud.attach_engine(db, svc)
+    except Exception:
+        pass
     return crud.enrich_service(svc)
 
 @router.post("/{invoice}/klaim-garansi", response_model=schemas.ServiceOut, status_code=201)
@@ -217,6 +262,14 @@ def klaim_garansi(
     new_svc.garansi_dari = orig.invoice
     db.commit()
     db.refresh(new_svc)
+    # Business Engine: garansi rework Rp0 -> engine row pending, kategori ikut asli
+    try:
+        from .. import engine_logic
+        orig_eng = db.query(crud.models.ServiceEngine).filter(crud.models.ServiceEngine.invoice == orig.invoice).first()
+        kat0 = orig_eng.kategori if orig_eng else "ringan"
+        engine_logic.ensure_engine_row(db, new_svc, kat0, 0, 0)
+    except Exception as e:
+        print("engine garansi fail:", e)
     log_action(db, "service.klaim_garansi", target=new_svc.invoice,
                detail=f"dari={orig.invoice} root={root.invoice} biaya={new_svc.biaya}",
                actor=current, store_id=new_svc.store_id)

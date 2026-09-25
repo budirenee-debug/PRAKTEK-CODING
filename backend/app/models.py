@@ -16,6 +16,7 @@ class Technician(Base):
     nama = Column(String(100), nullable=False, index=True)  # unik per toko (composite)
     foto = Column(String(255), nullable=True)  # URL avatar
     is_active = Column(Integer, default=1)  # 1 aktif, 0 nonaktif
+    level = Column(String(20), default="junior")  # Business Engine: senior / junior
     created_at = Column(DateTime, default=func.now())
 
     services = relationship("Service", back_populates="technician_obj")
@@ -202,3 +203,107 @@ class WaTemplate(Base):
     key = Column(String(30), nullable=False, index=True)  # service_masuk/bisa_diambil/gagal/sudah_diambil/klaim_garansi/umum
     template = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+# ---------- BUSINESS ENGINE (1 toko dulu, semua bawa store_id) ----------
+
+class StoreSettings(Base):
+    """Aturan Business Engine per toko. 1 baris per toko. Edit hanya owner."""
+    __tablename__ = "store_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, unique=True, index=True)
+    uang_hadir = Column(Integer, default=25000)  # flat harian saat check-in tepat waktu
+    jam_masuk = Column(String(5), default="09:00")  # HH:MM
+    toleransi_mnt = Column(Integer, default=15)
+    komisi_senior = Column(Integer, default=50)  # persen
+    komisi_junior = Column(Integer, default=35)  # persen
+    kuota_ringan_per_berat = Column(Integer, default=2)  # revisi blueprint: 2:1 harian
+    cicilan_max_pct = Column(Integer, default=20)  # max potong komisi harian
+    toleransi_junior_rp = Column(Integer, default=100000)  # 1x/bln ditanggung toko
+    keyword_berat = Column(String(255), default="IC,BOARD,MATI TOTAL,MESIN")
+    keyword_ringan = Column(String(255), default="LCD,BATERAI,SOFTWARE")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class ServiceEngine(Base):
+    """Jantung engine 1-to-1 dengan services via invoice. services tetap ramping."""
+    __tablename__ = "service_engine"
+
+    invoice = Column(String(20), ForeignKey("services.invoice"), primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    kategori = Column(String(20), default="ringan")  # berat / ringan (manual + default auto)
+    harga_part_up = Column(Integer, default=0)  # harga UP yg dilihat teknisi (pajak toko)
+    modal_asli = Column(Integer, default=0)  # rahasia owner only
+    jasa_bersih = Column(Integer, default=0)  # auto = biaya - harga_part_up
+    komisi_teknisi = Column(Integer, default=0)  # auto % senior/junior
+    komisi_status = Column(String(20), default="pending")  # pending / cair (cair saat Sudah Diambil)
+    dioper_dari = Column(String(100), nullable=True)
+    dioper_ke = Column(String(100), nullable=True)
+    dioper_oleh = Column(String(100), nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class ServicePart(Base):
+    """Snapshot part yg dipakai per invoice. Kunci harga saat itu."""
+    __tablename__ = "service_parts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    invoice = Column(String(20), ForeignKey("services.invoice"), nullable=False, index=True)
+    sparepart_id = Column(Integer, ForeignKey("spareparts.id"), nullable=True)
+    nama_snapshot = Column(String(120), nullable=False)
+    harga_up_snapshot = Column(Integer, default=0)
+    modal_asli_snapshot = Column(Integer, default=0)
+    qty = Column(Integer, default=1)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Attendance(Base):
+    """Check-in harian teknisi. 1x per hari per teknisi."""
+    __tablename__ = "attendances"
+    __table_args__ = (UniqueConstraint("technician_id", "tanggal", name="uq_attendance_tech_tgl"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=False, index=True)
+    tanggal = Column(Date, nullable=False, index=True)
+    jam_checkin = Column(String(5), nullable=True)  # HH:MM
+    on_time = Column(Boolean, default=False)
+    allowance_rp = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+
+
+class TechDebt(Base):
+    """Hutang nombok kelalaian 50:50. Cicil max 20% komisi harian."""
+    __tablename__ = "tech_debts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=False, index=True)
+    invoice_penyebab = Column(String(20), nullable=True, index=True)
+    total_rugi = Column(Integer, default=0)  # harga modal yg rusak
+    beban_teknisi = Column(Integer, default=0)  # 50% (0 jika toleransi junior)
+    beban_toko = Column(Integer, default=0)  # 50% (+ toleransi)
+    sudah_dicicil = Column(Integer, default=0)
+    sisa = Column(Integer, default=0)
+    sebab = Column(String(20), default="kelalaian")  # kelalaian / cacat_pabrik
+    status = Column(String(20), default="belum")  # belum / lunas
+    created_at = Column(DateTime, default=func.now())
+
+
+class CommissionLedger(Base):
+    """Buku kas resmi. Sumber untuk Laporan Teknisi Tab2 & Kas Saya."""
+    __tablename__ = "commission_ledgers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=False, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    invoice = Column(String(20), nullable=True, index=True)
+    tipe = Column(String(30), nullable=False, index=True)  # komisi_cair / allowance / potongan_cicilan / hutang_baru / toleransi_toko
+    masuk_rp = Column(Integer, default=0)
+    keluar_rp = Column(Integer, default=0)
+    sisa_hutang_saat_itu = Column(Integer, default=0)
+    keterangan = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())

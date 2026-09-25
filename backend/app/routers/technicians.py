@@ -40,6 +40,37 @@ def create_technician(
         raise HTTPException(status_code=400, detail="Teknisi sudah ada di toko ini")
     return crud.create_technician(db, payload, store_id=store.id if store else None)
 
+@router.patch("/{tech_id}")
+def update_technician(
+    tech_id: int,
+    payload: dict,
+    store_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current = Depends(get_current_user),
+):
+    """Update level senior/junior (owner/admin only)."""
+    from .. import models
+    from ..store_ctx import store_role
+    store = resolve_store(db, current, store_id)
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh ubah level teknisi")
+    tech = db.query(models.Technician).filter(models.Technician.id == tech_id).first()
+    if not tech:
+        raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan")
+    ensure_in_store(tech, store, "Teknisi")
+    if "level" in payload and payload["level"]:
+        lvl = str(payload["level"]).strip().lower()
+        if lvl not in ["senior", "junior"]:
+            raise HTTPException(status_code=400, detail="level harus senior atau junior")
+        tech.level = lvl
+    if "nama" in payload and payload["nama"]:
+        tech.nama = str(payload["nama"]).strip()
+    db.commit()
+    db.refresh(tech)
+    return tech
+
+
 @router.get("/{tech_id}/stats")
 def technician_stats(
     tech_id: int,

@@ -25,7 +25,18 @@ let data = [];
 // ---------- Inventory Sparepart ----------
 const INVENTORY_KEY = 'b_gadget_inventory_v1';
 const MERK_HITS = ['IPHONE','SAMSUNG','XIAOMI','OPPO','VIVO','INFINIX'];
-const todayISO = () => new Date().toISOString().slice(0,10);
+const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+// Backend campur: date/diambil_at = lokal WIB, created_at/updated_at = UTC (SQLite CURRENT_TIMESTAMP).
+// Untuk grouping "hari ini" pakai hari lokal: diambil_at (lokal) dulu, else updated_at dikonversi UTC->lokal, else date.
+function _localDayLOCAL(ts){ return String(ts||'').slice(0,10); }
+function _localDayUTC(ts){
+  if(!ts) return '';
+  let s = String(ts).trim().replace(' ', 'T').slice(0,19);
+  if(!/[zZ+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+  const d = new Date(s);
+  if(isNaN(d)) return String(ts).slice(0,10);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 const defaultInventory = []; // kosong — biar tes input baru benar-benar 0 (sebelumnya dummy 7 item dihapus sesuai request)
 let inventory = [];
 function normalizeMerk(m){
@@ -174,7 +185,7 @@ function computeDeadline(dateStr, dtype){
   const d = new Date(dateStr);
   const days = dtype === 'mingguan' ? 7 : 3;
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function computeSisa(deadlineStr){
   if(!deadlineStr) return null;
@@ -561,6 +572,11 @@ function normalize(item){
     created_at: item.created_at || null,
     diambil_at: item.diambil_at || null,
     diambil_oleh: item.diambil_oleh || null,
+    kategori: item.kategori || null,
+    harga_part_up: Number(item.harga_part_up)||0,
+    jasa_bersih: item.jasa_bersih ?? null,
+    komisi_teknisi: item.komisi_teknisi ?? null,
+    komisi_status: item.komisi_status || null,
   };
 }
 
@@ -810,7 +826,7 @@ async function loadData(silent){
 async function apiCreateService(payload){
   if(!USE_API){
     const newId='INV-2026-'+String(100+data.length+1).padStart(4,'0');
-    const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:new Date().toISOString().slice(0,10)};
+    const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO()};
     data.unshift(obj); saveLocal(); return obj;
   }
   try{
@@ -825,7 +841,7 @@ async function apiCreateService(payload){
       // coba fallback lokal agar input tetap masuk meski API down sementara
       console.warn('apiCreateService fallback lokal:', msg);
       const newId='INV-2026-'+String(100+data.length+1).padStart(4,'0');
-      const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:new Date().toISOString().slice(0,10)};
+      const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO()};
       data.unshift(obj); saveLocal();
       showToast('⚠ API gagal, disimpan lokal (akan sync saat online)');
       return obj;
@@ -1474,18 +1490,21 @@ async function loadTeamData(){
   const invCount = document.getElementById('teamInviteCount');
   const sid = getActiveStoreId();
   if(!sid){
-    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#dc2626">Belum ada toko aktif — login dulu</td></tr>`;
+    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:#dc2626">Belum ada toko aktif — login dulu</td></tr>`;
     if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">-</td></tr>`;
     return;
   }
-  if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat anggota...</td></tr>`;
+  if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat anggota...</td></tr>`;
   if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat kode...</td></tr>`;
   try{
-    const [store, members, invites] = await Promise.all([
+    const [store, members, invites, techs] = await Promise.all([
       apiFetch(`/stores/${sid}`),
       apiFetch(`/stores/${sid}/members`),
       apiFetch(`/stores/${sid}/invites`),
+      apiFetch(`/technicians?store_id=${sid}`).catch(()=>[]),
     ]);
+    const lvlByName = {};
+    (techs||[]).forEach(t=>{ if(t.nama) lvlByName[String(t.nama).toLowerCase()] = {id: t.id, level: t.level||'junior'}; });
     if(nameEl) nameEl.textContent = `${store.nama} (${store.kode})`;
     if(roleEl) roleEl.textContent = store.role_saya ? `Peran saya: ${store.role_saya}` : '';
     const activeMembers = members.filter(m=>m.is_active);
@@ -1498,9 +1517,17 @@ async function loadTeamData(){
       const statusBadge = m.is_active
         ? '<span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px;font-size:11px">Aktif</span>'
         : '<span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Nonaktif</span>';
+      const lv = lvlByName[String(m.username||'').toLowerCase()];
+      const lvlCell = m.role==='teknisi'
+        ? `<select onchange="changeTechLevel('${escapeHtml(m.username||'')}', this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
+             <option value="junior" ${(lv?.level||'junior')==='junior'?'selected':''}>junior 35%</option>
+             <option value="senior" ${(lv?.level||'')==='senior'?'selected':''}>senior 50%</option>
+           </select>`
+        : '<span style="color:#d1d5db">-</span>';
       return `<tr style="${!m.is_active?'background:#fffbeb':''}">
         <td><strong>${escapeHtml(m.username||'-')}</strong>${isMe?' <span style="font-size:10px;background:#111;color:#fff;padding:2px 6px;border-radius:8px">Anda</span>':''}</td>
         <td><select onchange="changeMemberRole(${m.id}, this.value)" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;text-transform:capitalize" ${isMe?'disabled title="Tidak bisa ubah role sendiri"':''}>${roleOpts}</select></td>
+        <td>${lvlCell}</td>
         <td>${statusBadge}</td>
         <td style="font-size:11px;color:#6b7280">${m.created_at?new Date(m.created_at).toLocaleDateString('id-ID'):'-'}</td>
         <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
@@ -1510,7 +1537,7 @@ async function loadTeamData(){
                <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="removeMember(${m.id}, '${escapeHtml(m.username||'')}')">🗑 Keluarkan</button>`}
         </div></td>
       </tr>`;
-    }).join('') || `<tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Belum ada anggota</td></tr>`;
+    }).join('') || `<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Belum ada anggota</td></tr>`;
     const activeInv = invites.filter(i=>!i.is_used);
     if(invCount) invCount.textContent = `${activeInv.length} kode aktif`;
     tbodyI.innerHTML = activeInv.length ? activeInv.map(i=>`
@@ -1527,9 +1554,28 @@ async function loadTeamData(){
       : `<tr><td colspan="4" style="text-align:center;padding:16px;color:#059669">✅ Tidak ada kode aktif — buat kode baru di kiri</td></tr>`;
   }catch(e){
     const msg = (e.message||'').slice(0,300);
-    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#dc2626">Gagal: ${escapeHtml(msg)}${String(msg).includes('403')?' — hanya owner/admin toko':''}</td></tr>`;
+    if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:#dc2626">Gagal: ${escapeHtml(msg)}${String(msg).includes('403')?' — hanya owner/admin toko':''}</td></tr>`;
     if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">Gagal load kode</td></tr>`;
   }
+}
+async function changeTechLevel(username, newLevel){
+  const sid = getActiveStoreId();
+  if(!confirm(`Ubah level ${username} jadi "${newLevel}"? (senior 50% / junior 35%)`)) { loadTeamData(); return; }
+  try{
+    let techs = await apiFetch(`/technicians?store_id=${sid}`);
+    let t = (techs||[]).find(x=>String(x.nama||'').toLowerCase()===String(username||'').toLowerCase());
+    if(!t){
+      // anggota user belum punya baris teknisi (mis. ANGDEDI) -> buatkan otomatis
+      showToast(`Membuat data teknisi ${username}...`);
+      t = await apiFetch(`/technicians?store_id=${sid}`, {method:'POST', body: JSON.stringify({nama: username, level: newLevel})});
+      showToast(`✅ ${username} dibuat sebagai teknisi ${newLevel} (50%/35%)`);
+      await loadTeamData();
+      return;
+    }
+    await apiFetch(`/technicians/${t.id}?store_id=${sid}`, {method:'PATCH', body: JSON.stringify({level: newLevel})});
+    showToast(`✅ ${username} → ${newLevel} (${newLevel==='senior'?'50%':'35%'})`);
+    await loadTeamData();
+  }catch(e){ showToast('Gagal ubah level: '+e.message); loadTeamData(); }
 }
 async function createTeamInvite(){
   const sid = getActiveStoreId();
@@ -2053,7 +2099,7 @@ function updateStats(){
   if(badge) badge.textContent = data.length;
   // deadline counts (client fallback)
   const overdueCount = data.filter(d=>d.is_overdue).length;
-  const todayDl = data.filter(d=>d.deadline===new Date().toISOString().slice(0,10) && !['Selesai','Service Sukses','Sudah Diambil','Dibatalkan'].includes(d.status)).length;
+  const todayDl = data.filter(d=>d.deadline===todayISO() && !['Selesai','Service Sukses','Sudah Diambil','Dibatalkan'].includes(d.status)).length;
   const hCount = data.filter(d=>d.deadline_type==='harian').length;
   const mCount = data.filter(d=>d.deadline_type==='mingguan').length;
   const menungguKonfirmasiCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
@@ -3229,7 +3275,7 @@ function displayStatus(s){
 function passesDeadlineFilter(d){
   if(deadlineFilter==='all') return true;
   if(deadlineFilter==='overdue') return d.is_overdue;
-  if(deadlineFilter==='today') return d.deadline===new Date().toISOString().slice(0,10);
+  if(deadlineFilter==='today') return d.deadline===todayISO();
   if(deadlineFilter==='harian') return d.deadline_type==='harian';
   if(deadlineFilter==='mingguan') return d.deadline_type==='mingguan';
   return true;
@@ -3646,7 +3692,7 @@ function addDaysISO(iso, n){
   try{
     const dt=new Date(iso.length<=10 ? iso+'T00:00:00' : iso);
     dt.setDate(dt.getDate()+Number(n));
-    return dt.toISOString().slice(0,10);
+    return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
   }catch{ return null; }
 }
 function garansiAktif(d){
@@ -3663,7 +3709,7 @@ function garansiBoxHtml(d){
   const id = escapeHtml(d.id);
   const hari = d.garansi_hari;
   const sampai = d.garansi_sampai || '';
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayISO();
   let btn, note;
   if(!hari){
     btn = `<button class="btn btn-ghost small" disabled style="flex:1;padding:8px 10px;font-size:11px;opacity:.5;cursor:not-allowed" title="Isi masa garansi dulu">🔁 Klaim Garansi</button>`;
@@ -3814,6 +3860,7 @@ function renderStatusView(targetId, statusName){
     }
     if(targetId!=='kanbanSudahDiambil'){
       if(isBisa && gagal) aksi += `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="prosesUlang('${escapeHtml(d.id)}')" title="Kembalikan ke teknisi untuk dikerjakan ulang">🔄 Proses Ulang</button>`;
+      if(isGaransiTab) aksi += `<button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="operGaransi('${escapeHtml(d.id)}')" title="Oper ke teknisi lain (admin/kasir)">↔️ Oper</button>`;
       aksi += `<select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${optsHtml}</select>`;
     }
     // badge asal klaim + box garansi hanya di tab Status Garansi
@@ -3946,37 +3993,41 @@ function renderTransaksiPendapatan(){
   const summaryEl=document.getElementById('pendapatanSummary');
   if(!tbody) return;
   const q=(document.getElementById('searchPendapatan')?.value||'').toLowerCase();
-  let filtered=data.filter(d=> ['Service Sukses'].includes(d.status));
+  // Business Engine: Sukses + Sudah Diambil (cair) masuk transaksi. Satu sumber dengan kas.
+  const SUKSES_STATUSES = ['Service Sukses','Sudah Diambil','Selesai'];
+  const actDate = (d)=> _localDayLOCAL(d.diambil_at) || _localDayUTC(d.updated_at) || String(d.date||'').slice(0,10);
+  let filtered=data.filter(d=> SUKSES_STATUSES.includes(d.status));
   if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.teknisi).toLowerCase().includes(q));
   filtered=applyTechFilter(filtered, techFilterVal('filterTeknisiPendapatan'));
   filtered=filtered.filter(passesDeadlineFilter);
-  // sort terbaru dulu
-  filtered.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')));
+  // sort terbaru dulu (aktivitas)
+  filtered.sort((a,b)=> String(b.diambil_at||b.updated_at||b.date||'').localeCompare(String(a.diambil_at||a.updated_at||a.date||'')));
   const total = filtered.reduce((s,d)=> s + (Number(d.biaya)||0), 0);
   if(countEl) countEl.textContent = filtered.length + ' service';
   if(totalEl) totalEl.textContent = formatRupiah(total);
   if(summaryEl) summaryEl.textContent = `${filtered.length} service • ${formatRupiah(total)}${q?` • filter "${escapeHtml(q)}"`:''}`;
-  const badge=document.getElementById('badge-pendapatan'); if(badge) badge.textContent = data.filter(d=> ['Service Sukses'].includes(d.status)).length;
-  // rekap per hari & 7 hari + profit
+  const badge=document.getElementById('badge-pendapatan'); if(badge) badge.textContent = data.filter(d=> SUKSES_STATUSES.includes(d.status)).length;
+  // rekap per hari & 7 hari + profit (Part UP off dulu: pakai sparepart lokal saja)
   const todayStr = todayISO();
-  const getSpCost = (inv)=> {
+  const getSpCost = (dOrInv)=> {
+    const inv = typeof dOrInv === 'object' ? dOrInv.id : dOrInv;
     const arr=serviceSpareparts[inv]||[];
     return arr.reduce((s,u)=> s + (Number(u.harga)||0)*(Number(u.qty)||0), 0);
   };
-  const hariIniRows = filtered.filter(d=> String(d.date||'').slice(0,10)===todayStr);
+  const hariIniRows = filtered.filter(d=> actDate(d)===todayStr);
   const hariIniTotal = hariIniRows.reduce((s,d)=> s + (Number(d.biaya)||0), 0);
-  const hariIniSp = hariIniRows.reduce((s,d)=> s + getSpCost(d.id), 0);
+  const hariIniSp = hariIniRows.reduce((s,d)=> s + getSpCost(d), 0);
   const hariIniProfit = hariIniTotal - hariIniSp;
   const elHariIni = document.getElementById('pendapatanHariIni'); if(elHariIni) elHariIni.textContent = formatRupiah(hariIniTotal);
   const elHariIniC = document.getElementById('pendapatanHariIniCount'); if(elHariIniC) elHariIniC.textContent = `${hariIniRows.length} service • hari ini • ${formatTanggal(todayStr)} • profit ${formatRupiah(hariIniProfit)}`;
-  // 7 hari terakhir (today -6 .. today)
+  // 7 hari terakhir (today -6 .. today) — hari lokal
   const last7 = [];
-  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); last7.push(d.toISOString().slice(0,10)); }
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); last7.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); }
   const map7={}; last7.forEach(dt=> map7[dt]={count:0,total:0,sp:0,profit:0});
   filtered.forEach(d=>{
-    const dt=String(d.date||'').slice(0,10);
-    if(map7[dt]){ 
-      const sp=getSpCost(d.id);
+    const dt=actDate(d);
+    if(map7[dt]){
+      const sp=getSpCost(d);
       map7[dt].count++; map7[dt].total += Number(d.biaya)||0; map7[dt].sp += sp; map7[dt].profit += (Number(d.biaya)||0)-sp;
     }
   });
@@ -3999,7 +4050,7 @@ function renderTransaksiPendapatan(){
   }
   // rekap mingguan (8 minggu kalender Senin–Minggu) + bulanan (12 bulan) — basis tgl masuk
   const accRow=(o,d)=>{
-    const sp=getSpCost(d.id);
+    const sp=getSpCost(d);
     o.count++; o.total+=Number(d.biaya)||0; o.sp+=sp; o.profit+=(Number(d.biaya)||0)-sp;
   };
   const rowHtml=(label,v,hl)=>{
@@ -4012,7 +4063,7 @@ function renderTransaksiPendapatan(){
     for(let i=7;i>=0;i--){ const d=new Date(thisMon+'T00:00:00'); d.setDate(d.getDate()-i*7); weeks.push(_lapSvcIsoLocal(d)); }
     const mapW={}; weeks.forEach(k=> mapW[k]={count:0,total:0,sp:0,profit:0});
     filtered.forEach(d=>{
-      const dt=String(d.date||'').slice(0,10); if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)) return;
+      const dt=actDate(d); if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)) return;
       const k=_lapSvcMonday(dt); if(k && mapW[k]) accRow(mapW[k],d);
     });
     const elW=document.getElementById('rekapMingguRange');
@@ -4028,7 +4079,7 @@ function renderTransaksiPendapatan(){
     for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
     const mapB={}; months.forEach(k=> mapB[k]={count:0,total:0,sp:0,profit:0});
     filtered.forEach(d=>{
-      const k=String(d.date||'').slice(0,7); if(mapB[k]) accRow(mapB[k],d);
+      const k=actDate(d).slice(0,7); if(mapB[k]) accRow(mapB[k],d);
     });
     const curM=String(todayStr).slice(0,7);
     const mName=(k)=>{ const [y,m]=k.split('-'); return new Date(+y,+m-1,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'}); };
@@ -4045,7 +4096,7 @@ function renderTransaksiPendapatan(){
       const arr=serviceSpareparts[d.id]||[];
       const spHtml = !arr.length ? '<span style="color:#8a8f98;font-size:11px">— Tidak Ada —</span>' : arr.map(u=> `<div style="font-size:11px"><strong>${escapeHtml(u.merk)}</strong> ${escapeHtml(u.nama)} <span style="color:#6b7280">x${u.qty}</span> <span style="color:#b45309">${formatRupiah(u.harga*u.qty)}</span></div>`).join('');
       const spTotal = arr.reduce((s,u)=> s + (Number(u.harga)||0)*(Number(u.qty)||0), 0);
-      const isTodayRow = String(d.date||'').slice(0,10)===todayStr;
+      const isTodayRow = actDate(d)===todayStr;
       return `
       <tr style="${isTodayRow?'background:#ecfdf5;border-left:3px solid #059669':''}">
         <td><strong style="font-size:11px">${escapeHtml(d.id)}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(formatTanggal(d.date))}</span>${isTodayRow?'<div style="margin-top:3px"><span style="background:#059669;color:#fff;padding:1px 5px;border-radius:6px;font-size:9px">HARI INI</span></div>':''}</td>
@@ -4095,8 +4146,8 @@ function renderTransaksiPendapatan(){
     });
     filtered.forEach(d=>{
       const t=d.teknisi||'Menunggu Teknisi';
-      const dt=String(d.date||'').slice(0,10);
-      const sp=getSpCost(d.id);
+      const dt=actDate(d);
+      const sp=getSpCost(d);
       const profit=(Number(d.biaya)||0)-sp;
       if(dt===todayStr){
         byTechH[t].hariIni.count++; byTechH[t].hariIni.total+=Number(d.biaya||0); byTechH[t].hariIni.sp+=sp; byTechH[t].hariIni.profit+=profit;
@@ -4552,6 +4603,7 @@ async function handleServiceSubmit(e){
   if(!estimasi) return showToast('Estimasi Selesai wajib diisi — deadline mengikuti estimasi');
   if(!penerima) return showToast('Penerima wajib dipilih');
 
+  const kategori = document.getElementById('f-kategori')?.value || null;
   const payload = {
     nama, wa,
     device: device,
@@ -4563,7 +4615,9 @@ async function handleServiceSubmit(e){
     teknisi,
     penerima,
     status: "Antri",
-    estimasi_selesai: estimasi
+    estimasi_selesai: estimasi,
+    kategori: kategori || null,
+    harga_part_up: 0
   };
 
   try{

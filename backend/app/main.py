@@ -14,6 +14,7 @@ load_dotenv()
 
 from .database import Base, engine, get_db
 from .routers import services, customers, technicians, stats, auth, inventory, stores, invites, audit, track
+from .routers import engine as engine_router
 from . import models
 from .seed import seed
 from .auth import ensure_superadmin
@@ -185,6 +186,7 @@ def _migrate_unique_per_store():
                 nama VARCHAR(100) NOT NULL,
                 foto VARCHAR(255),
                 is_active INTEGER DEFAULT 1,
+                level VARCHAR(20) DEFAULT 'junior',
                 created_at DATETIME,
                 CONSTRAINT uq_technician_nama_store UNIQUE (nama, store_id)
             )""",
@@ -320,6 +322,52 @@ def _migrate_multistore():
     except Exception as e:
         print("migrate multistore fail:", e)
 _migrate_multistore()
+def _migrate_engine():
+    """Business Engine Fase 1: kolom level + tabel engine auto-create via create_all.
+    Backfill: settings default per toko, level junior, service_engine untuk service lama."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            tcols = [row[1] for row in conn.execute(text("PRAGMA table_info(technicians)")).fetchall()]
+            if "level" not in tcols:
+                conn.execute(text("ALTER TABLE technicians ADD COLUMN level VARCHAR(20) DEFAULT 'junior'"))
+                print("migrated: technicians.level")
+            conn.execute(text("UPDATE technicians SET level='junior' WHERE level IS NULL OR level=''"))
+            conn.commit()
+        from sqlalchemy.orm import sessionmaker
+        _Session = sessionmaker(bind=engine)
+        _db = _Session()
+        try:
+            stores = _db.query(models.Store).filter(models.Store.is_active == True).all()
+            for st in stores:
+                ex = _db.query(models.StoreSettings).filter(models.StoreSettings.store_id == st.id).first()
+                if not ex:
+                    _db.add(models.StoreSettings(store_id=st.id))
+            _db.commit()
+            # backfill service_engine untuk service lama (agar tidak pending massal)
+            existing = {r[0] for r in _db.query(models.ServiceEngine.invoice).all()}
+            olds = _db.query(models.Service).all()
+            n = 0
+            for s in olds:
+                if s.invoice in existing:
+                    continue
+                closed = (s.status or "") in ("Sudah Diambil", "Service Sukses", "Selesai")
+                _db.add(models.ServiceEngine(
+                    invoice=s.invoice, store_id=s.store_id, kategori="ringan",
+                    harga_part_up=0, modal_asli=0,
+                    jasa_bersih=(s.biaya or 0), komisi_teknisi=0,
+                    komisi_status="cair" if closed else "pending"))
+                n += 1
+                if n % 200 == 0:
+                    _db.commit()
+            if n:
+                _db.commit()
+                print(f"engine: backfill service_engine {n} baris")
+        finally:
+            _db.close()
+    except Exception as e:
+        print("migrate engine fail:", e)
+_migrate_engine()
 # ensure superadmin on startup
 try:
     from sqlalchemy.orm import sessionmaker
@@ -373,6 +421,7 @@ app.include_router(technicians.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(track.router, prefix="/api")
+app.include_router(engine_router.router, prefix="/api")
 
 # Serve frontend static (rapi: frontend/assets/*) — single source, hapus mount /root ambigu (fix P0-2)
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")

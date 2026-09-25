@@ -122,6 +122,9 @@
                     <button class="menu-item" data-view="laporan-penjualan">
                         <span class="mi">📊</span> Laporan Penjualan
                     </button>
+                    <button class="menu-item" data-view="kas-saya">
+                        <span class="mi">💰</span> Kas Saya
+                    </button>
 
                     <div class="menu-category">AKUN</div>
                     <button class="menu-item" data-view="pengaturan">
@@ -310,8 +313,12 @@
                                     </div>
                                 </div>
                                 <div class="field"><label>Estimasi Biaya</label><input id="f-biaya" type="text" inputmode="numeric" placeholder="Rp 0" autocomplete="off"><span id="f-biaya-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
+                                <div class="field"><label>Kategori</label>
+                                    <select id="f-kategori"><option value="" selected>Auto (dari keluhan)</option><option value="ringan">Ringan (LCD/Baterai)</option><option value="berat">Berat (IC/Board/Mati Total)</option></select>
+                                    <span id="kuotaInfo" style="font-size:11px;color:#b45309;margin-top:4px"></span>
+                                </div>
                                 <div class="field"><label>Teknisi</label>
-                                    <select id="f-teknisi"><option selected>Menunggu Teknisi</option><option>Andi</option><option>Sinta</option><option>Budi</option></select>
+                                    <select id="f-teknisi" onchange="refreshKuotaInfo()"><option selected>Menunggu Teknisi</option><option>Andi</option><option>Sinta</option><option>Budi</option></select>
                                 </div>
                                 <div class="field"><label>Estimasi Selesai *</label><input id="f-estimasi" type="date" required onchange="updateDeadlinePreview()"></div>
                                 <div class="field"><label>Penerima *</label>
@@ -705,7 +712,39 @@
             </section>
             <section class="view" id="view-laporan-teknisi">
                 <div class="card"><div class="card-head"><h3>Laporan Teknisi</h3><span class="muted">Performa bulan ini — avatar sesuai foto profil</span></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Teknisi</th><th>Handle</th><th>Service Sukses</th><th>Failed</th><th>Rating</th></tr></thead><tbody id="tbodyLaporanTeknisi"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div></div>
+                <div class="tabs" style="margin-bottom:10px">
+                    <button class="tab active" data-laptek="performa" onclick="setLapTekTab('performa')">Performa</button>
+                    <button class="tab" data-laptek="kas" onclick="setLapTekTab('kas')">💰 Buku Kas (owner)</button>
+                </div>
+                <div id="lapTekPerforma">
+                    <div class="table-wrap"><table class="table"><thead><tr><th>Teknisi</th><th>Handle</th><th>Service Sukses</th><th>Failed</th><th>Rating</th></tr></thead><tbody id="tbodyLaporanTeknisi"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                <div id="lapTekKas" style="display:none">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+                        <label style="font-size:11px;color:#8a8f98">Teknisi:</label>
+                        <select id="kasTeknisiSelect" onchange="renderKasTeknisi()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"></select>
+                        <button class="btn btn-ghost small" onclick="renderKasTeknisi()">↻ Refresh</button>
+                    </div>
+                    <div class="stats" style="margin-bottom:10px">
+                        <div class="stat-card"><div class="stat-head"><span>Komisi Cair</span></div><h3 id="kasKomisi">Rp 0</h3><p class="trend" id="kasKomisiSub">-</p></div>
+                        <div class="stat-card"><div class="stat-head"><span>Uang Hadir</span></div><h3 id="kasAllowance">Rp 0</h3><p class="trend">check-in tepat waktu</p></div>
+                        <div class="stat-card" style="border-left:4px solid #ef4444"><div class="stat-head"><span>Sisa Hutang</span></div><h3 id="kasHutang" style="color:#ef4444">Rp 0</h3><p class="trend" id="kasPending">0 pending</p></div>
+                    </div>
+                    <div id="kasPendingList" style="margin-bottom:10px;display:flex;flex-direction:column;gap:8px"></div>
+                    <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasTeknisi"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Pilih teknisi</td></tr></tbody></table></div>
+                </div>
+                </div>
+            </section>
+            <!-- KAS SAYA (teknisi: milik sendiri, owner: sama tapi semua via laporan) -->
+            <section class="view" id="view-kas-saya">
+                <div class="card"><div class="card-head"><h3>💰 Kas Saya</h3><span class="muted" id="kasSayaSub">Komisi + uang hadir — transparan</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasSaya()">↻ Refresh</button></div>
+                <div class="stats" style="margin-bottom:10px">
+                    <div class="stat-card"><div class="stat-head"><span>Hari Ini Cair</span></div><h3 id="kasSayaHari">Rp 0</h3><p class="trend">komisi + hadir hari ini</p></div>
+                    <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="kasSayaBulan">Rp 0</h3><p class="trend" id="kasSayaLevel">-</p></div>
+                    <div class="stat-card" style="border-left:4px solid #ef4444"><div class="stat-head"><span>Sisa Hutang</span></div><h3 id="kasSayaHutang" style="color:#ef4444">Rp 0</h3><p class="trend" id="kasSayaPending">0 pending</p></div>
+                </div>
+                <div id="kasSayaKuota" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
+                <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div></div>
             </section>
             <section class="view" id="view-laporan-penjualan">
                 <div class="card"><div class="card-head"><h3>Laporan Penjualan</h3><span class="muted">Pendapatan</span></div>
@@ -748,6 +787,27 @@
                     </div>
                     <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code> <code>{garansi_sampai}</code> <code>{metode_bayar}</code> <code>{diambil_at}</code> <code>{diambil_oleh}</code> <code>{lacak}</code>. Kosongkan + Simpan = kembali ke default.</p>
                     <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
+                </div>
+                <div class="card" id="engineSettingsCard" style="max-width:760px;margin:0 auto;display:none">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>⚙️ Aturan Business Engine</h3><span class="muted">owner only</span></div>
+                        <div class="toolbar-right"><button class="btn btn-ghost small" onclick="loadEngineSettings()">↻ Refresh</button></div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:12px">Uang hadir, jam masuk, komisi, kuota 2:1, cicilan, proteksi junior. Perubahan tercatat di audit.</p>
+                    <div class="form-grid">
+                        <div class="field"><label>Uang Hadir / hari (Rp)</label><input id="eng-uang" type="text" inputmode="numeric" placeholder="25000"></div>
+                        <div class="field"><label>Jam Masuk (HH:MM)</label><input id="eng-jam" placeholder="09:00"></div>
+                        <div class="field"><label>Toleransi Telat (mnt)</label><input id="eng-toleransi" type="number" min="0" placeholder="15"></div>
+                        <div class="field"><label>Kuota Ringan per Berat (2 = 2:1)</label><input id="eng-kuota" type="number" min="1" max="10" placeholder="2"></div>
+                        <div class="field"><label>Komisi Senior (%)</label><input id="eng-senior" type="number" min="0" max="100" placeholder="50"></div>
+                        <div class="field"><label>Komisi Junior (%)</label><input id="eng-junior" type="number" min="0" max="100" placeholder="35"></div>
+                        <div class="field"><label>Cicilan Max (%/hari)</label><input id="eng-cicil" type="number" min="1" max="100" placeholder="20"></div>
+                        <div class="field"><label>Toleransi Junior (Rp/bln)</label><input id="eng-toleransi-rp" type="text" inputmode="numeric" placeholder="100000"></div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:12px">
+                        <button class="btn btn-dark" style="flex:1" onclick="saveEngineSettings()">💾 Simpan Aturan Engine</button>
+                    </div>
+                    <p id="engineSettingsMsg" style="font-size:11px;color:#059669;margin-top:8px;display:none"></p>
                 </div>
             </section>
 
@@ -807,11 +867,11 @@
                             <p style="font-size:11px;color:#8a8f98;margin-top:8px">Kode yang sudah dipakai / dibatalkan otomatis hilang dari list aktif. <span id="teamInviteCount">0 kode aktif</span>.</p>
                         </div>
                     </div>
-                    <div class="card-head" style="margin-bottom:10px"><h3>Anggota Toko</h3><span class="muted">Role & status bisa diubah owner/admin — perubahan tersimpan otomatis</span></div>
+                    <div class="card-head" style="margin-bottom:10px"><h3>Anggota Toko</h3><span class="muted">Role, level & status bisa diubah owner/admin — perubahan tersimpan otomatis</span></div>
                     <div class="table-wrap">
                         <table class="table" id="tableTeamMembers">
-                            <thead><tr><th>Username</th><th>Role di Toko</th><th>Status</th><th>Bergabung</th><th style="text-align:center">Aksi</th></tr></thead>
-                            <tbody id="tbodyTeamMembers"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
+                            <thead><tr><th>Username</th><th>Role di Toko</th><th>Level</th><th>Status</th><th>Bergabung</th><th style="text-align:center">Aksi</th></tr></thead>
+                            <tbody id="tbodyTeamMembers"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -1083,5 +1143,6 @@
     <div id="printArea"></div>
 
     <script src="assets/js/script.js?v=ambil8"></script>
+    <script src="assets/js/engine.js?v=eng1"></script>
 </body>
 </html>

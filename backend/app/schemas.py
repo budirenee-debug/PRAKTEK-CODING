@@ -12,6 +12,17 @@ class TechnicianBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=100)
     foto: Optional[str] = None
     is_active: Optional[int] = 1
+    level: Optional[str] = Field(default="junior", description="senior / junior")
+
+    @field_validator('level')
+    @classmethod
+    def validate_level(cls, v):
+        if v is None:
+            return "junior"
+        v = v.strip().lower()
+        if v not in ["senior", "junior"]:
+            raise ValueError('level harus senior atau junior')
+        return v
 
 class TechnicianCreate(TechnicianBase):
     pass
@@ -19,6 +30,47 @@ class TechnicianCreate(TechnicianBase):
 class TechnicianOut(TechnicianBase):
     id: int
     created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+# ---------- Business Engine ----------
+class StoreSettingsOut(BaseModel):
+    id: int
+    store_id: int
+    uang_hadir: int = 25000
+    jam_masuk: str = "09:00"
+    toleransi_mnt: int = 15
+    komisi_senior: int = 50
+    komisi_junior: int = 35
+    kuota_ringan_per_berat: int = 2
+    cicilan_max_pct: int = 20
+    toleransi_junior_rp: int = 100000
+    keyword_berat: str = "IC,BOARD,MATI TOTAL,MESIN"
+    keyword_ringan: str = "LCD,BATERAI,SOFTWARE"
+    updated_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+class StoreSettingsUpdate(BaseModel):
+    uang_hadir: Optional[int] = Field(None, ge=0)
+    jam_masuk: Optional[str] = Field(None, max_length=5)
+    toleransi_mnt: Optional[int] = Field(None, ge=0)
+    komisi_senior: Optional[int] = Field(None, ge=0, le=100)
+    komisi_junior: Optional[int] = Field(None, ge=0, le=100)
+    kuota_ringan_per_berat: Optional[int] = Field(None, ge=1, le=10)
+    cicilan_max_pct: Optional[int] = Field(None, ge=1, le=100)
+    toleransi_junior_rp: Optional[int] = Field(None, ge=0)
+    keyword_berat: Optional[str] = Field(None, max_length=255)
+    keyword_ringan: Optional[str] = Field(None, max_length=255)
+
+class AttendanceOut(BaseModel):
+    id: int
+    technician_id: int
+    technician_nama: Optional[str] = None
+    tanggal: datetime.date
+    jam_checkin: Optional[str] = None
+    on_time: bool = False
+    allowance_rp: int = 0
     class Config:
         from_attributes = True
 
@@ -114,7 +166,19 @@ class ServiceBase(BaseModel):
         return v
 
 class ServiceCreate(ServiceBase):
-    pass
+    kategori: Optional[str] = Field(default=None, description="berat / ringan (auto jika kosong)")
+    harga_part_up: Optional[int] = Field(default=0, ge=0, description="harga UP yg dilihat teknisi")
+    modal_asli: Optional[int] = Field(default=0, ge=0, description="rahasia owner only")
+
+    @field_validator('kategori')
+    @classmethod
+    def validate_kategori(cls, v):
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if v not in ["berat", "ringan"]:
+            raise ValueError('kategori harus berat atau ringan')
+        return v
 
 class KlaimGaransiIn(BaseModel):
     """Body klaim garansi: keluhan baru wajib, teknisi & biaya opsional (default ikut asli / 0)."""
@@ -215,6 +279,12 @@ class ServiceOut(BaseModel):
     diambil_oleh: Optional[str] = None  # pengambil HP (default nama pelanggan)
     created_at: Optional[dt] = None
     updated_at: Optional[dt] = None
+    # Business Engine (diisi dari service_engine, agar transaksi + kas satu sumber)
+    kategori: Optional[str] = None  # berat / ringan
+    harga_part_up: Optional[int] = None
+    jasa_bersih: Optional[int] = None
+    komisi_teknisi: Optional[int] = None
+    komisi_status: Optional[str] = None  # pending / cair
 
     @field_validator('kelengkapan', mode='before')
     @classmethod

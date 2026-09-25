@@ -87,6 +87,57 @@ def compute_deadline_from_estimasi(estimasi: date = None, base_date: date = None
 
 TERMINAL_STATUSES = {"Service Sukses", "Selesai", "Sudah Diambil", "Dibatalkan", "Service Failed", "Garansi", "Bisa Diambil"}
 
+def attach_engine(db: Session, svc):
+    """Tempel data service_engine ke objek service (agar ServiceOut ada part/jasa/komisi)."""
+    if not svc:
+        return svc
+    try:
+        inv = getattr(svc, "invoice", None)
+        if not inv:
+            return svc
+        row = db.query(models.ServiceEngine).filter(models.ServiceEngine.invoice == inv).first()
+        if row:
+            svc.kategori = row.kategori
+            svc.harga_part_up = row.harga_part_up
+            svc.jasa_bersih = row.jasa_bersih
+            svc.komisi_teknisi = row.komisi_teknisi
+            svc.komisi_status = row.komisi_status
+        else:
+            svc.kategori = None
+            svc.harga_part_up = 0
+            svc.jasa_bersih = None
+            svc.komisi_teknisi = None
+            svc.komisi_status = None
+    except Exception:
+        pass
+    return svc
+
+
+def attach_engine_many(db: Session, rows):
+    try:
+        invs = [getattr(r, "invoice", None) for r in rows if getattr(r, "invoice", None)]
+        if not invs:
+            return rows
+        emap = {e.invoice: e for e in db.query(models.ServiceEngine).filter(models.ServiceEngine.invoice.in_(invs)).all()}
+        for r in rows:
+            e = emap.get(getattr(r, "invoice", None))
+            if e:
+                r.kategori = e.kategori
+                r.harga_part_up = e.harga_part_up
+                r.jasa_bersih = e.jasa_bersih
+                r.komisi_teknisi = e.komisi_teknisi
+                r.komisi_status = e.komisi_status
+            else:
+                r.kategori = None
+                r.harga_part_up = 0
+                r.jasa_bersih = None
+                r.komisi_teknisi = None
+                r.komisi_status = None
+    except Exception:
+        pass
+    return rows
+
+
 def enrich_service(svc):
     """Tambah sisa_hari dan is_overdue dinamis (virtual, tidak mutasi DB) — fix P0-5/6."""
     if not svc:
@@ -132,6 +183,8 @@ def get_service(db: Session, invoice: str, store_id=None):
     svc = db.query(models.Service).filter(models.Service.invoice == invoice).first()
     if svc and store_id is not None and svc.store_id != store_id:
         return None
+    if svc:
+        attach_engine(db, svc)
     return enrich_service(svc)
 
 def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = None, search: str = None, device: str = None, deadline_type: str = None, overdue: bool = None, store_id=None, teknisi_scope: set = None):
@@ -178,6 +231,7 @@ def get_services(db: Session, skip: int = 0, limit: int = 100, status: str = Non
             )
     q = q.order_by(desc(models.Service.created_at))
     rows = q.offset(skip).limit(limit).all()
+    attach_engine_many(db, rows)
     rows = [enrich_service(r) for r in rows]
     return rows
 
@@ -378,7 +432,8 @@ def get_technicians(db: Session, store_id=None):
     return q.all()
 
 def create_technician(db: Session, payload: schemas.TechnicianCreate, store_id=None):
-    t = models.Technician(nama=payload.nama, foto=payload.foto, store_id=store_id)
+    t = models.Technician(nama=payload.nama, foto=payload.foto,
+                          level=(payload.level or "junior"), store_id=store_id)
     db.add(t)
     db.commit()
     db.refresh(t)
