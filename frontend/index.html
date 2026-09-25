@@ -7,6 +7,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css?v=ambil3">
+    <style>html.guard-lock body{visibility:hidden}</style>
+    <script>
+    // Guard dini anti-bocor: sembunyikan body sampai lolos auth.
+    // Penting untuk tombol Kembali (bfcache) yang tidak mengulang DOMContentLoaded.
+    (function(){
+      try{ document.documentElement.classList.add('guard-lock'); }catch(e){}
+      function needLogin(){
+        try{ return !localStorage.getItem('access_token'); }catch(e){ return true; }
+      }
+      function guardReplace(){
+        if(needLogin()){
+          try{ location.replace('login.html'); }catch(e){ location.href='login.html'; }
+          return true;
+        }
+        return false;
+      }
+      // cek sinkron saat parse head — cegah flash dashboard sebelum redirect
+      guardReplace();
+      // bfcache: pageshow persisted=true saat Back/Forward — cek ulang
+      window.addEventListener('pageshow', function(ev){ guardReplace(); });
+      window.__dashGuardReplace = guardReplace;
+    })();
+    </script>
 </head>
 <body>
     <div class="app">
@@ -133,7 +156,7 @@
                 </button>
                 <div class="store-info">
                     <span>● Sistem Online</span>
-                    <span id="app-ver">vBOS3-nota3</span>
+                    <span id="app-ver">vBOS9-guard1</span>
                 </div>
             </div>
         </aside>
@@ -1059,6 +1082,6 @@
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/script.js?v=ambil7"></script>
+    <script src="assets/js/script.js?v=ambil8"></script>
 </body>
 </html>

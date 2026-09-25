@@ -121,15 +121,15 @@ def _to_out(svc: models.Service, toko_nama: Optional[str]) -> TrackOut:
 
 @router.get("", response_model=List[TrackOut])
 def track(q: str, db: Session = Depends(get_db)):
-    """Cari service by invoice atau IMEI — boleh sebagian (case-insensitive).
+    """Cari service by invoice atau IMEI — boleh sebagian (case-insensitive, minimal 4 karakter).
 
     Contoh: GET /api/track?q=REN-2026-0001 , ?q=356938035643809 , atau ?q=8675
     (4 digit terakhir IMEI). Exact match diutamakan, lalu terbaru.
     Publik — tanpa token. Return max 5.
     """
     key = (q or "").strip()
-    if len(key) < 3:
-        raise HTTPException(status_code=400, detail="Kode nota / IMEI minimal 3 karakter")
+    if len(key) < 4:
+        raise HTTPException(status_code=400, detail="Kode nota / IMEI minimal 4 karakter")
     like = f"%{key}%"
     cands = (
         db.query(models.Service)

@@ -44,7 +44,7 @@
 
       <div class="invite-note">🔒 Pendaftaran <strong>invite-only</strong> — belum punya akun? <a href="register.html" style="font-weight:600">Daftar dengan kode undangan →</a></div>
 
-      <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="lacak.html">🔍 Lacak Service</a> • <a href="index.html">Dashboard POS</a></div>
+      <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="lacak.html">🔍 Lacak Service</a></div>
     </div>
   </div>
   <script>
@@ -70,6 +70,24 @@
       }, 100);
     });
 
+    // Sudah login tapi pencet Back ke halaman login → lempar balik ke dashboard.
+    // Pakai pageshow agar bfcache ikut dicek, dan replace agar riwayat bersih.
+    async function bounceIfLoggedIn(){
+      let token = null;
+      try{ token = localStorage.getItem('access_token'); }catch(e){}
+      if(!token) return;
+      try{
+        const res = await fetch(`${API}/auth/me`, {headers:{'Authorization':`Bearer ${token}`}});
+        if(res.ok){ location.replace('index.html'); }
+        else if(res.status === 401){
+          try{ localStorage.removeItem('access_token'); }catch(e){}
+        }
+        // status lain (offline/error) → biarkan di login, jangan tendang paksa
+      }catch(e){ /* offline → tetap di login */ }
+    }
+    window.addEventListener('pageshow', bounceIfLoggedIn);
+    bounceIfLoggedIn();
+
     async function handleLogin(e){
       e.preventDefault();
       const u = document.getElementById('username').value.trim();
@@ -93,7 +111,7 @@
           localStorage.setItem('active_store_id', String(data.primary_store_id));
         }
         alert.className='alert ok'; alert.textContent='Berhasil! Mengalihkan...'; alert.style.display='block';
-        setTimeout(()=> location.href='index.html', 800);
+        setTimeout(()=> location.replace('index.html'), 800);
       }catch(err){
         // khusus pending approval
         const msg = err.message.includes('persetujuan') ? '⏳ ' + err.message : err.message;

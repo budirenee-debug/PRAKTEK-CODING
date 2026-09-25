@@ -59,8 +59,8 @@
       <form onsubmit="handleTrack(event)">
         <div class="field">
           <label>Kode Nota / IMEI *</label>
-          <input id="t-q" required placeholder="contoh: REN-2026-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
-          <span class="hint">Kode nota ada di struk / nota WA dari toko. IMEI boleh diketik sebagian.</span>
+          <input id="t-q" required minlength="4" placeholder="contoh: REN-2026-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <span class="hint">Kode nota ada di struk / nota WA dari toko. IMEI boleh diketik sebagian — minimal 4 karakter.</span>
         </div>
         <button class="btn btn-accent btn-block" type="submit">Lacak →</button>
       </form>
@@ -148,6 +148,7 @@
       ev.preventDefault();
       const q = document.getElementById('t-q').value.trim();
       if (!q) return;
+      if (q.length < 4) { showAlert('Kode nota / IMEI minimal 4 karakter', 'err'); return; }
       const url = new URL(location.href);
       url.searchParams.set('q', q);
       history.replaceState(null, '', url);

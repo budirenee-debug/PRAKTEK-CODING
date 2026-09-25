@@ -665,6 +665,26 @@ function switchActiveStore(id){
 }
 
 // ---------- API helpers ----------
+function goLoginReplace(){
+  try{ location.replace('login.html'); }catch(e){ location.href='login.html'; }
+}
+function enforceAuthOrRedirect(){
+  // dipakai guard awal + pageshow (bfcache Back/Forward)
+  if(!localStorage.getItem('access_token')){ goLoginReplace(); return false; }
+  return true;
+}
+// Back/Forward dari login setelah logout: halaman direstore dari bfcache
+// tanpa mengulang DOMContentLoaded — paksa cek ulang di sini.
+window.addEventListener('pageshow', ()=>{
+  try{
+    const p = (location.pathname||'');
+    const isDash = p.endsWith('/index.html') || p.endsWith('/frontend') || p.endsWith('/frontend/') || p === '/' || p === '';
+    if(!isDash) return;
+    // layar dikunci → jangan tendang, biarkan popup kunci yang urus
+    try{ if(document.getElementById('lockModal')?.classList.contains('show')) return; }catch(e){}
+    enforceAuthOrRedirect();
+  }catch(e){}
+});
 async function apiFetch(path, opts={}){
   const url = `${API_BASE}${withStoreScope(path)}`;
   const token = localStorage.getItem('access_token');
@@ -674,6 +694,19 @@ async function apiFetch(path, opts={}){
   const headers = {...baseHeaders, ...(opts.headers||{})};
   const res = await fetch(url, {...opts, headers});
   if(!res.ok){
+    // token mati/expired saat polling/sync → tendang ke login sekali saja (anti-loop di halaman publik)
+    if(res.status === 401){
+      try{
+        const p = (location.pathname||'');
+        const isDash = p.includes('index.html') || p.endsWith('/frontend') || p.endsWith('/frontend/');
+        let locked = false;
+        try{ locked = !!document.getElementById('lockModal')?.classList.contains('show'); }catch(e){}
+        if(isDash && localStorage.getItem('access_token') && !locked){
+          localStorage.removeItem('access_token');
+          goLoginReplace();
+        }
+      }catch(e){}
+    }
     const txt = await res.text();
     throw new Error(txt || res.statusText);
   }
@@ -980,7 +1013,8 @@ function handleLogout(){
     localStorage.removeItem('bos_stores');
     localStorage.removeItem('active_store_id');
     showToast('Logout berhasil - mengalihkan...');
-    setTimeout(()=> location.href='login.html', 600);
+    // replace agar tombol Kembali tidak bisa buka dashboard cache sesudah logout
+    setTimeout(()=> goLoginReplace(), 600);
   }
 }
 function userFotoUrl(f){
@@ -1624,14 +1658,14 @@ async function unlockScreen(){
 function lockLogout(){
   // keluar dari layar kunci (tanpa confirm) — balik ke login
   ['access_token','username','role','nama','foto','bos_stores','active_store_id'].forEach(k=>{ try{ localStorage.removeItem(k); }catch{} });
-  location.href='login.html';
+  goLoginReplace();
 }
 
 // Init
 document.addEventListener('DOMContentLoaded', async ()=>{
+  // guard: belum login → login dulu (pakai replace agar Back tidak balik ke dashboard)
+  if(!enforceAuthOrRedirect()) return;
   updateSidebarUser();
-  // guard: belum login → login dulu (link Dashboard di halaman login otomatis mental ke sini)
-  if(!localStorage.getItem('access_token')){ location.href='login.html'; return; }
   // verifikasi token masih berlaku: 401 → login; error jaringan → lanjut offline
   try{
     await apiFetch('/auth/me');
@@ -1639,9 +1673,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     const msg=String((e && e.message)||'');
     if(/belum login|token tidak valid|401|unauthor|expired/i.test(msg)){
       localStorage.removeItem('access_token');
-      location.href='login.html'; return;
+      goLoginReplace(); return;
     }
   }
+  // lolos guard → tampilkan body (buka kunci anti-flash)
+  try{ document.documentElement.classList.remove('guard-lock'); }catch(e){}
   setupNavigation();
   setupChips();
   await initStoreContext();
