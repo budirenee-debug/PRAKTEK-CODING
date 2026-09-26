@@ -107,7 +107,8 @@ class Sparepart(Base):
     masuk = Column(Integer, default=0)
     keluar = Column(Integer, default=0)
     stok = Column(Integer, default=0)
-    harga = Column(Integer, default=0)
+    harga = Column(Integer, default=0)  # harga JUAL ke pelanggan
+    harga_beli = Column(Integer, default=0)  # harga BELI/modal dari supplier
     tgl = Column(Date, default=datetime.date.today)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

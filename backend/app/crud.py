@@ -500,6 +500,7 @@ def create_sparepart(db: Session, payload: schemas.SparepartCreate, store_id=Non
         keluar=payload.keluar or 0,
         stok=stok,
         harga=payload.harga or 0,
+        harga_beli=payload.harga_beli or 0,
         tgl=payload.tgl or date.today()
     )
     db.add(sp)

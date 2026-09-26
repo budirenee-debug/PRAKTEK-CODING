@@ -133,6 +133,9 @@
                     <button class="menu-item" data-view="kelola-tim">
                         <span class="mi">👥</span> Kelola Tim
                     </button>
+                    <a class="menu-item" id="menu-owner" href="owner.html" style="text-decoration:none">
+                        <span class="mi">🏪</span> Owner Space
+                    </a>
                     <button class="menu-item" data-view="profil">
                         <span class="mi">👤</span> Atur Profil
                     </button>
@@ -189,6 +192,16 @@
 
             <!-- VIEW: DASHBOARD -->
             <section class="view active" id="view-dashboard">
+                <div id="previewBanner" class="approval-banner" style="display:none;background:#eff6ff;border-color:#bfdbfe">
+                    <div class="approval-banner-left">
+                        <div class="approval-banner-icon">👁</div>
+                        <div>
+                            <strong id="previewTitle" style="font-size:13px">Mode preview teknisi</strong>
+                            <p id="previewSub" style="font-size:12px;color:#1e40af;margin-top:2px">Filter terkunci ke 1 teknisi — kamu tetap login owner (full akses).</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark small" style="white-space:nowrap" onclick="exitPreviewTeknisi()">✕ Keluar preview</button>
+                </div>
                 <div id="approvalBanner" class="approval-banner" style="display:none" onclick="switchView('approval-akun')">
                     <div class="approval-banner-left">
                         <div class="approval-banner-icon">🛡️</div>
@@ -1142,7 +1155,8 @@
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/script.js?v=ambil8"></script>
-    <script src="assets/js/engine.js?v=eng1"></script>
+    <script src="assets/js/auth.js?v=role2"></script>
+    <script src="assets/js/script.js?v=ambil10"></script>
+    <script src="assets/js/engine.js?v=eng2"></script>
 </body>
 </html>

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Masuk — BOS SERVICE</title>
-  <meta name="description" content="Masuk ke BOS SERVICE (Bisnis Operasional System) — platform service HP & laptop multi-toko.">
+  <title>Masuk Owner — BOS SERVICE</title>
+  <meta name="description" content="Login khusus owner/admin BOS SERVICE — menuju Owner Space (pengaturan toko + laporan keuangan).">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css?v=navy1">
   <link rel="stylesheet" href="assets/css/bos.css?v=mobile1">
@@ -20,7 +20,7 @@
     .alert{padding:10px 12px;border-radius:12px;font-size:13px;display:none;margin-bottom:12px}
     .alert.err{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
     .alert.ok{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
-    .invite-note{font-size:12px;color:#8a8f98;background:#f6f6f7;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:14px;text-align:center}
+    .owner-badge{display:inline-block;font-size:11px;font-weight:700;background:#04074a;color:#fff;border-radius:20px;padding:3px 10px;margin-bottom:10px;letter-spacing:.3px}
   </style>
 </head>
 <body>
@@ -28,28 +28,25 @@
     <div class="login-card">
       <a href="landing.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <span style="width:44px;height:44px;background:#04074a;color:#fff;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:13px">BOS</span>
-        <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">BOS SERVICE<br><span style="font-family:Inter;font-weight:400;font-size:11px;color:#8a8f98">Bisnis Operasional System</span></span>
+        <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">Owner Space<br><span style="font-family:Inter;font-weight:400;font-size:11px;color:#8a8f98">Pengaturan toko + laporan keuangan</span></span>
       </a>
-      <h1>Masuk</h1>
-      <p class="tagline">Platform service HP &amp; laptop • satu akun untuk banyak toko</p>
+      <span class="owner-badge">🏪 LOGIN OWNER / ADMIN</span>
+      <h1>Masuk Owner</h1>
+      <p class="tagline">Khusus owner &amp; admin toko • teknisi/kasir lewat <a href="login.html">login toko →</a></p>
 
       <div id="alert" class="alert"></div>
 
-      <!-- FORM LOGIN (kontrak API tidak berubah: POST /api/auth/login) -->
-      <form id="loginForm" onsubmit="handleLogin(event)" autocomplete="off">
-        <div class="field"><label>Username</label><input id="username" required value="" placeholder="Masukkan username" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <form id="loginForm" onsubmit="handleOwnerLogin(event)" autocomplete="off">
+        <div class="field"><label>Username</label><input id="username" required value="" placeholder="Username owner/admin" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div class="field"><label>Password</label><input id="password" type="password" required value="" placeholder="Masukkan password" autocomplete="new-password"></div>
-        <button class="btn btn-dark" style="width:100%;margin-top:8px" type="submit">Masuk →</button>
+        <button class="btn btn-dark" style="width:100%;margin-top:8px" type="submit">Masuk ke Owner Space →</button>
       </form>
 
-      <div class="invite-note">🔒 Pendaftaran <strong>invite-only</strong> — belum punya akun? <a href="register.html" style="font-weight:600">Daftar dengan kode undangan →</a></div>
-
-      <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="lacak.html">🔍 Lacak Service</a><br><span style="font-size:11px">Owner/admin? <a href="login-owner.html" style="font-weight:600">Masuk Owner Space →</a></span></div>
+      <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="login.html">Login toko (kasir/teknisi)</a> • <a href="lacak.html">🔍 Lacak Service</a></div>
     </div>
   </div>
   <script src="assets/js/auth.js?v=role2"></script>
   <script>
-    // API + routing role via BOSAuth (single source). Fallback lokal jika auth.js gagal load.
     const API = (window.BOSAuth ? window.BOSAuth.API : (() => {
       const stored = localStorage.getItem('API_BASE');
       if (stored) return stored;
@@ -61,7 +58,6 @@
       return location.origin + '/api';
     })());
 
-    // cegah browser autofill menampilkan kredensial lama
     window.addEventListener('load', () => {
       setTimeout(() => {
         const u = document.getElementById('username');
@@ -71,9 +67,13 @@
       }, 100);
     });
 
-    // Sudah login tapi pencet Back ke halaman login → lempar ke landing role masing-masing.
-    // Pakai pageshow agar bfcache ikut dicek, dan replace agar riwayat bersih.
-    async function bounceIfLoggedIn(){
+    function showMsg(kind, msg){
+      const alert = document.getElementById('alert');
+      alert.className = 'alert ' + kind; alert.textContent = msg; alert.style.display = 'block';
+    }
+
+    // Sudah login owner tapi pencet Back → langsung ke owner.html.
+    async function bounceIfOwner(){
       let token = null;
       try{ token = window.BOSAuth ? window.BOSAuth.getToken() : localStorage.getItem('access_token'); }catch(e){}
       if(!token) return;
@@ -81,32 +81,24 @@
         const res = await fetch(`${API}/auth/me`, {headers:{'Authorization':`Bearer ${token}`}});
         if(res.ok){
           const me = await res.json().catch(()=>null);
-          // sinkronkan role global agar guard dashboard akurat
-          try{
-            if(me && me.role) localStorage.setItem('role', String(me.role).toLowerCase());
-          }catch(e){}
-          const role = (me && me.role) || (window.BOSAuth ? window.BOSAuth.getGlobalRole() : '');
-          const target = window.BOSAuth ? window.BOSAuth.landingFor(role) : 'index.html';
-          location.replace(target);
+          try{ if(me && me.role) localStorage.setItem('role', String(me.role).toLowerCase()); }catch(e){}
+          const role = window.BOSAuth ? window.BOSAuth.myActiveRole() : String((me && me.role) || '').toLowerCase();
+          if(['superadmin','owner','admin'].includes(role)) location.replace('owner.html');
+          // teknisi/kasir: biarkan di halaman ini agar dapat pesan penolakan jelas saat login ulang
         }
         else if(res.status === 401){
-          try{
-            if(window.BOSAuth) window.BOSAuth.logout(true);
-            else localStorage.removeItem('access_token');
-          }catch(e){}
+          try{ if(window.BOSAuth) window.BOSAuth.logout(true); else localStorage.removeItem('access_token'); }catch(e){}
         }
-        // status lain (offline/error) → biarkan di login, jangan tendang paksa
-      }catch(e){ /* offline → tetap di login */ }
+      }catch(e){}
     }
-    window.addEventListener('pageshow', bounceIfLoggedIn);
-    bounceIfLoggedIn();
+    window.addEventListener('pageshow', bounceIfOwner);
+    bounceIfOwner();
 
-    async function handleLogin(e){
+    async function handleOwnerLogin(e){
       e.preventDefault();
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value;
-      const alert = document.getElementById('alert');
-      alert.style.display='none';
+      document.getElementById('alert').style.display = 'none';
       try{
         const res = await fetch(`${API}/auth/login`, {
           method:'POST',
@@ -115,24 +107,24 @@
         });
         const data = await res.json();
         if(!res.ok) throw new Error(data.detail || 'Gagal login');
-        alert.className='alert ok'; alert.textContent='Berhasil! Mengalihkan...'; alert.style.display='block';
-        // simpan sesi + redirect per role (semua role saat ini ke index.html,
-        // teknisi otomatis mode terbatas di dalamnya)
-        if(window.BOSAuth) window.BOSAuth.redirectAfterLogin(data);
+        // Simpan dulu agar myActiveRole (per-toko) bisa dihitung
+        if(window.BOSAuth) window.BOSAuth.saveLogin(data);
         else {
           localStorage.setItem('access_token', data.access_token);
           localStorage.setItem('username', data.username);
           localStorage.setItem('role', data.role);
           localStorage.setItem('bos_stores', JSON.stringify(data.stores || []));
-          if(data.primary_store_id){
-            localStorage.setItem('active_store_id', String(data.primary_store_id));
-          }
-          setTimeout(()=> location.replace('index.html'), 800);
+          if(data.primary_store_id) localStorage.setItem('active_store_id', String(data.primary_store_id));
         }
+        const role = window.BOSAuth ? window.BOSAuth.myActiveRole() : String(data.role || '').toLowerCase();
+        if(!['superadmin','owner','admin'].includes(role)){
+          try{ if(window.BOSAuth) window.BOSAuth.logout(true); else localStorage.removeItem('access_token'); }catch(e){}
+          throw new Error('⛔ Akun "' + u + '" (' + (role || 'tanpa peran') + ') bukan owner/admin. Pakai login toko untuk kasir/teknisi.');
+        }
+        showMsg('ok', 'Berhasil! Membuka Owner Space...');
+        setTimeout(()=> location.replace('owner.html'), 600);
       }catch(err){
-        // khusus pending approval
-        const msg = String(err.message || '').includes('persetujuan') ? '⏳ ' + err.message : err.message;
-        alert.className='alert err'; alert.textContent=msg; alert.style.display='block';
+        showMsg('err', String(err.message || 'Gagal login'));
       }
     }
   </script>

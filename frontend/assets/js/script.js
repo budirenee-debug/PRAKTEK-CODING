@@ -732,13 +732,19 @@ async function apiFetch(path, opts={}){
 let _offlineToastShown = false;
 // ---------- Batas visibilitas teknisi (frontend lapis 2; backend yang menegakkan) ----------
 function myActiveRole(){
-  const g = localStorage.getItem('role') || '';
+  // delegasi ke BOSAuth (single source) jika ada; fallback lokal agar tidak crash
+  try{
+    if(window.BOSAuth && typeof window.BOSAuth.myActiveRole === 'function'){
+      return window.BOSAuth.myActiveRole();
+    }
+  }catch{}
+  const g = (localStorage.getItem('role') || '').trim().toLowerCase();
   if(g === 'superadmin') return 'superadmin';
   try{
     const stores = getMyStores();
     const active = getActiveStoreId();
     const cur = stores.find(s=>s.id===active);
-    if(cur && (cur.role_saya || cur.role)) return cur.role_saya || cur.role;
+    if(cur && (cur.role_saya || cur.role)) return String(cur.role_saya || cur.role).trim().toLowerCase();
   }catch{}
   return g;
 }
@@ -768,17 +774,53 @@ async function cacheMyProfile(){
   applyRoleMenu();
 }
 function applyRoleMenu(){
-  const isTek = isTeknisiMode();
-  document.querySelectorAll('.menu-item[data-view="pelanggan"], .menu-item[data-view="tambah-pelanggan"]').forEach(b=>{
-    b.style.display = isTek ? 'none' : '';
+  // Teknisi: lihat list service tapi difilter miliknya (filterTeknisiView + backend scope).
+  // Tidak ada pengaturan toko & transaksi. Backend tetap menegakkan (403/404).
+  const role = myActiveRole();
+  const isTek = role === 'teknisi';
+  const TEK_HIDE = [
+    'pelanggan', 'tambah-pelanggan',
+    'service-masuk', 'inventory-tambah',
+    'transaksi-penjualan', 'transaksi-pembayaran', 'transaksi-pendapatan',
+    'laporan-service', 'laporan-penjualan',
+    'pengaturan', 'kelola-tim', 'approval-akun'
+  ];
+  TEK_HIDE.forEach(v=>{
+    document.querySelectorAll('.menu-item[data-view="' + v + '"]').forEach(b=>{
+      b.style.display = isTek ? 'none' : '';
+    });
   });
   const cat = document.getElementById('cat-customer');
   if(cat) cat.style.display = isTek ? 'none' : '';
   // kelola tim & pengaturan toko khusus owner/admin (backend juga menolak kasir/teknisi)
-  const canManage = ['superadmin','owner','admin'].includes(myActiveRole());
-  document.querySelectorAll('.menu-item[data-view="kelola-tim"], .menu-item[data-view="pengaturan"]').forEach(b=>{
-    b.style.display = canManage ? '' : 'none';
-  });
+  let canManage = false;
+  try{
+    canManage = window.BOSAuth ? window.BOSAuth.canManage() : ['superadmin','owner','admin'].includes(role);
+  }catch{ canManage = ['superadmin','owner','admin'].includes(role); }
+  if(!isTek){
+    document.querySelectorAll('.menu-item[data-view="kelola-tim"], .menu-item[data-view="pengaturan"]').forEach(b=>{
+      b.style.display = canManage ? '' : 'none';
+    });
+  }
+  // teknisi: kunci tombol tambah di dalam view sparepart (read-only, pakai via service saja)
+  try{
+    const addBtns = document.querySelectorAll('[onclick*="switchView(\'inventory-tambah\')"], [onclick*="openAlatAddModal"]');
+    addBtns.forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+  }catch{}
+  // teknisi: sembunyikan tombol +Service Baru (input via admin/kasir)
+  try{
+    const btnBaru = document.getElementById('btnServiceBaru');
+    if(btnBaru && isTek) btnBaru.style.display = 'none';
+  }catch{}
+  // teknisi: tab Buku Kas (owner) di laporan-teknisi disembunyikan — pakai Kas Saya saja
+  try{
+    document.querySelectorAll('[data-laptek="kas"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+  }catch{}
+  // Owner Space: hanya owner/admin/superadmin
+  try{
+    const own = document.getElementById('menu-owner');
+    if(own) own.style.display = canManage ? '' : 'none';
+  }catch{}
 }
 async function loadData(silent){
   if(!USE_API){
@@ -878,6 +920,7 @@ async function loadAvailableTechs(){
   }
   if(!USE_API){
     populateTechFilters();
+    try{ applyPreviewTeknisi(); }catch(e){}
     return availableTechs;
   }
   try{
@@ -906,6 +949,7 @@ async function loadAvailableTechs(){
   }
   populateTeknisiSelect();
   populateTechFilters();
+  try{ applyPreviewTeknisi(); }catch(e){}
   return availableTechs;
 }
 
@@ -1053,7 +1097,7 @@ function avatarUrlFor(name, foto){
 }
 function updateSidebarUser(){
   const u = localStorage.getItem('username') || 'Admin Toko';
-  const r = localStorage.getItem('role') || '';
+  const r = myActiveRole() || (localStorage.getItem('role') || '');
   const elU = document.getElementById('sidebar-username');
   const elR = document.getElementById('sidebar-role');
   const elA = document.getElementById('sidebar-avatar');
@@ -1967,9 +2011,17 @@ function clearAllSearch(){
   }
 }
 function switchView(view, clearSearch){
-  // teknisi tidak boleh buka modul pelanggan
-  if(isTeknisiMode() && (view==='pelanggan' || view==='tambah-pelanggan')){
-    showToast('⛔ Modul pelanggan khusus owner/admin/kasir');
+  // Guard role: teknisi hanya boleh modul kerjaan dia + sparepart/alat (read) + kas saya.
+  // Daftar blokir disamakan dengan applyRoleMenu agar tidak bisa diakses via console/stat-card.
+  const TEK_BLOCKED = new Set([
+    'pelanggan', 'tambah-pelanggan',
+    'service-masuk', 'inventory-tambah',
+    'transaksi-penjualan', 'transaksi-pembayaran', 'transaksi-pendapatan',
+    'laporan-service', 'laporan-penjualan',
+    'pengaturan', 'kelola-tim', 'approval-akun'
+  ]);
+  if(isTeknisiMode() && TEK_BLOCKED.has(view)){
+    showToast('⛔ Modul ini khusus owner/admin — akun teknisi hanya: kerjaan saya + sparepart + kas saya');
     return;
   }
   if(clearSearch) clearAllSearch();
@@ -2047,7 +2099,7 @@ function switchView(view, clearSearch){
 function statGoMasuk(){ switchView('semua-service'); const s=document.getElementById('filterStatusSemua'); if(s){ s.value=''; renderSemuaService(); } }
 function statGoProses(){ switchView('proses'); setDeadlineFilter('all'); statusFilter='all'; document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all')); renderKanban(); }
 function statGoSukses(){ switchView('semua-service'); setTimeout(()=>{ const s=document.getElementById('filterStatusSemua'); if(s){ s.value='Service Sukses'; renderSemuaService(); }},80); }
-function statGoPendapatan(){ switchView('laporan-penjualan'); }
+function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('laporan-penjualan'); }
 function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('overdue'),80); }
 function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
 function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
@@ -3313,6 +3365,38 @@ function populateTechFilters(){
 function applyTechFilter(list, techName){
   if(!techName) return list;
   return list.filter(d=>d.teknisi===techName);
+}
+// Owner preview beranda teknisi: login tetap owner (full akses),
+// tapi filter list dikunci ke 1 teknisi via ?teknisi=NAMA.
+// Dipanggil setelah populateTechFilters agar opsi sudah ada.
+function applyPreviewTeknisi(){
+  let name = '';
+  try{ name = new URLSearchParams(location.search).get('teknisi') || ''; }catch(e){}
+  name = String(name || '').trim();
+  if(!name) return false;
+  let canPreview = false;
+  try{ canPreview = window.BOSAuth ? window.BOSAuth.canManage() : ['superadmin','owner','admin'].includes(myActiveRole()); }catch(e){}
+  if(!canPreview) return false;
+  TECH_FILTER_IDS.forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    if([...sel.options].some(o=>o.value===name)) sel.value = name;
+  });
+  try{
+    const b = document.getElementById('previewBanner');
+    if(b) b.style.display = '';
+    const t = document.getElementById('previewTitle');
+    if(t) t.textContent = '👁 Preview: ' + name + ' (kamu tetap owner)';
+  }catch(e){}
+  try{ renderAll(); }catch(e){}
+  return true;
+}
+function exitPreviewTeknisi(){
+  try{
+    const u = new URL(location.href);
+    u.searchParams.delete('teknisi');
+    location.replace(u.pathname + (u.search ? '?' + u.searchParams.toString() : '') + u.hash);
+  }catch(e){ location.replace('index.html'); }
 }
 async function updateBiaya(invoice, newBiaya){
   const n = parseRupiah(String(newBiaya));

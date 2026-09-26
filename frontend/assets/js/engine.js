@@ -42,6 +42,15 @@ async function saveEngineSettings(){
 }
 
 function setLapTekTab(t){
+  // Guard: tab kas owner khusus owner/admin — teknisi pakai Kas Saya
+  try{
+    const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+      || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+    if(t === 'kas' && isTek){
+      t = 'performa';
+      try{ showToast('⛔ Buku kas khusus owner — kamu pakai Kas Saya'); }catch(e){}
+    }
+  }catch(e){}
   document.querySelectorAll('[data-laptek]').forEach(b=>b.classList.toggle('active', b.dataset.laptek===t));
   document.getElementById('lapTekPerforma').style.display = t==='performa'?'':'none';
   document.getElementById('lapTekKas').style.display = t==='kas'?'':'none';

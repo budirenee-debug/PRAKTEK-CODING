@@ -143,6 +143,20 @@ def _migrate_bayar():
         print("migrate bayar fail:", e)
 _migrate_bayar()
 
+def _migrate_sparepart_beli():
+    """Harga beli: tambah spareparts.harga_beli untuk DB lama (harga lama = harga jual)."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(spareparts)")).fetchall()]
+            if "harga_beli" not in cols:
+                conn.execute(text("ALTER TABLE spareparts ADD COLUMN harga_beli INTEGER DEFAULT 0"))
+                print("migrated: spareparts.harga_beli")
+            conn.commit()
+    except Exception as e:
+        print("migrate sparepart beli fail:", e)
+_migrate_sparepart_beli()
+
 def _migrate_profil():
     """Foto profil: tambah users.foto untuk DB lama."""
     try:

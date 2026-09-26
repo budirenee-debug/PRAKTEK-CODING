@@ -309,7 +309,8 @@ class SparepartBase(BaseModel):
     masuk: int = Field(default=0, ge=0)
     keluar: int = Field(default=0, ge=0)
     stok: Optional[int] = Field(default=None, ge=0)  # jika None auto = masuk - keluar
-    harga: int = Field(default=0, ge=0)
+    harga: int = Field(default=0, ge=0)  # harga JUAL
+    harga_beli: int = Field(default=0, ge=0)  # harga BELI/modal
     tgl: Optional[datetime.date] = None
 
     @field_validator('merk')
@@ -332,6 +333,7 @@ class SparepartUpdate(BaseModel):
     keluar: Optional[int] = Field(None, ge=0)
     stok: Optional[int] = Field(None, ge=0)
     harga: Optional[int] = Field(None, ge=0)
+    harga_beli: Optional[int] = Field(None, ge=0)
     tgl: Optional[datetime.date] = None
 
 class SparepartOut(SparepartBase):
