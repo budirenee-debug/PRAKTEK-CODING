@@ -293,6 +293,52 @@ class TechDebt(Base):
     created_at = Column(DateTime, default=func.now())
 
 
+class WorkAccident(Base):
+    """Kecelakaan kerja: unit/part rusak saat dikerjakan. Beban dibagi teknisi/toko/pelanggan."""
+    __tablename__ = "work_accidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    invoice = Column(String(20), nullable=True, index=True)  # service terkait
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    jenis = Column(String(30), default="part_rusak")  # part_rusak / komponen_pelanggan / catatan
+    kronologi = Column(Text, nullable=True)
+    part_pengganti = Column(String(120), nullable=True)
+    sumber_pengganti = Column(String(20), default="persediaan")  # persediaan / beli_luar
+    modal_pengganti = Column(Integer, default=0)
+    siapa_bayar = Column(String(20), default="toko")  # toko / pelanggan
+    beban_persen = Column(Integer, default=50)  # porsi teknisi (%) saat toko tanggung
+    beban_teknisi = Column(Integer, default=0)
+    beban_toko = Column(Integer, default=0)
+    nota_pelanggan = Column(Integer, default=0)  # tagihan ke pelanggan (0 jika toko tanggung)
+    status = Column(String(20), default="tercatat")  # tercatat / selesai
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Refund(Base):
+    """Refund dana klaim garansi. Sumber dana dari pendapatan hari itu, komisi dibalik."""
+    __tablename__ = "refunds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    kode = Column(String(30), nullable=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    invoice = Column(String(20), nullable=True, index=True)  # service klaim/root
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    alasan = Column(Text, nullable=True)
+    nominal = Column(Integer, default=0)
+    metode = Column(String(20), default="Tunai")  # Tunai / Transfer / QRIS
+    dari_pendapatan = Column(Integer, default=0)  # bagian dari omzet hari ini
+    jadi_pengeluaran = Column(Integer, default=0)  # sisayg kurang → catat pengeluaran
+    komisi_dibalik = Column(Integer, default=0)
+    status = Column(String(20), default="selesai")  # proses / selesai
+    catatan = Column(String(255), nullable=True)
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
 class CommissionLedger(Base):
     """Buku kas resmi. Sumber untuk Laporan Teknisi Tab2 & Kas Saya."""
     __tablename__ = "commission_ledgers"

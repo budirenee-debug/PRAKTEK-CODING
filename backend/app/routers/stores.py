@@ -161,6 +161,112 @@ def update_store(store_id: int, payload: schemas.StoreUpdate,
     return _store_to_out(db, s, role_saya=my_role)
 
 
+@router.get("/jaringan/ringkasan")
+def jaringan_ringkasan(db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Ringkasan per cabang untuk menu Kelola Cabang (owner/admin).
+    Hanya toko yang dianggarkan user — superadmin lihat semua. Tidak ada data lintas toko lain."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    # gate: hanya owner/admin/superadmin (bukan teknisi/kasir) — isinya angka keuangan
+    if current.role == "superadmin":
+        ok = True
+    else:
+        ok = any(m.role in ("owner", "admin") for m in _my_memberships(db, current))
+    if not ok:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh lihat ringkasan cabang")
+    today = datetime.now().date()
+    out = []
+    for s in user_stores(db, current):
+        if not s.get("is_active"):
+            continue
+        anggota = db.query(models.Membership).filter(
+            models.Membership.store_id == s["id"], models.Membership.is_active == True).all()
+        per_role = {}
+        for m in anggota:
+            per_role[m.role] = per_role.get(m.role, 0) + 1
+        svcs = db.query(models.Service).filter(models.Service.store_id == s["id"]).all()
+        SUKSES = ("Service Sukses", "Sudah Diambil", "Selesai")
+        sukses = [x for x in svcs if x.status in SUKSES]
+        proses = [x for x in svcs if x.status not in SUKSES + ("Service Failed", "Dibatalkan", "Garansi")]
+        hari_ini = len([x for x in sukses if str(x.diambil_at or "")[:10] == today.isoformat()])
+        parts = db.query(models.Sparepart).filter(models.Sparepart.store_id == s["id"]).all()
+        stok_nilai = sum(int(p.harga_beli or 0) * int(p.stok or 0) for p in parts)
+        stok_tipis = len([p for p in parts if int(p.stok or 0) <= 3])
+        refunds = db.query(models.Refund).filter(models.Refund.store_id == s["id"]).all() \
+            if hasattr(models, "Refund") else []
+        celaka = db.query(models.WorkAccident).filter(models.WorkAccident.store_id == s["id"]).all() \
+            if hasattr(models, "WorkAccident") else []
+        out.append({**s,
+                    "jumlah_anggota": len(anggota), "per_role": per_role,
+                    "jumlah_teknisi": per_role.get("teknisi", 0),
+                    "total_service": len(svcs), "total_sukses": len(sukses),
+                    "dalam_proses": len(proses), "sukses_hari_ini": hari_ini,
+                    "omzet": sum(int(x.biaya or 0) for x in sukses),
+                    "omzet_bulan_ini": sum(int(x.biaya or 0) for x in sukses
+                                           if str(x.diambil_at or x.date or "")[:7] == today.strftime("%Y-%m")),
+                    "jumlah_part": len(parts), "nilai_stok": stok_nilai, "stok_tipis": stok_tipis,
+                    "total_refund": sum(int(r.nominal or 0) for r in refunds),
+                    "total_kecelakaan": len(celaka),
+                    "beban_teknisi_kecelakaan": sum(int(a.beban_teknisi or 0) for a in celaka)})
+    total = {"cabang": len(out), "service": sum(o["total_service"] for o in out),
+             "sukses": sum(o["total_sukses"] for o in out), "proses": sum(o["dalam_proses"] for o in out),
+             "omzet": sum(o["omzet"] for o in out), "omzet_bulan_ini": sum(o["omzet_bulan_ini"] for o in out),
+             "anggota": sum(o["jumlah_anggota"] for o in out), "teknisi": sum(o["jumlah_teknisi"] for o in out),
+             "nilai_stok": sum(o["nilai_stok"] for o in out),
+             "refund": sum(o["total_refund"] for o in out),
+             "kecelakaan": sum(o["total_kecelakaan"] for o in out)}
+    return {"cabang": out, "total": total}
+
+
+@router.get("/manage/invites")
+def manage_invites(db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Semua kode undangan milik toko-toko yang dikelola user (untuk tab "Toko").
+    Ringkasan per toko + daftar kode lengkap dengan status aktif/terpakai/kadaluarsa."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    stores = [s for s in user_stores(db, current) if s.get("is_active")]
+    kelola = []
+    for s in stores:
+        try:
+            _require_store_manager(db, current, s["id"])
+            kelola.append(s)
+        except HTTPException:
+            continue
+    sekarang = datetime.utcnow()
+    rows, per_toko = [], []
+    for s in kelola:
+        invs = db.query(models.Invite).filter(
+            models.Invite.store_id == s["id"], models.Invite.kind == "member"
+        ).order_by(models.Invite.id.desc()).all()
+        aktif = dipakai = 0
+        for i in invs:
+            if i.is_used:
+                dipakai += 1
+                status = "terpakai"
+            elif i.expires_at and i.expires_at < sekarang:
+                status = "kadaluarsa"
+            else:
+                aktif += 1
+                status = "aktif"
+            out = _invite_to_out(db, i)
+            out["status"] = status
+            out["sisa_hari"] = (i.expires_at - sekarang).days if i.expires_at else None
+            out["link"] = f"register.html?invite={i.code}"
+            rows.append(out)
+        per_toko.append({"id": s["id"], "nama": s["nama"], "kode": s["kode"],
+                         "role_saya": s.get("role_saya"), "total": len(invs),
+                         "aktif": aktif, "terpakai": dipakai,
+                         "jumlah_anggota": db.query(models.Membership).filter(
+                             models.Membership.store_id == s["id"],
+                             models.Membership.is_active == True).count()})
+    rows.sort(key=lambda r: (r["status"] != "aktif", -(r["id"] or 0)))
+    return {"rows": rows, "toko": per_toko,
+            "total": {"kode": len(rows),
+                      "aktif": sum(t["aktif"] for t in per_toko),
+                      "terpakai": sum(t["terpakai"] for t in per_toko),
+                      "toko": len(per_toko)}}
+
+
 @router.get("/{store_id}/members", response_model=list[schemas.MembershipOut])
 def list_members(store_id: int, db: Session = Depends(get_db), current=Depends(get_current_user)):
     if not current:

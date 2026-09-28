@@ -103,6 +103,71 @@ def ensure_engine_row(db: Session, svc: models.Service, kategori_manual, harga_u
     return row
 
 
+def apply_teknisi_beban(db: Session, store_id: int, tech: models.Technician, total: int,
+                        persen: int = 50, sebab: str = "kelalaian", invoice: str = None,
+                        label: str = "Nombok"):
+    """Bagi beban_my ke teknisi sesuai persen + proteksi junior 1x/bulan.
+    Tulis TechDebt (biar cicilan 20% jalan) + CommissionLedger (biar muncul di Kas Saya).
+    Return dict: beban_teknisi, beban_toko, proteksi, debt_id."""
+    total = int(total or 0)
+    persen = max(0, min(100, int(persen or 0)))
+    beban_teknisi = total * persen // 100
+    beban_toko = total - beban_teknisi
+    proteksi = False
+    sett = get_settings(db, store_id)
+    if beban_teknisi > 0 and (tech.level or "junior") == "junior":
+        # junior: 1x/bulan kalau rp-nya <= toleransi_junior_rp → ditanggung toko 100%
+        today = datetime.date.today()
+        awal = datetime.datetime(today.year, today.month, 1)
+        used = db.query(models.TechDebt).filter(
+            models.TechDebt.technician_id == tech.id,
+            models.TechDebt.created_at >= awal,
+            models.TechDebt.beban_teknisi == 0,
+            models.TechDebt.beban_toko > 0).count()
+        if used == 0 and total <= (sett.toleransi_junior_rp or 100000):
+            beban_teknisi = 0
+            beban_toko = total
+            proteksi = True
+    debt = None
+    if beban_teknisi > 0:
+        debt = models.TechDebt(store_id=store_id, technician_id=tech.id, invoice_penyebab=invoice,
+                               total_rugi=total, beban_teknisi=beban_teknisi,
+                               beban_toko=beban_toko, sudah_dicicil=0, sisa=beban_teknisi,
+                               sebab=sebab, status="belum")
+        db.add(debt)
+        db.commit()
+        db.refresh(debt)
+        db.add(models.CommissionLedger(
+            store_id=store_id, technician_id=tech.id, tanggal=datetime.date.today(),
+            invoice=invoice, tipe="hutang_baru", masuk_rp=0, keluar_rp=0,
+            sisa_hutang_saat_itu=beban_teknisi,
+            keterangan=f"{label} {invoice or ''} beban Rp{beban_teknisi} "
+                       f"cicil max {sett.cicilan_max_pct}%"))
+    else:
+        db.add(models.CommissionLedger(
+            store_id=store_id, technician_id=tech.id, tanggal=datetime.date.today(),
+            invoice=invoice, tipe="toleransi_toko", masuk_rp=0, keluar_rp=0,
+            sisa_hutang_saat_itu=0,
+            keterangan=f"{label} {invoice or ''} Rp{total} ditanggung toko 100%"))
+    db.commit()
+    return {"beban_teknisi": beban_teknisi, "beban_toko": beban_toko,
+            "proteksi": proteksi, "debt_id": debt.id if debt else None}
+
+
+def cek_penghasilan_hari_ini(db: Session, store_id: int):
+    """Omzet service yang sudah cair HARI INI (dasar sumber dana refund)."""
+    today = datetime.date.today()
+    rows = db.query(models.Service).filter(
+        models.Service.store_id == store_id,
+        models.Service.status.in_(["Service Sukses", "Sudah Diambil", "Selesai"])).all()
+    total = 0
+    for s in rows:
+        d = str(s.diambil_at or s.updated_at or s.date or "")[:10]
+        if d == today.isoformat():
+            total += int(s.biaya or 0)
+    return total
+
+
 def cairkan(db: Session, svc: models.Service, actor=None):
     """CAIR saat Sudah Diambil. Hitung ulang jasa/komisi, potong hutang max 20%, tulis ledger. Idempotent."""
     row = db.query(models.ServiceEngine).filter(models.ServiceEngine.invoice == svc.invoice).first()

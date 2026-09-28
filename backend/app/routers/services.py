@@ -98,6 +98,9 @@ def create_service(
         crud.attach_engine(db, svc)
     except Exception:
         pass
+    log_action(db, "service.create", target=svc.invoice,
+               detail=f"{svc.device} • {svc.nama} • biaya {svc.biaya} • teknisi {svc.teknisi or '-'} • kategori {kat}",
+               actor=current, store_id=store.id)
     return svc
 
 @router.patch("/{invoice}", response_model=schemas.ServiceOut)
@@ -133,9 +136,29 @@ def update_service(
             raise
         except Exception:
             pass
+    # Snapshot nilai LAMA dulu (setelah crud.update_service objek yang sama berubah,
+    # jadi harus diambil sebelum update agar diff harga tidak kosong).
+    jejak = {k: getattr(existing, k, None) for k in
+             ("biaya", "teknisi", "status", "hasil", "metode_bayar", "device", "imei",
+              "garansi_hari", "garansi_sampai", "diambil_oleh", "keterangan")}
     svc = crud.update_service(db, invoice, payload)
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    # Jejak anti-fraud: catat apa yang berubah + harga lama -> baru (penting untuk sadly)
+    try:
+        berubah = []
+        for k, lama in jejak.items():
+            baru = getattr(svc, k, None)
+            if k == "biaya":
+                if int(lama or 0) != int(baru or 0):
+                    berubah.append(f"harga {lama} -> {baru}")
+            elif lama != baru:
+                berubah.append(f"{k} {lama} -> {baru}")
+        if berubah:
+            log_action(db, "service.update_harga" if any(x.startswith('harga') for x in berubah) else "service.update",
+                       target=svc.invoice, detail="; ".join(berubah)[:480], actor=current, store_id=_sid(store))
+    except Exception as e:
+        print("audit service.update fail:", e)
     # Business Engine: CAIR jika status berubah jadi Sudah Diambil via PATCH
     try:
         data_status = payload.model_dump(exclude_unset=True).get("status")
@@ -174,6 +197,7 @@ def update_status(
     scope = _teknisi_scope(db, current, store)
     if scope is not None and not is_own_or_free(svc.teknisi, scope):
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    status_lama = svc.status
     svc.status = status
     # tgl pengambilan: dicatat persis saat jadi Sukses/Sudah Diambil
     if status in ("Sudah Diambil", "Service Sukses", "Selesai"):
@@ -186,6 +210,11 @@ def update_status(
             pass
     db.commit()
     db.refresh(svc)
+    log_action(db, "service.status", target=svc.invoice,
+               detail=f"{svc.status} <- {status_lama} • oleh {getattr(current, 'username', '?')}"
+                      + (f" • ambil oleh {svc.diambil_oleh}" if svc.diambil_oleh else "")
+                      + (f" • bayar {svc.metode_bayar}" if svc.metode_bayar else ""),
+               actor=current, store_id=_sid(store))
     # Business Engine: CAIR hanya saat Sudah Diambil (Sukses masih PENDING)
     if status == "Sudah Diambil":
         try:
@@ -291,4 +320,8 @@ def delete_service(
     ok = crud.delete_service(db, invoice)
     if not ok:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    log_action(db, "service.hapus", target=invoice,
+               detail=f"Hapus service {svc.device} • {svc.nama} • biaya {svc.biaya} • status {svc.status}"
+                      f" • teknisi {svc.teknisi or '-'}",
+               actor=current, store_id=_sid(store))
     return {"message": f"{invoice} dihapus"}

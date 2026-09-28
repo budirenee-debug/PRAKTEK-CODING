@@ -7,11 +7,13 @@
   <meta name="description" content="Dashboard owner BOS SERVICE: pengaturan toko, laporan keuangan teknisi & sparepart, kelola tim. Owner/admin only.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=ambil3">
+  <link rel="stylesheet" href="assets/css/style.css?v=black1">
   <link rel="stylesheet" href="assets/css/bos.css?v=mobile1">
   <style>
     html.guard-lock body{visibility:hidden}
-    .menu-item.active{background:#04074a;color:#fff}
+    /* menu aktif mengikuti tema sidebar hitam (lihat style.css) */
+    .menu-item.active{background:#fafafa;color:#0a0a0b;border-color:#fafafa;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+    .menu-item.active .mi{background:#0a0a0b;color:#fafafa}
     .view{display:none}
     .view.active{display:block}
     .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
@@ -44,6 +46,41 @@
       .sidebar-overlay.show{display:block}
     }
     .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:55}
+    .ownDemoNote{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:9px 12px;font-size:12px;margin-bottom:10px}
+    .demo-on{color:#92400e;background:#fde68a;border-radius:6px;padding:1px 6px;font-size:10.5px;font-weight:700}
+    /* ---- LOG ANTI-FRAUD: daftar padat, 1 baris = 1 aksi ---- */
+    #ownWrap .af-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+    #ownWrap .af-filters input,#ownWrap .af-filters select{padding:6px 8px;border:1px solid #ececec;border-radius:8px;font-size:12px;background:#fff}
+    #ownWrap .af-filters input{min-width:150px}
+    .af-active{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:11.5px}
+    .af-chip{display:inline-flex;align-items:center;gap:5px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:20px;padding:3px 6px 3px 9px;font-size:11.5px;font-weight:600}
+    .af-chip b{font-weight:700}
+    .af-chip button{border:0;background:#c7d2fe;color:#3730a3;border-radius:50%;width:16px;height:16px;line-height:1;cursor:pointer;font-size:11px;padding:0}
+    .af-chip button:hover{background:#3730a3;color:#fff}
+    .af-list{border:1px solid #ececec;border-radius:12px;overflow:hidden;background:#fff}
+    .af-day{background:#f9fafb;border-bottom:1px solid #ececec;padding:5px 10px;font-size:10.5px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px}
+    .af-row{display:grid;grid-template-columns:44px 20px 1fr auto;gap:8px;align-items:center;padding:5px 10px;border-bottom:1px solid #f4f4f5;font-size:12px;line-height:1.35}
+    .af-row:last-child{border-bottom:0}
+    .af-row:hover{background:#fafafa}
+    .af-row.ttinggi{background:#fff5f5}
+    .af-row.ttinggi:hover{background:#fee2e2}
+    .af-row .t{font-size:11px;color:#9ca3af;font-variant-numeric:tabular-nums}
+    .af-row .i{font-size:13px;text-align:center}
+    .af-row .m{min-width:0}
+    .af-row .lbl{font-weight:600;color:#111827}
+    .af-row .det{color:#6b7280;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .af-row .tgt{color:#4b5563;font-size:11px}
+    .af-row .who{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;white-space:nowrap}
+    .af-row .who b{color:#111827;font-weight:600;cursor:pointer;text-decoration:underline dotted}
+    .af-row .who b:hover{color:#04074a}
+    .af-flag{background:#fee2e2;color:#b91c1c;border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap}
+    .af-actor-pill{display:inline-flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:20px;padding:2px 8px;font-size:11px;cursor:pointer}
+    .af-actor-pill:hover{background:#e5e7eb}
+    .af-actor-pill.on{background:#04074a;color:#fff;border-color:#04074a}
+    @media(max-width:860px){
+      .af-row{grid-template-columns:38px 18px 1fr;row-gap:2px}
+      .af-row .who{grid-column:3/4;white-space:normal}
+    }
   </style>
   <script>
   (function(){
@@ -70,7 +107,7 @@
         </div>
         <div class="store-switch" style="padding:8px 12px 0">
           <label for="ownStoreSel" style="font-size:10.5px;color:#9aa0a6;display:block;margin-bottom:4px">🏪 Toko aktif</label>
-          <select id="ownStoreSel" onchange="ownSwitchStore(this.value)" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid #2a2c2f;background:#1b1d1f;color:#e5e7eb;font-size:12px;outline:0"></select>
+          <select id="ownStoreSel" onchange="ownSwitchStore(this.value)" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid #26262b;background:#131316;color:#e4e4e7;font-size:12px;outline:0"></select>
         </div>
         <nav class="menu">
           <button class="menu-item active" data-own="ringkas" onclick="ownShow('ringkas')">
@@ -78,7 +115,7 @@
           </button>
           <div class="menu-category">KEUANGAN</div>
           <button class="menu-item" data-own="keuangan" onclick="ownShow('keuangan')">
-            <span class="mi">💰</span> Keuangan Teknisi
+            <span class="mi">💰</span> Keuangan
           </button>
           <button class="menu-item" data-own="finsukses" onclick="ownShow('finsukses')">
             <span class="mi">✅</span> Pendapatan Sukses
@@ -96,12 +133,15 @@
           <button class="menu-item" data-own="inventori" onclick="ownShow('inventori')">
             <span class="mi">◈</span> Inventori
           </button>
-          <div class="menu-category">TOKO</div>
+          <div class="menu-category">KONTROL</div>
           <button class="menu-item" data-own="toko" onclick="ownShow('toko')">
             <span class="mi">🏪</span> Profil Toko
           </button>
           <button class="menu-item" data-own="engine" onclick="ownShow('engine')" id="menu-engine">
             <span class="mi">⚙</span> Aturan Engine
+          </button>
+          <button class="menu-item" data-own="antifraud" onclick="ownShow('antifraud')">
+            <span class="mi">🛡️</span> Log Anti-fraud
           </button>
           <button class="menu-item" data-own="tim" onclick="ownShow('tim')">
             <span class="mi">👥</span> Kelola Tim
@@ -255,25 +295,176 @@
           </div>
         </section>
 
-        <!-- KEUANGAN TEKNISI: semua tampil + skoring, tanpa dropdown -->
+        <!-- KEUANGAN: sub-tab Kas Teknisi / Kecelakaan Kerja / Refund Dana -->
         <section class="view" id="view-own-keuangan">
+          <div class="tabs" style="margin-bottom:12px">
+            <button class="tab active" data-ownkeu="kas" onclick="ownKeuTab('kas')">💰 Kas Teknisi</button>
+            <button class="tab" data-ownkeu="celaka" onclick="ownKeuTab('celaka')">🛠 Kecelakaan Kerja</button>
+            <button class="tab" data-ownkeu="refund" onclick="ownKeuTab('refund')">💸 Refund Dana</button>
+          </div>
+
+          <div id="ownKeuPanel-kas">
+          <div class="tabs" style="margin-bottom:12px">
+            <button class="tab active" data-ownpot="all" onclick="ownPotonganTab('all')">📊 Semua Teknisi</button>
+            <button class="tab" data-ownpot="kas" onclick="ownPotonganTab('kas')">📄 Rincian Kas</button>
+            <button class="tab" data-ownpot="pot" onclick="ownPotonganTab('pot')">✂️ Potongan</button>
+          </div>
+
+          <div id="ownPotPanel-all">
+          <div id="kasDemoNote" class="ownDemoNote" style="display:none"></div>
           <div class="card">
             <div class="card-head toolbar">
               <div class="toolbar-left"><h3>💰 Keuangan Semua Teknisi</h3><span class="muted">Klik baris untuk rincian • peringkat by komisi cair</span></div>
               <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownKasAll()">↻</button></div>
             </div>
             <div class="stats" style="margin-bottom:10px">
-              <div class="stat-card"><div class="stat-head"><span>Total Komisi Cair</span></div><h3 id="kasAllKomisi">-</h3><p class="trend">semua teknisi</p></div>
+              <div class="stat-card"><div class="stat-head"><span>Total Komisi Cair</span></div><h3 id="kasAllKomisi">-</h3><p class="trend">sudah dipotong cicilan</p></div>
               <div class="stat-card"><div class="stat-head"><span>Total Uang Hadir</span></div><h3 id="kasAllHadir">-</h3><p class="trend">semua teknisi</p></div>
-              <div class="stat-card" style="border-left:4px solid #ef4444"><div class="stat-head"><span>Total Hutang</span></div><h3 id="kasAllHutang" style="color:#ef4444">-</h3><p class="trend">aktif</p></div>
+              <div class="stat-card" style="border-left:4px solid #b45309"><div class="stat-head"><span>Total Potongan</span></div><h3 id="kasAllPotongan" style="color:#b45309">-</h3><p class="trend">cicilan hutang + refund</p></div>
+              <div class="stat-card" style="border-left:4px solid #ef4444"><div class="stat-head"><span>Total Hutang</span></div><h3 id="kasAllHutang" style="color:#ef4444">-</h3><p class="trend">belum dicicil</p></div>
             </div>
-            <div class="table-wrap"><table class="table compact"><thead><tr><th style="text-align:center">#</th><th>Teknisi</th><th style="text-align:right">Komisi</th><th style="text-align:right">Hadir</th><th style="text-align:right">Hutang</th><th style="text-align:right">Total</th><th>Skor</th></tr></thead><tbody id="tbodyKasAll"><tr><td colspan="7" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th style="text-align:center">#</th><th>Teknisi</th><th style="text-align:right">Komisi</th><th style="text-align:right">Hadir</th><th style="text-align:right">Potongan</th><th style="text-align:right">Hutang</th><th style="text-align:right">Total</th><th>Skor</th></tr></thead><tbody id="tbodyKasAll"><tr><td colspan="8" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Komisi = komisi bruto (sebelum dipotong). Potongan = cicilan hutang + komisi refund yang dibalik. <strong>Total = Komisi − Potongan + Hadir</strong>. Hutang = sisa yang belum dicicil (bakal dipotong dari komisi berikutnya).</p>
           </div>
+          </div>
+
+          <div id="ownPotPanel-kas" style="display:none">
           <div class="card">
             <div class="card-head toolbar">
-              <div class="toolbar-left"><h3>📄 Rincian Kas</h3><span class="muted" id="kasDetailName">Pilih teknisi di tabel atas</span></div>
+              <div class="toolbar-left"><h3>📄 Rincian Kas per Teknisi</h3><span class="muted" id="kasDetailName">Pilih teknisi di tab Semua Teknisi</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownKasAll()">↻</button></div>
             </div>
-            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasTeknisi"><tr><td colspan="6" style="text-align:center">Belum ada teknisi dipilih</td></tr></tbody></table></div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasTeknisi"><tr><td colspan="6" style="text-align:center">Pilih teknisi di tab Semua Teknisi</td></tr></tbody></table></div>
+          </div>
+          </div>
+
+          <div id="ownPotPanel-pot" style="display:none">
+            <div id="potDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>✂️ Potongan</h3><span class="muted">Semua pengurangan dari buku kas teknisi</span></div>
+                <div class="toolbar-right">
+                  <select id="potTeknisi" onchange="ownPotongan()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select>
+                  <select id="potTipe" onchange="ownPotongan()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Jenis</option><option value="potongan_cicilan">Cicilan hutang</option><option value="refund_balik">Refund dibalik</option><option value="lainnya">Lainnya</option></select>
+                  <button class="btn btn-ghost small" onclick="ownPotongan()">↻</button>
+                </div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Potongan</span></div><h3 id="potTotal" style="color:#dc2626">-</h3><p class="trend" id="potTotalSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Cicilan Hutang</span></div><h3 id="potCicil">-</h3><p class="trend">auto potong dari komisi</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Refund Dibalik</span></div><h3 id="potRefund">-</h3><p class="trend">komisi dikurangi</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Sisa Hutang Belum Lunas</span></div><h3 id="potSisa">-</h3><p class="trend">akan dicicil berikutnya</p></div>
+              </div>
+              <div id="potTopList" style="font-size:12.5px;color:#4b5563;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 14px;margin-bottom:10px"></div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th>Tanggal</th><th>Teknisi</th><th>Invoice</th><th>Jenis Potongan</th><th style="text-align:right">Nominal</th><th style="text-align:right">Sisa Hutang</th><th>Keterangan</th></tr></thead>
+                  <tbody id="tbodyPotongan"><tr><td colspan="7" style="text-align:center">Belum ada data</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <!-- SUB-TAB: KECELAKAHAAN KERJA -->
+          <div id="ownKeuPanel-celaka" style="display:none">
+            <div id="celakaDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>🛠 Kecelakaan Kerja</h3><span class="muted">Unit/part rusak saat dikerjakan • beban teknisi dicicil max 20%</span></div>
+                <div class="toolbar-right">
+                  <select id="celakaStatus" onchange="ownAccidents()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Status</option><option value="tercatat">Tercatat</option><option value="selesai">Selesai</option></select>
+                  <button class="btn btn-ghost small" onclick="ownAccidents()">↻</button>
+                  <button class="btn btn-dark small" onclick="ownCelakaOpen()">+ Catat Kecelakaan</button>
+                </div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Kerugian</span></div><h3 id="celRugi" style="color:#dc2626">-</h3><p class="trend" id="celRugiSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Beban Toko</span></div><h3 id="celToko">-</h3><p class="trend">toko tanggung</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Beban Teknisi</span></div><h3 id="celTeknisi">-</h3><p class="trend" id="celTeknisiSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Tagihan Pelanggan</span></div><h3 id="celPelanggan">-</h3><p class="trend">tempo pelanggan</p></div>
+              </div>
+              <div id="celakaNote" style="display:none;font-size:12.5px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:12px;padding:10px 14px;margin-bottom:10px"></div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th>Tanggal</th><th>Invoice</th><th>Teknisi</th><th>Kronologi</th><th>Pengganti</th><th style="text-align:right">Modal</th><th style="text-align:right">Beban Teknisi</th><th style="text-align:right">Beban Toko</th><th style="text-align:right">Pelanggan</th><th style="text-align:center">Status</th><th style="text-align:center">Aksi</th></tr></thead>
+                  <tbody id="tbodyCelaka"><tr><td colspan="11" style="text-align:center">Belum ada data</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB: REFUND DANA -->
+          <div id="ownKeuPanel-refund" style="display:none">
+            <div id="refundDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>💸 Refund Dana</h3><span class="muted">Klaim garansi gagal • komisi teknisi dibalik proporsional</span></div>
+                <div class="toolbar-right">
+                  <button class="btn btn-ghost small" onclick="ownRefunds()">↻</button>
+                  <button class="btn btn-dark small" onclick="ownRefundOpen()">+ Catat Refund</button>
+                </div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Refund</span></div><h3 id="refTotal" style="color:#dc2626">-</h3><p class="trend" id="refTotalSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Dari Omzet Hari Ini</span></div><h3 id="refDari">-</h3><p class="trend">dipotong dari pendapatan</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Jadi Pengeluaran</span></div><h3 id="refKeluar">-</h3><p class="trend">omzet kurang → kas keluar</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Komisi Dibalik</span></div><h3 id="refKomisi">-</h3><p class="trend">potong dari teknisi</p></div>
+              </div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th>Kode</th><th>Tanggal</th><th>Invoice</th><th>Pelanggan</th><th>Teknisi</th><th>Alasan</th><th style="text-align:right">Nominal</th><th>Bayar</th><th style="text-align:right">Dari Omzet</th><th style="text-align:right">Jadi Keluar</th><th style="text-align:right">Komisi Balik</th><th style="text-align:center">Aksi</th></tr></thead>
+                  <tbody id="tbodyRefund"><tr><td colspan="12" style="text-align:center">Belum ada data</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL: Kecelakaan Kerja -->
+          <div class="modal" id="celakaModal">
+            <div class="modal-box" style="max-width:620px">
+              <button class="modal-close" onclick="ownCelakaClose()">×</button>
+              <h3 style="margin-bottom:4px">🛠 Catat Kecelakaan Kerja</h3>
+              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Unit atau komponen rusak saat dikerjakan. Pilih siapa yang menanggung — beban teknisi otomatis jadi hutang (cicil max 20% komisi).</p>
+              <form id="celakaForm" onsubmit="ownCelakaSave(event)">
+                <div class="form-grid">
+                  <div class="field"><label>Teknisi (pelaku) *</label><select id="cel-teknisi" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="">Pilih teknisi</option></select></div>
+                  <div class="field"><label>Invoice Service</label><input id="cel-invoice" list="celInvoiceList" placeholder="opsional"><datalist id="celInvoiceList"></datalist></div>
+                  <div class="field"><label>Jenis Kejadian *</label><select id="cel-jenis" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="part_rusak">Part toko yang rusak</option><option value="komponen_pelanggan">Komponen asli pelanggan ikut rusak</option><option value="catatan">Catatan saja (tanpa kerugian)</option></select></div>
+                  <div class="field"><label>Tanggal</label><input id="cel-tanggal" type="date"></div>
+                  <div class="field" style="grid-column:1/-1"><label>Kronologi *</label><textarea id="cel-kronologi" rows="2" required placeholder="Contoh: LCD pelanggan ikut pecah saat bongkar baterai"></textarea></div>
+                  <div class="field"><label>Part Pengganti</label><input id="cel-part" placeholder="LCD Samsung A52"></div>
+                  <div class="field"><label>Sumber Pengganti</label><select id="cel-sumber" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="persediaan">Ambil dari Persediaan</option><option value="beli_luar">Beli luar</option></select></div>
+                  <div class="field"><label>Modal Pengganti (Rp) *</label><input id="cel-modal" type="number" min="0" required placeholder="600000" oninput="ownCelakaPreview()"><span id="cel-modalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                  <div class="field"><label>Siapa Bayar?</label><select id="cel-bayar" onchange="ownCelakaPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="toko">Toko tanggung</option><option value="pelanggan">Pelanggan bayar</option></select></div>
+                  <div class="field" id="cel-persenWrap"><label>Porsi Beban Teknisi</label><select id="cel-persen" onchange="ownCelakaPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="0">0% — semua toko</option><option value="25">25%</option><option value="50" selected>50% — default</option><option value="75">75%</option><option value="100">100% — semua teknisi</option></select><span style="font-size:11px;color:#8a8f98">Junior terproteksi 1×/bulan (ditanggung toko)</span></div>
+                </div>
+                <div id="cel-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownCelakaClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Kecelakaan</button></div>
+              </form>
+            </div>
+          </div>
+
+          <!-- MODAL: Refund Dana -->
+          <div class="modal" id="refundModal">
+            <div class="modal-box" style="max-width:620px">
+              <button class="modal-close" onclick="ownRefundClose()">×</button>
+              <h3 style="margin-bottom:4px">💸 Catat Refund Dana</h3>
+              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Klaim garansi tidak bisa diperbaiki. Nominal diambil dari omzet hari ini; komisi teknisi dibalik proporsional.</p>
+              <form id="refundForm" onsubmit="ownRefundSave(event)">
+                <div class="form-grid">
+                  <div class="field"><label>Invoice Service *</label><input id="ref-invoice" list="refInvoiceList" required placeholder="ketik nomor nota"><datalist id="refInvoiceList"></datalist></div>
+                  <div class="field"><label>Nominal Refund (Rp) *</label><input id="ref-nominal" type="number" min="1" required placeholder="450000" oninput="ownRefundPreview()"><span id="ref-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                  <div class="field"><label>Metode Bayar *</label><select id="ref-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
+                  <div class="field"><label>Tanggal</label><input id="ref-tanggal" type="date"></div>
+                  <div class="field" style="grid-column:1/-1"><label>Alasan (wajib) *</label><textarea id="ref-alasan" rows="2" required placeholder="Contoh: IC display rusak, tidak bisa diperbaiki"></textarea></div>
+                  <div class="field" style="grid-column:1/-1"><label>Catatan</label><input id="ref-catatan" placeholder="Opsional"></div>
+                  <div class="field" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500"><input type="checkbox" id="ref-tutup" checked style="width:15px;height:15px"> Tutup klaim garansi jadi <strong>Service Failed</strong></label></div>
+                </div>
+                <div id="ref-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownRefundClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Refund</button></div>
+              </form>
+            </div>
           </div>
         </section>
 
@@ -490,20 +681,148 @@
           </div>
         </section>
 
-        <!-- TIM -->
-        <section class="view" id="view-own-tim">
+        <!-- LOG ANTI-FRAUD -->
+        <section class="view" id="view-own-antifraud">
           <div class="card">
             <div class="card-head toolbar">
-              <div class="toolbar-left"><h3>👥 Kelola Tim</h3><span class="muted">Invite + anggota toko aktif</span></div>
-              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownTeam()">↻ Refresh</button></div>
+              <div class="toolbar-left"><h3>🛡️ Log Anti-fraud</h3><span class="muted" id="afTokoLine">Jejak setiap aksi di toko ini</span></div>
+              <div class="toolbar-right">
+                <span class="count-pill" id="afCount">0</span>
+                <button class="btn btn-ghost small" onclick="ownAfReset()">↺ Reset</button>
+                <button class="btn btn-ghost small" onclick="ownAntifraud()">↻</button>
+              </div>
             </div>
-            <div class="form-grid" style="margin-bottom:12px">
-              <div class="field"><label>Role</label><select id="teamInviteRole"><option value="kasir">Kasir</option><option value="teknisi">Teknisi</option><option value="admin">Admin</option></select></div>
-              <div class="field"><label>Berlaku</label><select id="teamInviteExpiry"><option value="30">30 hari</option><option value="7">7 hari</option><option value="1">1 hari</option><option value="0">Tanpa batas</option></select></div>
-              <div class="field"><label>&nbsp;</label><button class="btn btn-dark" onclick="ownCreateInvite()">Buat Kode →</button></div>
+            <div class="af-filters">
+              <select id="afLevel" onchange="ownAfFilterChange()"><option value="">Semua level</option><option value="tinggi">🔴 Janggal</option><option value="normal">⚪ Normal</option></select>
+              <select id="afActor"><option value="">Semua pelaku</option></select>
+              <select id="afPola"><option value="">Semua jenis</option></select>
+              <input id="afSince" type="date" title="Sejak tanggal">
+              <input id="afQ" placeholder="cari aksi / target / catatan..." oninput="ownAfFilterChange()">
+              <span style="flex:1"></span>
+              <label style="font-size:11.5px;color:#4b5563;display:flex;align-items:center;gap:5px;cursor:pointer">
+                <input type="checkbox" id="afOnlyTinggi" onchange="ownAfFilterChange()" style="width:14px;height:14px"> hanya janggal
+              </label>
             </div>
-            <div id="teamInviteResult" style="font-size:12px;color:#065f46;margin-bottom:10px"></div>
-            <div class="table-wrap"><table class="table"><thead><tr><th>Username</th><th>Role di Toko</th><th>Status</th><th style="text-align:center">Lihat</th></tr></thead><tbody id="tbodyTeam"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div class="af-active" id="afActive" style="display:none"></div>
+            <div id="afPolaBar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card"><div class="stat-head"><span>Total Aktivitas</span></div><h3 id="afTotal">-</h3><p class="trend" id="afTotalSub">-</p></div>
+              <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Janggal</span></div><h3 id="afTinggi" style="color:#dc2626">-</h3><p class="trend">hapus • harga • refund • nombok</p></div>
+              <div class="stat-card"><div class="stat-head"><span>Normal</span></div><h3 id="afNormal">-</h3><p class="trend">rutin harian</p></div>
+            </div>
+            <div id="afInfo" style="font-size:11.5px;color:#8a8f98;margin-bottom:8px">
+              🔐 Log tidak bisa dihapus dari dashboard — hanya superadmin lewat database.
+            </div>
+            <div id="afDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="af-list" id="afList"><div style="padding:18px;text-align:center;color:#8a8f98;font-size:12px">Memuat...</div></div>
+            <div id="afPager" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:11.5px;color:#8a8f98">
+              <span id="afPageInfo">-</span>
+              <span style="display:flex;gap:6px">
+                <button class="btn btn-ghost small" onclick="ownAfPage(-1)">← Sebelumnya</button>
+                <button class="btn btn-ghost small" onclick="ownAfPage(1)">Lanjut →</button>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- TIM -->
+        <section class="view" id="view-own-tim">
+          <div class="tabs" style="margin-bottom:12px">
+            <button class="tab active" data-owntim="tim" onclick="ownTimTab('tim')">👥 Anggota & Kode Undangan</button>
+            <button class="tab" data-owntim="cabang" onclick="ownTimTab('cabang')">🏬 Kelola Cabang</button>
+          </div>
+
+          <div id="ownTimPanel-tim">
+            <div id="tokoDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>👥 Anggota & Kode Undangan</h3><span class="muted" id="tkCtxLine">Kode undangan, anggota & stat — semua mengikuti toko tujuan di bawah</span></div>
+                <div class="toolbar-right">
+                  <button class="btn btn-ghost small" onclick="ownTimMuatUlang()">↻</button>
+                </div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-head"><span>Anggota Toko Ini</span></div><h3 id="tkAnggota">-</h3><p class="trend" id="tkAnggotaSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Kode Aktif</span></div><h3 id="tkAktif" style="color:#059669">-</h3><p class="trend">siap dibagikan</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Sudah Terpakai</span></div><h3 id="tkTerpakai">-</h3><p class="trend">sudah mendaftar</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Total Kode</span></div><h3 id="tkTotal">-</h3><p class="trend">toko ini</p></div>
+              </div>
+
+              <div class="card form-card" style="box-shadow:none;border:1px solid #ececec;margin-bottom:14px">
+                <div class="card-head"><h3>Buat Kode Undangan</h3></div>
+                <div class="form-grid">
+                  <div class="field"><label>Toko Tujuan *</label><select id="invToko" onchange="ownTokoGantiToko()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="">Pilih toko…</option></select><span style="font-size:11px;color:#8a8f98">kode, anggota & stat di bawah ikut toko ini</span></div>
+                  <div class="field"><label>Peran</label><select id="invRole" onchange="ownInvPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="teknisi">Teknisi</option><option value="kasir">Kasir</option><option value="admin">Admin</option></select></div>
+                  <div class="field"><label>Berlaku</label><select id="invDays" onchange="ownInvPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="30">30 hari</option><option value="7">7 hari</option><option value="1">1 hari</option><option value="0">Tanpa batas</option></select></div>
+                  <div class="field"><label>Jumlah Kode</label><input id="invJumlah" type="number" min="1" max="10" value="1" onchange="ownInvPreview()"></div>
+                </div>
+                <div id="invPreview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                <div class="form-actions"><button type="button" class="btn btn-dark" onclick="ownBuatKode()">Buat Kode →</button></div>
+              </div>
+
+              <div class="toolbar" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <strong style="font-size:13px">🔑 Kode Undangan</strong>
+                <span class="muted" style="font-size:11.5px">klik Salin untuk mengambil link, ✕ untuk membatalkan</span>
+                <span style="flex:1"></span>
+                <select id="invFilterStatus" onchange="ownTokoFilter()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua status</option><option value="aktif">🟢 Aktif</option><option value="terpakai">🔵 Terpakai</option><option value="kadaluarsa">⚫ Kadaluarsa</option></select>
+              </div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th style="width:130px">Kode</th><th style="width:80px">Peran</th><th style="width:110px">Status</th><th style="width:100px">Berlaku</th><th>Dipakai Oleh</th><th style="text-align:center">Aksi</th></tr></thead>
+                  <tbody id="tbodyTokoKode"><tr><td colspan="6" style="text-align:center">Memuat...</td></tr></tbody>
+                </table>
+              </div>
+
+              <div class="toolbar" style="display:flex;align-items:center;gap:8px;margin:16px 0 8px">
+                <strong style="font-size:13px">👤 Anggota toko ini</strong>
+                <span class="muted" style="font-size:11.5px" id="tkAnggotaNote">-</span>
+              </div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th>Username</th><th style="width:120px">Peran</th><th style="width:110px">Status</th><th style="text-align:center;width:150px">Lihat</th></tr></thead>
+                  <tbody id="tbodyTeam"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="ownTimPanel-cabang" style="display:none">
+            <div id="cabangDemoNote" class="ownDemoNote" style="display:none"></div>
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>🏪 Kelola Cabang</h3><span class="muted">Semua toko/cabang yang bisa kamu akses</span></div>
+                <div class="toolbar-right">
+                  <button class="btn btn-ghost small" onclick="ownJaringan()">↻ Refresh</button>
+                  <button class="btn btn-dark small" onclick="ownCabangForm(true)">+ Cabang Baru</button>
+                </div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-head"><span>Jumlah Cabang</span></div><h3 id="cabTotal">-</h3><p class="trend" id="cabTotalSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Omzet Gabungan</span></div><h3 id="cabOmzet">-</h3><p class="trend" id="cabOmzetSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Service Diproses</span></div><h3 id="cabSvc">-</h3><p class="trend" id="cabSvcSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Anggota</span></div><h3 id="cabAnggota">-</h3><p class="trend" id="cabAnggotaSub">-</p></div>
+              </div>
+              <div class="table-wrap">
+                <table class="table compact">
+                  <thead><tr><th style="width:60px">Kode</th><th>Nama</th><th>Alamat</th><th>WA</th><th style="text-align:center">Anggota</th><th style="text-align:center">Service</th><th style="text-align:right">Omzet</th><th style="text-align:right">Stok</th><th style="text-align:center">Status</th><th style="text-align:center">Aksi</th></tr></thead>
+                  <tbody id="tbodyCabang"><tr><td colspan="10" style="text-align:center">Memuat...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="modal" id="cabangModal">
+              <div class="modal-box" style="max-width:480px">
+                <button class="modal-close" onclick="ownCabangForm(false)">×</button>
+                <h3 style="margin-bottom:12px" id="cabangModalTitle">🏪 Cabang Baru</h3>
+                <div class="field" style="margin-bottom:10px"><label>Nama Toko / Cabang *</label><input id="cab-nama" placeholder="B_gadget Cabang Depok"></div>
+                <div class="field" style="margin-bottom:10px"><label>Alamat</label><input id="cab-alamat" placeholder="Jl. Margonda 12, Depok"></div>
+                <div class="field" style="margin-bottom:10px"><label>Nomor WhatsApp</label><input id="cab-wa" placeholder="085314711119"></div>
+                <p style="font-size:11.5px;color:#8a8f98;margin:0 0 12px">Kode toko dibuat otomatis dari nama (3 huruf + angka) dan dipakai sebagai prefix nomor nota cabang.</p>
+                <div style="display:flex;gap:10px">
+                  <button type="button" class="btn btn-ghost" style="flex:1" onclick="ownCabangForm(false)">Batal</button>
+                  <button type="button" class="btn btn-dark" style="flex:1" onclick="ownCabangSave()">Simpan</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -517,7 +836,7 @@
     const rp = n => 'Rp ' + (Number(n)||0).toLocaleString('id-ID');
     const TITLES = {
       ringkas: ['Monitor Toko', 'Keuangan + operasional hari ini'],
-      keuangan: ['Keuangan Teknisi', 'Semua teknisi + skoring'],
+      keuangan: ['Keuangan', 'Kas Teknisi • Kecelakaan Kerja • Refund Dana'],
       finsukses: ['Pendapatan Sukses', 'Service cair: Sukses + Sudah Diambil + Selesai'],
       bayar: ['Pembayaran', 'Tunai • Transfer • QRIS • Belum bayar'],
       keluar: ['Pengeluaran', 'Belanja + operasional toko'],
@@ -525,7 +844,8 @@
       inventori: ['Inventori', 'Sparepart + alat'],
       toko: ['Profil Toko', 'Nama, WA & alamat — tampil di nota'],
       engine: ['Aturan Business Engine', 'Komisi, kuota 2:1, cicilan'],
-      tim: ['Kelola Tim', 'Invite + anggota toko aktif'],
+      antifraud: ['Log Anti-fraud', 'Jejak setiap aksi — yang janggal ditandai'],
+      tim: ['Kelola Tim', 'Anggota, undangan & jaringan cabang'],
     };
     function ownShow(v){
       document.querySelectorAll('[data-own]').forEach(b=>b.classList.toggle('active', b.dataset.own===v));
@@ -545,7 +865,7 @@
               document.getElementById('stSukses').textContent = window._ownDemoStats.sukses;
             }
           }),
-          keuangan: () => ownKasAll(),
+          keuangan: () => ownKeuTab(window._ownKeuTab || 'kas'),
           finsukses: () => ownFinSukses(),
           bayar: () => ownBayar(),
           keluar: () => ownKeluar(),
@@ -553,7 +873,8 @@
           inventori: () => { ownInvResetFilters(); return ownInvLoad(); },
           toko: () => ownStoreProfile(),
           engine: () => ownEngine(),
-          tim: () => ownTeam(),
+          antifraud: () => { window._afOffset = 0; return ownAntifraud(); },
+          tim: () => ownTimTab(window._ownTimTab || 'tim'),
         };
         if(loaders[v]) loaders[v]().catch(() => {});
       }catch(e){}
@@ -633,7 +954,8 @@
       window._ownServices = null;
       // Tombol ↻ pojok kanan atas: bersihkan juga search/filter inventori → kembali ke semua
       try{ ownInvResetFilters(); }catch(e){}
-      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownFinSukses(), ownBayar(), ownKeluar(), ownPenjualan(), ownInvLoad(), ownTeam()]);
+      try{ const s = document.getElementById('potTeknisi'); if(s) delete s.dataset.filled; }catch(e){}
+      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownPenjualan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan()]);
       // Jika mode demo (toko kosong), pastikan kartu operasional ikut angka contoh
       // (ownStats dari /stats backend tetap 0 untuk toko kosong).
       try{
@@ -707,6 +1029,121 @@
         {nama: 'Kamera Infinix Hot', merk: 'INFINIX', keluar: 4, stok: 0, harga: 150000},
         {nama: 'IC Cas Universal', merk: 'LAIN', keluar: 15, stok: 10, harga: 50000},
       ];
+    }
+    // ---------- Data ilustrasi (dipakai HANYA kalau data asli kosong) ----------
+    function ownDemoOn(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.style.display = '';
+      el.innerHTML = '<strong>DATA CONTOH (ilustrasi)</strong> — belum ada data asli di toko ini. Angka di bawah hanya contoh supaya kolom kelihatan; otomatis diganti data asli begitu ada transaksi.';
+    }
+    function ownDemoOff(id){ try{ document.getElementById(id).style.display = 'none'; }catch(e){} }
+    function OWN_DUMMY_KAS(){
+      // [nama, level, komisi_bruto, cicilan, refund, allowance, sisa_hutang, handle, sukses]
+      // komisi_cair di buku kas = komisi_bruto - cicilan (sudah net), jadi identity:
+      //   komisi_bruto - (cicilan + refund) + allowance = Total
+      const R = [
+        ['Andi',  'senior', 4200000, 600000, 240000, 375000,  60000, 38, 35],
+        ['Sinta', 'senior', 3100000, 620000,      0, 300000, 190000, 29, 27],
+        ['Rizky', 'senior', 2400000, 240000,      0, 300000,      0, 22, 21],
+        ['Budi',  'junior', 1850000, 340000,  30000, 150000, 360000, 19, 15],
+        ['Dimas', 'junior',  980000,  98000,      0, 150000,  40000, 12,  9],
+      ];
+      return R.map((r, i) => {
+        const rating = r[8] > 0 ? Math.max(3.0, Math.min(5.0, (r[8] / r[7]) * 5)).toFixed(1) + ' ★' : '-';
+        return {id: 'demo-' + (i + 1), nama: r[0], level: r[1],
+                komisi_bruto: r[2], komisi_cair: r[2] - r[3],
+                allowance: r[5], potongan: r[3] + r[4],
+                sisa_hutang: r[6],
+                total_diterima: r[2] - r[3] - r[4] + r[5],
+                netto: r[2] - r[3] - r[4] + r[5],
+                handle: r[7], sukses: r[8], rating: rating, _demo: true};
+      });
+    }
+    function OWN_DUMMY_POTONGAN(){
+      const iso = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      // [hariLalu, teknisi, level, invoice, tipe, keluar, sisaHutang, keterangan]
+      // Total per teknisi & sisaHutang SAMA PERSIS dengan OWN_DUMMY_KAS.
+      const R = [
+        [9,  'Andi',  'senior', 'DEMO-006', 'potongan_cicilan', 150000, 510000, 'Cicil hutang max 20% dari DEMO-006'],
+        [6,  'Andi',  'senior', 'DEMO-003', 'potongan_cicilan', 150000, 360000, 'Cicil hutang max 20% dari DEMO-003'],
+        [4,  'Andi',  'senior', 'DEMO-005', 'refund_balik',     120000, 300000, 'Refund RFD-DEMO-001 450.000 dari DEMO-005 - komisi dibalik proporsional'],
+        [2,  'Andi',  'senior', 'DEMO-004', 'refund_balik',     120000, 210000, 'Refund RFD-DEMO-004 275.000 dari DEMO-006 - komisi dibalik proporsional'],
+        [1,  'Andi',  'senior', 'DEMO-004', 'potongan_cicilan', 150000, 120000, 'Cicil hutang max 20% dari DEMO-004'],
+        [0,  'Andi',  'senior', 'DEMO-007', 'potongan_cicilan', 150000,  60000, 'Cicil hutang max 20% dari DEMO-007'],
+        [10, 'Sinta', 'senior', 'DEMO-004', 'potongan_cicilan', 180000, 550000, 'Cicil hutang max 20% dari DEMO-004'],
+        [6,  'Sinta', 'senior', 'DEMO-006', 'potongan_cicilan', 180000, 370000, 'Cicil hutang max 20% dari DEMO-006'],
+        [3,  'Sinta', 'senior', 'DEMO-002', 'potongan_cicilan', 130000, 240000, 'Cicil hutang max 20% dari DEMO-002'],
+        [0,  'Sinta', 'senior', 'DEMO-008', 'potongan_cicilan', 130000, 190000, 'Cicil hutang max 20% dari DEMO-008'],
+        [8,  'Rizky', 'senior', 'DEMO-001', 'potongan_cicilan', 120000, 120000, 'Cicil hutang max 20% dari DEMO-001'],
+        [2,  'Rizky', 'senior', 'DEMO-005', 'potongan_cicilan', 120000,      0, 'Cicil hutang max 20% dari DEMO-005 - hutang lunas'],
+        [9,  'Budi',  'junior', 'DEMO-005', 'potongan_cicilan', 120000, 600000, 'Cicil hutang max 20% dari DEMO-005'],
+        [5,  'Budi',  'junior', 'DEMO-002', 'refund_balik',      30000, 540000, 'Refund RFD-DEMO-002 120.000 dari DEMO-002 - komisi dibalik proporsional'],
+        [4,  'Budi',  'junior', 'DEMO-002', 'potongan_cicilan', 120000, 480000, 'Cicil hutang max 20% dari DEMO-002'],
+        [1,  'Budi',  'junior', 'DEMO-001', 'potongan_cicilan', 100000, 360000, 'Cicil hutang max 20% dari DEMO-001'],
+        [7,  'Dimas', 'junior', 'DEMO-003', 'potongan_cicilan',  48000,  88000, 'Cicil hutang max 20% dari DEMO-003'],
+        [3,  'Dimas', 'junior', 'DEMO-004', 'potongan_cicilan',  50000,  40000, 'Cicil hutang max 20% dari DEMO-004'],
+      ];
+      const rows = R.map((r, i) => ({id: 'd' + i, tanggal: iso(r[0]), teknisi: r[1], level: r[2],
+        technician_id: null, invoice: r[3], tipe: r[4], keluar: r[5], sisa_hutang: r[6],
+        keterangan: r[7], _demo: true}));
+      const per = {};
+      rows.forEach(r => per[r.teknisi] = (per[r.teknisi] || 0) + r.keluar);
+      const cur = {};
+      rows.forEach(r => { if(cur[r.teknisi] === undefined || r.sisa_hutang < cur[r.teknisi]) cur[r.teknisi] = r.sisa_hutang; });
+      return {rows: rows, ringkasan: {
+        total: rows.reduce((s, r) => s + r.keluar, 0),
+        cicilan: rows.filter(r => r.tipe === 'potongan_cicilan').reduce((s, r) => s + r.keluar, 0),
+        refund: rows.filter(r => r.tipe === 'refund_balik').reduce((s, r) => s + r.keluar, 0),
+        lainnya: 0, jumlah: rows.length, bulan_ini: rows.reduce((s, r) => s + r.keluar, 0),
+        sisa_hutang: Object.values(cur).reduce((a, b) => a + b, 0), per_teknisi: per, _demo: true}};
+    }
+    function OWN_DUMMY_CELAKA(){
+      const iso = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      // [hariLalu, teknisi, level, invoice, device, jenis, kronologi, part, sumber, modal, bayar, persen, bTek, bToko, nota, status]
+      const R = [
+        [0, 'Budi', 'junior', 'DEMO-002', 'Vivo Y36', 'part_rusak', 'Baterai swap terbalik, HP mati total', 'Baterai Vivo Y36', 'persediaan', 180000, 'toko', 50, 90000, 90000, 0, 'tercatat'],
+        [1, 'Andi', 'senior', 'DEMO-003', 'Xiaomi Redmi Note 12', 'komponen_pelanggan', 'LCD pelanggan ikut bergaris saat bongkar frame', 'LCD Redmi Note 12', 'beli_luar', 320000, 'pelanggan', 50, 0, 0, 320000, 'tercatat'],
+        [3, 'Sinta', 'senior', 'DEMO-005', 'iPhone XR', 'part_rusak', 'Kamera depan pecah saat ganti LCD', 'Kamera iPhone XR', 'persediaan', 450000, 'toko', 50, 225000, 225000, 0, 'selesai'],
+        [6, 'Dimas', 'junior', 'DEMO-001', 'Realme C55', 'part_rusak', 'Speaker sobbing saat ganti charger port', 'Speaker Realme C55', 'persediaan', 95000, 'toko', 100, 95000, 0, 0, 'selesai'],
+        [9, 'Rizky', 'senior', 'DEMO-004', 'Infinix Hot 30', 'catatan', 'Kabel flex pengelupas saat dibongkar, tidak sampai pecah', '-', 'persediaan', 0, 'toko', 50, 0, 0, 0, 'selesai'],
+      ];
+      const rows = R.map((r, i) => ({id: 'd' + i, tanggal: iso(r[0]), invoice: r[3], device: r[4],
+        pelanggan: 'Pelanggan DEMO', teknisi: r[1], teknisi_id: null, level: r[2], jenis: r[5],
+        kronologi: r[6], part_pengganti: r[7], sumber_pengganti: r[8], modal_pengganti: r[9],
+        siapa_bayar: r[10], beban_persen: r[11], beban_teknisi: r[12], beban_toko: r[13],
+        nota_pelanggan: r[14], status: r[15], dibuat_oleh: 'contoh', _demo: true}));
+      return {rows: rows, ringkasan: {
+        total: rows.length,
+        total_rugi: rows.reduce((s, r) => s + r.modal_pengganti, 0),
+        beban_teknisi: rows.reduce((s, r) => s + r.beban_teknisi, 0),
+        beban_toko: rows.reduce((s, r) => s + r.beban_toko, 0),
+        nota_pelanggan: rows.reduce((s, r) => s + r.nota_pelanggan, 0),
+        bulan_ini: rows.length, rugi_bulan_ini: rows.reduce((s, r) => s + r.modal_pengganti, 0),
+        aktif: rows.filter(r => r.status !== 'selesai').length,
+        sisa_aktif: rows.filter(r => r.status !== 'selesai').reduce((s, r) => s + r.beban_teknisi, 0),
+        _demo: true}};
+    }
+    function OWN_DUMMY_REFUND(){
+      const iso = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      // [hariLalu, invoice, device, pelanggan, teknisi, alasan, nominal, metode, dariOmzet, jadiKeluar, komisiBalik]
+      const R = [
+        [0, 'DEMO-005', 'iPhone XR', 'Budi Santoso', 'Sinta', 'IC display rusak, dicek 2x tidak bisa diperbaiki', 450000, 'Transfer', 450000, 0, 90000],
+        [2, 'DEMO-002', 'Vivo Y36', 'Siti Aminah',   'Budi',  'Baterai batch error, tukar unit baru tidak berhasil', 120000, 'Tunai', 0, 120000, 30000],
+        [5, 'DEMO-003', 'Xiaomi Redmi Note 12', 'Agus', 'Andi', 'Mainboard korosi, tidak ada board pengganti di gudang', 300000, 'QRIS', 0, 300000, 0],
+        [8, 'DEMO-006', 'Oppo Reno 8', 'Dewi',         'Rizky', 'Kamera tetap fuzzy setelah penggantian, garansi claims gagal', 275000, 'Transfer', 275000, 0, 60000],
+      ];
+      const rows = R.map((r, i) => ({id: 'd' + i, kode: 'RFD-DEMO-' + String(i + 1).padStart(3, '0'),
+        tanggal: iso(r[0]), invoice: r[1], device: r[2], pelanggan: r[3], teknisi: r[4],
+        alasan: r[5], nominal: r[6], metode: r[7], dari_pendapatan: r[8], jadi_pengeluaran: r[9],
+        komisi_dibalik: r[10], status: 'selesai', catatan: null, dibuat_oleh: 'contoh', _demo: true}));
+      return {rows: rows, ringkasan: {
+        total: rows.length, total_refund: rows.reduce((s, r) => s + r.nominal, 0),
+        dari_pendapatan: rows.reduce((s, r) => s + r.dari_pendapatan, 0),
+        jadi_pengeluaran: rows.reduce((s, r) => s + r.jadi_pengeluaran, 0),
+        komisi_dibalik: rows.reduce((s, r) => s + r.komisi_dibalik, 0),
+        bulan_ini: rows.length, refund_bulan_ini: rows.reduce((s, r) => s + r.nominal, 0),
+        hari_ini: 1, refund_hari_ini: rows[0].nominal, _demo: true}};
     }
     // ---------- Analitik pemantauan: HP masuk/keluar, performa teknisi, merk, keluhan, sparepart ----------
     function ownBrand(device){
@@ -972,7 +1409,7 @@
     // ---------- Keuangan: SEMUA teknisi tampil + skoring (tanpa dropdown) ----------
     async function ownKasAll(){
       const tb = document.getElementById('tbodyKasAll');
-      tb.innerHTML = '<tr><td colspan="7" style="text-align:center">Memuat...</td></tr>';
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center">Memuat...</td></tr>';
       let techs = [];
       try{
         const t = await ownFetch('/technicians');
@@ -984,49 +1421,446 @@
       }
       const svc = await ownServices();
       const kasList = await Promise.all(techs.map(async t => {
-        let k = {komisi_cair: 0, allowance: 0, sisa_hutang: 0, total_diterima: 0, riwayat: []};
+        let k = {komisi_cair: 0, komisi_bruto: 0, allowance: 0, potongan: 0, sisa_hutang: 0, total_diterima: 0, netto: 0, riwayat: []};
         if(typeof t.id === 'number'){
           try{ k = await ownFetch(`/engine/kas/teknisi/${t.id}`); }catch(e){}
         } else {
           // teknisi demo: komisi ilustrasi dari service contoh
           const mine = svc.filter(d => d.teknisi === t.nama && ['Service Sukses', 'Sudah Diambil', 'Selesai'].includes(d.status));
           const tot = mine.reduce((s, d) => s + (Number(d.biaya) || 0), 0);
-          k = {komisi_cair: Math.round(tot * 0.4), allowance: 50000, sisa_hutang: 0, total_diterima: Math.round(tot * 0.4) + 50000, riwayat: []};
+          k = {komisi_cair: Math.round(tot * 0.4), komisi_bruto: Math.round(tot * 0.4), allowance: 50000, potongan: 0, sisa_hutang: 0, total_diterima: Math.round(tot * 0.4) + 50000, netto: Math.round(tot * 0.4) + 50000, riwayat: []};
         }
         const handle = svc.filter(d => d.teknisi === t.nama).length;
         const sukses = svc.filter(d => d.teknisi === t.nama && ['Service Sukses', 'Sudah Diambil', 'Selesai'].includes(d.status)).length;
         const rating = handle > 0 ? Math.max(3.0, Math.min(5.0, (sukses / handle) * 5)).toFixed(1) + ' ★' : '-';
         return {...t, ...k, handle, sukses, rating};
       }));
+      // Data ilustrasi HANYA kalau semua teknisi belum punya komisi/potongan sama sekali
+      const kosong = !kasList.length || kasList.every(t => !(t.komisi_bruto || t.komisi_cair) && !(t.potongan) && !(t.allowance));
+      if(kosong){ kasList.length = 0; kasList.push(...OWN_DUMMY_KAS()); ownDemoOn('kasDemoNote'); }
+      else ownDemoOff('kasDemoNote');
       kasList.sort((a, b) => (b.komisi_cair || 0) - (a.komisi_cair || 0));
       const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
       try{
         document.getElementById('kasAllKomisi').textContent = rp(kasList.reduce((s, t) => s + (t.komisi_cair || 0), 0));
         document.getElementById('kasAllHadir').textContent = rp(kasList.reduce((s, t) => s + (t.allowance || 0), 0));
+        document.getElementById('kasAllPotongan').textContent = rp(kasList.reduce((s, t) => s + (t.potongan || 0), 0));
         document.getElementById('kasAllHutang').textContent = rp(kasList.reduce((s, t) => s + (t.sisa_hutang || 0), 0));
       }catch(e){}
       tb.innerHTML = kasList.map((t, i) =>
-        `<tr onclick="ownKasDetail('${esc(String(t.id))}', '${esc(t.nama)}')" style="cursor:pointer" title="Klik untuk rincian">`
+        `<tr onclick="ownKasOpen('${esc(String(t.id))}', '${esc(t.nama)}')" style="cursor:pointer" title="Klik untuk rincian kas">`
         + `<td style="text-align:center;font-weight:700">${medal(i)}</td>`
         + `<td><strong>${esc(t.nama)}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(t.level || 'junior')} • ${t.handle} handle</span></td>`
-        + `<td style="text-align:right;color:#059669;font-weight:700">${rp(t.komisi_cair || 0)}</td>`
+        + `<td style="text-align:right;color:#059669;font-weight:700">${rp(t.komisi_bruto ?? t.komisi_cair ?? 0)}</td>`
         + `<td style="text-align:right">${rp(t.allowance || 0)}</td>`
+        + `<td style="text-align:right;color:${(t.potongan || 0) ? '#b45309' : 'inherit'};font-weight:${(t.potongan || 0) ? 700 : 400}">${rp(t.potongan || 0)}</td>`
         + `<td style="text-align:right;color:${(t.sisa_hutang || 0) ? '#dc2626' : 'inherit'};font-weight:${(t.sisa_hutang || 0) ? 700 : 400}">${rp(t.sisa_hutang || 0)}</td>`
-        + `<td style="text-align:right;font-weight:700">${rp(t.total_diterima || 0)}</td>`
+        + `<td style="text-align:right;font-weight:700">${rp(t.netto ?? t.total_diterima ?? 0)}</td>`
         + `<td style="font-size:12.5px">${t.rating}</td></tr>`
-      ).join('') || '<tr><td colspan="7" style="text-align:center">Belum ada teknisi</td></tr>';
+      ).join('') || '<tr><td colspan="8" style="text-align:center">Belum ada teknisi</td></tr>';
       // otomatis tampilkan rincian peringkat 1
-      if(kasList.length) ownKasDetail(String(kasList[0].id), kasList[0].nama);
+      if(kasList.length) ownKasDetail(String(kasList[0].id), kasList[0].nama, kasList[0]._demo);
     }
-    async function ownKasDetail(id, nama){
+    async function ownKasDetail(id, nama, demo){
       const tb = document.getElementById('tbodyKasTeknisi');
       try{ document.getElementById('kasDetailName').textContent = 'Rincian: ' + nama; }catch(e){}
+      if(demo){
+        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Rincian per teknisi (ilustrasi) belum dibuat — kolom ini terisi dari buku kas asli.</td></tr>';
+        return;
+      }
       tb.innerHTML = '<tr><td colspan="6" style="text-align:center">Memuat...</td></tr>';
       try{
         const j = await ownFetch(`/engine/kas/teknisi/${id}`);
-        const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko'};
+        const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', refund_balik:'↩️ Refund dibalik', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko'};
         tb.innerHTML = (j.riwayat || []).map(l => `<tr><td>${esc(l.tanggal || '')}</td><td>${esc(l.invoice || '-')}</td><td>${tipe[l.tipe] || esc(l.tipe)}</td><td style="text-align:right;color:#059669;font-weight:700">${l.masuk ? rp(l.masuk) : ''}</td><td style="text-align:right;color:#dc2626">${l.keluar ? rp(l.keluar) : ''}</td><td style="font-size:11px">${esc(l.ket || '')}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center">Belum ada riwayat</td></tr>';
       }catch(e){ tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#8a8f98">Rincian backend tidak tersedia (teknisi contoh / API menyusul)</td></tr>`; }
+    }
+
+    // ---------- Sub-tab dalam Kas Teknisi: Semua / Rincian Kas / Potongan ----------
+    function ownPotonganTab(k, load){
+      window._ownPotTab = k || 'all';
+      document.querySelectorAll('[data-ownpot]').forEach(b => b.classList.toggle('active', b.dataset.ownpot === window._ownPotTab));
+      ['all','kas','pot'].forEach(x => {
+        const el = document.getElementById('ownPotPanel-' + x);
+        if(el) el.style.display = (x === window._ownPotTab) ? '' : 'none';
+      });
+      if(load === false) return;
+      ownPotonganLoad();
+    }
+    function ownPotonganLoad(){
+      const k = window._ownPotTab || 'all';
+      if(k === 'pot') return ownPotongan();
+      return ownKasAll();
+    }
+    function ownKasOpen(id, nama){
+      ownKasDetail(id, nama, String(id).indexOf('demo-') === 0);
+      ownPotonganTab('kas', false);
+    }
+    async function ownPotongan(){
+      const tb = document.getElementById('tbodyPotongan');
+      if(!tb) return;
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center">Memuat...</td></tr>';
+      try{
+        const selT = document.getElementById('potTeknisi');
+        const selJ = document.getElementById('potTipe');
+        const q = [];
+        if(selT && selT.value) q.push('technician_id=' + encodeURIComponent(selT.value));
+        const tipe = selJ ? selJ.value : '';
+        if(tipe && tipe !== 'lainnya') q.push('tipe=' + encodeURIComponent(tipe));
+        const d = await ownFetch('/engine/potongans' + (q.length ? '?' + q.join('&') : ''));
+        let rows = Array.isArray(d) ? d : (d.rows || []);
+        let ring = (d && d.ringkasan) || {total: 0, cicilan: 0, refund: 0, lainnya: 0, jumlah: 0, bulan_ini: 0, sisa_hutang: 0, per_teknisi: {}};        // data ilustrasi hanya kalau tabel benar-benar kosong
+        if(!rows.length){
+          const dum = OWN_DUMMY_POTONGAN();
+          rows = dum.rows; ring = dum.ringkasan;
+          if(!tipe || tipe === 'lainnya'){ /* biarkan semua jenis tampil */ }
+          else if(tipe !== 'lainnya') rows = rows.filter(r => r.tipe === tipe);
+          ownDemoOn('potDemoNote');
+        } else ownDemoOff('potDemoNote');
+        if(tipe === 'lainnya') rows = rows.filter(r => !['potongan_cicilan', 'refund_balik'].includes(r.tipe));
+        ownSet('potTotal', rp(ring.total));
+        ownSet('potTotalSub', `${ring.jumlah} kali • bulan ini ${rp(ring.bulan_ini)}`);
+        ownSet('potCicil', rp(ring.cicilan));
+        ownSet('potRefund', rp(ring.refund));
+        ownSet('potSisa', rp(ring.sisa_hutang));
+        // isi dropdown teknisi (dari daftar resmi, bukan baris terfilter)
+        try{
+          if(selT && !selT.dataset.filled){
+            const cur = selT.value;
+            selT.innerHTML = '<option value="">Semua Teknisi</option>';
+            const t = await ownFetch('/technicians');
+            (Array.isArray(t) ? t : []).forEach(x => {
+              const o = document.createElement('option');
+              o.value = x.id; o.textContent = x.nama;
+              selT.appendChild(o);
+            });
+            selT.dataset.filled = '1';
+            if(cur) selT.value = cur;
+          }
+        }catch(e){}
+        // ranking teknisi paling banyak potongan
+        const per = ring.per_teknisi || {};
+        const list = Object.keys(per).sort((a, b) => per[b] - per[a]).slice(0, 5);
+        const top = document.getElementById('potTopList');
+        if(top){
+          const max = list.length ? per[list[0]] : 0;
+          top.innerHTML = list.length
+            ? '<strong style="font-size:12px">Paling banyak dipotong:</strong> ' + list.map(n => {
+                const pct = max ? Math.round(per[n] / max * 100) : 0;
+                return `<span style="display:inline-block;margin:4px 10px 0 0">${esc(n)} <strong>${rp(per[n])}</strong> <span style="font-size:10.5px;color:#8a8f98">${pct}%</span></span>`;
+              }).join('')
+            : 'Belum ada potongan tercatat.';
+        }
+        const jenis = {potongan_cicilan:'✂️ Cicilan hutang', refund_balik:'↩️ Refund dibalik', hutang_baru:'⚠️ Hutang baru', toleransi_toko:'🛡️ Ditanggung toko'};
+        tb.innerHTML = rows.map(r => `<tr>`
+            + `<td style="white-space:nowrap">${esc(r.tanggal || '')}</td>`
+            + `<td>${esc(r.teknisi || '-')}${r.level ? '<br><span style="font-size:10.5px;color:#8a8f98">' + esc(r.level) + '</span>' : ''}</td>`
+            + `<td style="font-size:11px">${esc(r.invoice || '-')}</td>`
+            + `<td style="font-size:11.5px">${jenis[r.tipe] || esc(r.tipe)}</td>`
+            + `<td style="text-align:right;color:#dc2626;font-weight:700">${rp(r.keluar || 0)}</td>`
+            + `<td style="text-align:right">${rp(r.sisa_hutang || 0)}</td>`
+            + `<td style="font-size:11px">${esc(r.keterangan || '')}</td>`
+            + `</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada potongan</td></tr>';
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,120)}</td></tr>`;
+      }
+    }
+
+    // ---------- Sub-tab Keuangan: Kas / Kecelakaan Kerja / Refund ----------
+    function ownSet(id, v){ try{ document.getElementById(id).textContent = v; }catch(e){} }
+    function ownKeuTab(k){
+      window._ownKeuTab = k || 'kas';
+      document.querySelectorAll('[data-ownkeu]').forEach(b => b.classList.toggle('active', b.dataset.ownkeu === window._ownKeuTab));
+      ['kas','celaka','refund'].forEach(x => {
+        const el = document.getElementById('ownKeuPanel-' + x);
+        if(el) el.style.display = (x === window._ownKeuTab) ? '' : 'none';
+      });
+      ownKeuLoad();
+    }
+    function ownKeuLoad(){
+      const k = window._ownKeuTab || 'kas';
+      if(k === 'celaka') return ownAccidents();
+      if(k === 'refund') return ownRefunds();
+      return ownPotonganTab(window._ownPotTab || 'all');
+    }
+    function ownToday(){
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    async function ownFillTechSel(selId){
+      const sel = document.getElementById(selId);
+      if(!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Pilih teknisi</option>';
+      let n = 0;
+      try{
+        const t = await ownFetch('/technicians');
+        (Array.isArray(t) ? t : []).forEach(x => {
+          const o = document.createElement('option');
+          o.value = x.nama; o.dataset.id = x.id;
+          o.textContent = x.nama + ' (' + (x.level || 'junior') + ')';
+          sel.appendChild(o);
+          n++;
+        });
+      }catch(e){}
+      if(!n){
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = 'Belum ada teknisi (beban ke toko)';
+        sel.appendChild(o);
+      }
+      if(cur) sel.value = cur;
+    }
+    async function ownFillInvList(listId){
+      const dl = document.getElementById(listId);
+      if(!dl) return;
+      try{
+        const arr = await ownServices();
+        dl.innerHTML = arr.slice(0, 200).map(d =>
+          `<option value="${esc(d.invoice || '')}">${esc(d.device || '')} — ${esc(d.teknisi || 'Tanpa teknisi')} — ${rp(d.biaya || 0)}</option>`).join('');
+      }catch(e){}
+    }
+
+    // ---------- Kecelakaan Kerja ----------
+    async function ownAccidents(){
+      const tb = document.getElementById('tbodyCelaka');
+      if(!tb) return;
+      tb.innerHTML = '<tr><td colspan="11" style="text-align:center">Memuat...</td></tr>';
+      try{
+        const st = (document.getElementById('celakaStatus') || {}).value || '';
+        const rows = await ownFetch('/finance/accidents' + (st ? '?status=' + encodeURIComponent(st) : ''));
+        let arr = Array.isArray(rows) ? rows : (rows.rows || []);
+        let ring = await ownFetch('/finance/accidents/ringkasan');
+        if(!arr.length){
+          const dum = OWN_DUMMY_CELAKA();
+          arr = dum.rows; ring = dum.ringkasan;
+          if(st) arr = arr.filter(a => a.status === st);
+          ownDemoOn('celakaDemoNote');
+        } else ownDemoOff('celakaDemoNote');
+        if(ring && ring._demo){
+          ownSet('celRugiSub', `${ring.total} kejadian (ilustrasi)`);
+        } else {
+          ownSet('celRugiSub', `${ring.total} kejadian • bulan ini ${ring.bulan_ini} (${rp(ring.rugi_bulan_ini)})`);
+        }
+        ownSet('celRugi', rp(ring.total_rugi));
+        ownSet('celToko', rp(ring.beban_toko));
+        ownSet('celTeknisi', rp(ring.beban_teknisi));
+        ownSet('celTeknisiSub', ring.aktif ? `${ring.aktif} belum selesai` : 'semua tuntas');
+        ownSet('celPelanggan', rp(ring.nota_pelanggan));
+        const note = document.getElementById('celakaNote');
+        if(note){
+          if(ring.sisa_aktif > 0){
+            note.style.display = 'block';
+            note.textContent = '⏳ Masih ada ' + ring.aktif + ' kejadian aktif — beban teknisi ' + rp(ring.sisa_aktif)
+              + ' akan dicicil otomatis dari komisi service berikutnya (maks 20% per service).';
+          } else note.style.display = 'none';
+        }
+        const jenis = {part_rusak:'Part toko', komponen_pelanggan:'Komponen pelanggan', catatan:'Catatan'};
+        const sumber = {persediaan:'📦 Persediaan', beli_luar:'🛒 Beli luar'};
+        tb.innerHTML = arr.map(a => {
+          const aktif = a.status !== 'selesai';
+          const badge = aktif ? '<span class="pill warn">tercatat</span>' : '<span class="pill ok">selesai</span>';
+          const akt = aktif
+            ? `<button class="btn btn-ghost small" onclick="ownCelakaSelesai(${a.id})">✓ Selesai</button>`
+            : '<span style="font-size:11px;color:#8a8f98">tuntas</span>';
+          return `<tr>`
+            + `<td style="white-space:nowrap">${esc(a.tanggal || '')}</td>`
+            + `<td style="font-size:11px"><strong>${esc(a.invoice || '-')}</strong>${a.device ? '<br><span style="font-size:10.5px;color:#8a8f98">' + esc(a.device) + '</span>' : ''}</td>`
+            + `<td>${esc(a.teknisi || '-')}${a.level ? '<br><span style="font-size:10.5px;color:#8a8f98">' + esc(a.level) + '</span>' : ''}</td>`
+            + `<td style="max-width:220px;font-size:11.5px">${esc((a.kronologi || '').slice(0, 90))}${String(a.kronologi || '').length > 90 ? '…' : ''}<br><span class="pill">${jenis[a.jenis] || esc(a.jenis)}</span></td>`
+            + `<td style="font-size:11.5px">${esc(a.part_pengganti || '-')}<br><span style="font-size:10.5px;color:#8a8f98">${sumber[a.sumber_pengganti] || ''}</span></td>`
+            + `<td style="text-align:right">${rp(a.modal_pengganti || 0)}</td>`
+            + `<td style="text-align:right;color:${(a.beban_teknisi||0) ? '#dc2626' : 'inherit'};font-weight:${(a.beban_teknisi||0) ? 700 : 400}">${rp(a.beban_teknisi || 0)}${a.beban_persen ? '<br><span style="font-size:10.5px;color:#8a8f98">' + a.beban_persen + '%</span>' : ''}</td>`
+            + `<td style="text-align:right">${rp(a.beban_toko || 0)}</td>`
+            + `<td style="text-align:right;color:${(a.nota_pelanggan||0) ? '#b45309' : 'inherit'}">${rp(a.nota_pelanggan || 0)}</td>`
+            + `<td style="text-align:center">${badge}</td>`
+            + `<td style="text-align:center">${akt}</td></tr>`;
+        }).join('') || '<tr><td colspan="11" style="text-align:center;color:#8a8f98">Belum ada kecelakaan kerja tercatat</td></tr>';
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="11" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,120)}</td></tr>`;
+      }
+    }
+    function ownCelakaOpen(){
+      try{ document.getElementById('celakaModal').classList.add('show'); }catch(e){}
+      const d = document.getElementById('cel-tanggal');
+      if(d && !d.value) d.value = ownToday();
+      ownFillTechSel('cel-teknisi');
+      ownFillInvList('celInvoiceList');
+      ownCelakaPreview();
+    }
+    function ownCelakaClose(){ try{ document.getElementById('celakaModal').classList.remove('show'); }catch(e){} }
+    function ownCelakaPreview(){
+      const modal = Number(document.getElementById('cel-modal')?.value || 0);
+      const bayar = document.getElementById('cel-bayar')?.value || 'toko';
+      const persen = Number(document.getElementById('cel-persen')?.value || 0);
+      const wrap = document.getElementById('cel-persenWrap');
+      if(wrap) wrap.style.display = (bayar === 'toko') ? '' : 'none';
+      const box = document.getElementById('cel-preview');
+      if(!box) return;
+      const mi = document.getElementById('cel-modalInfo');
+      if(mi) mi.textContent = rp(modal);
+      if(!modal){ box.textContent = 'Isi modal pengganti untuk melihat hitungan beban.'; return; }
+      if(bayar === 'pelanggan'){
+        box.innerHTML = '👤 <strong>Pelanggan bayar</strong> — nota pelanggan ' + rp(modal) + ', teknisi &amp; toko <strong>Rp 0</strong>. Utang ke pelanggan dicatat manual di nota.';
+        return;
+      }
+      const tk = modal * persen / 100;
+      const toko = modal - tk;
+      box.innerHTML = '🧮 <strong>Toko tanggung</strong> — beban teknisi <strong style="color:#dc2626">' + rp(tk) + '</strong> (' + persen + '%) + beban toko <strong>' + rp(toko) + '</strong>.'
+        + (persen > 0 ? ' Junior: kejadian pertama ≤ toleransi bulanan otomatis jadi 100% toko.' : '');
+    }
+    async function ownCelakaSave(e){
+      e.preventDefault();
+      const sel = document.getElementById('cel-teknisi');
+      const opt = sel.options[sel.selectedIndex];
+      const body = {
+        technician_id: opt && opt.dataset.id ? Number(opt.dataset.id) : null,
+        teknisi: (sel.value || '').trim() || null,
+        invoice: (document.getElementById('cel-invoice')?.value || '').trim() || null,
+        jenis: document.getElementById('cel-jenis')?.value,
+        tanggal: document.getElementById('cel-tanggal')?.value || null,
+        kronologi: (document.getElementById('cel-kronologi')?.value || '').trim(),
+        part_pengganti: (document.getElementById('cel-part')?.value || '').trim() || null,
+        sumber_pengganti: document.getElementById('cel-sumber')?.value,
+        modal_pengganti: Number(document.getElementById('cel-modal')?.value || 0),
+        siapa_bayar: document.getElementById('cel-bayar')?.value,
+        beban_persen: Number(document.getElementById('cel-persen')?.value || 0),
+      };
+      try{
+        const r = await ownFetch('/finance/accidents', {method: 'POST', body: JSON.stringify(body)});
+        ownCelakaClose();
+        const ket = r.beban_teknisi > 0
+          ? 'Beban teknisi ' + rp(r.beban_teknisi) + ' dicatat sebagai hutang (auto cicil).'
+          : (r.nota_pelanggan > 0 ? 'Tagihan pelanggan ' + rp(r.nota_pelanggan) + '.' : 'Ditanggung toko 100%.');
+        ownAlert('ok', 'Kecelakaan kerja tercatat. ' + ket);
+        await ownAccidents();
+        try{ await ownStats(); }catch(x){}
+      }catch(err){
+        ownAlert('err', 'Gagal: ' + (err.message || err));
+      }
+    }
+    async function ownCelakaSelesai(id){
+      if(!confirm('Tandai kecelakaan ini selesai? Beban teknisi tetap jadi hutang (sudah tercatat).')) return;
+      try{
+        await ownFetch('/finance/accidents/' + id + '/selesai', {method: 'POST'});
+        ownAlert('ok', 'Kejadian ditandai selesai.');
+        await ownAccidents();
+      }catch(e){ ownAlert('err', 'Gagal: ' + (e.message || e)); }
+    }
+
+    // ---------- Refund Dana ----------
+    async function ownRefunds(){
+      const tb = document.getElementById('tbodyRefund');
+      if(!tb) return;
+      tb.innerHTML = '<tr><td colspan="12" style="text-align:center">Memuat...</td></tr>';
+      try{
+        const rows = await ownFetch('/finance/refunds');
+        let arr = Array.isArray(rows) ? rows : (rows.rows || []);
+        let ring = await ownFetch('/finance/refunds/ringkasan');
+        if(!arr.length){
+          const dum = OWN_DUMMY_REFUND();
+          arr = dum.rows; ring = dum.ringkasan;
+          ownDemoOn('refundDemoNote');
+        } else ownDemoOff('refundDemoNote');
+        ownSet('refTotal', rp(ring.total_refund));
+        ownSet('refTotalSub', ring._demo
+          ? `${ring.total} refund (ilustrasi)`
+          : `${ring.total} refund • bulan ini ${ring.refund_bulan_ini ? rp(ring.refund_bulan_ini) : 'Rp 0'}`);
+        ownSet('refDari', rp(ring.dari_pendapatan));
+        ownSet('refKeluar', rp(ring.jadi_pengeluaran));
+        ownSet('refKomisi', rp(ring.komisi_dibalik));
+        const metodeIcon = m => m === 'Tunai' ? '💵' : m === 'Transfer' ? '🏦' : '📱';
+        tb.innerHTML = arr.map(r => {
+          const waTxt = encodeURIComponent('Refund ' + (r.kode || '') + '\nInvoice: ' + (r.invoice || '-') + '\nNominal: Rp' + (r.nominal || 0) + ' (' + (r.metode || '') + ')\nAlasan: ' + (r.alasan || '-'));
+          return `<tr>`
+            + `<td style="font-size:11px"><strong>${esc(r.kode || '-')}</strong></td>`
+            + `<td style="white-space:nowrap">${esc(r.tanggal || '')}</td>`
+            + `<td style="font-size:11px">${esc(r.invoice || '-')}</td>`
+            + `<td style="font-size:11.5px">${esc(r.pelanggan || '-')}${r.device ? '<br><span style="font-size:10.5px;color:#8a8f98">' + esc(r.device) + '</span>' : ''}</td>`
+            + `<td style="font-size:11.5px">${esc(r.teknisi || '-')}</td>`
+            + `<td style="max-width:200px;font-size:11.5px">${esc((r.alasan || '').slice(0, 80))}${String(r.alasan || '').length > 80 ? '…' : ''}</td>`
+            + `<td style="text-align:right;color:#dc2626;font-weight:700">${rp(r.nominal || 0)}</td>`
+            + `<td style="font-size:11.5px">${metodeIcon(r.metode)} ${esc(r.metode || '-')}</td>`
+            + `<td style="text-align:right;color:#059669">${rp(r.dari_pendapatan || 0)}</td>`
+            + `<td style="text-align:right;color:#b45309">${rp(r.jadi_pengeluaran || 0)}</td>`
+            + `<td style="text-align:right">${rp(r.komisi_dibalik || 0)}</td>`
+            + `<td style="text-align:center"><a class="btn btn-ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${waTxt}">WA</a></td>`
+            + `</tr>`;
+        }).join('') || '<tr><td colspan="12" style="text-align:center;color:#8a8f98">Belum ada refund dana</td></tr>';
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="12" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,120)}</td></tr>`;
+      }
+    }
+    function ownRefundOpen(){
+      try{ document.getElementById('refundModal').classList.add('show'); }catch(e){}
+      const d = document.getElementById('ref-tanggal');
+      if(d && !d.value) d.value = ownToday();
+      ownFillInvList('refInvoiceList');
+      ownRefundPreview();
+    }
+    function ownRefundClose(){ try{ document.getElementById('refundModal').classList.remove('show'); }catch(e){} }
+    let _refTmr = null;
+    function ownRefundPreview(){
+      if(_refTmr) clearTimeout(_refTmr);
+      _refTmr = setTimeout(() => ownRefundPreviewNow(), 350);
+    }
+    async function ownRefundPreviewNow(){
+      const box = document.getElementById('ref-preview');
+      if(!box) return;
+      const nominal = Number(document.getElementById('ref-nominal')?.value || 0);
+      const inv = (document.getElementById('ref-invoice')?.value || '').trim();
+      const ni = document.getElementById('ref-nominalInfo');
+      if(ni) ni.textContent = rp(nominal);
+      if(!nominal){ box.textContent = 'Isi nominal refund untuk melihat sumber dana & komisi yang dibalik.'; return; }
+      try{
+        const arr = await ownServices();
+        const today = ownToday();
+        const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
+        const omzet = arr.filter(d => SUKSES.includes(d.status) && String(d.diambil_at || d.updated_at || d.date || '').slice(0,10) === today)
+          .reduce((s, d) => s + (Number(d.biaya) || 0), 0);
+        const svc = arr.find(d => String(d.invoice || '').toLowerCase() === inv.toLowerCase());
+        let komisi = 0, basis = 0;
+        if(svc){
+          try{
+            const e = await ownFetch('/engine/service/' + encodeURIComponent(svc.invoice));
+            komisi = Number(e.komisi_teknisi || 0);
+          }catch(e){ komisi = 0; }
+          basis = Number(svc.biaya || 0) || 1;
+        }
+        const balik = Math.floor(komisi * Math.min(nominal, basis) / basis);
+        const dari = Math.min(nominal, omzet);
+        const keluar = nominal - dari;
+        box.innerHTML = '💸 <strong>Sumber dana</strong>: dari omzet hari ini ' + rp(omzet) + ' → dipotong <strong style="color:#059669">' + rp(dari) + '</strong>'
+          + (keluar > 0 ? ' + <strong style="color:#b45309">jadi pengeluaran ' + rp(keluar) + '</strong> (omzet kurang)' : '')
+          + '<br>👨‍🔧 <strong>Komisi teknisi dibalik</strong>: <strong>' + rp(balik) + '</strong>'
+          + (svc ? ' (dari komisi ' + rp(komisi) + ' × ' + rp(nominal) + '/' + rp(basis) + ')' : ' — ketik nomor nota yang valid untuk hitung otomatis')
+          + (svc && nominal > basis ? '<br><span style="color:#dc2626">⚠️ Nominal melebihi biaya service (' + rp(basis) + '), backend akan menolak.</span>' : '');
+      }catch(e){
+        box.textContent = 'Pratinjau tidak lengkap: ' + (e.message || e);
+      }
+    }
+    async function ownRefundSave(e){
+      e.preventDefault();
+      const body = {
+        invoice: (document.getElementById('ref-invoice')?.value || '').trim(),
+        nominal: Number(document.getElementById('ref-nominal')?.value || 0),
+        metode: document.getElementById('ref-metode')?.value,
+        tanggal: document.getElementById('ref-tanggal')?.value || null,
+        alasan: (document.getElementById('ref-alasan')?.value || '').trim(),
+        catatan: (document.getElementById('ref-catatan')?.value || '').trim() || null,
+        tutup_klaim: !!document.getElementById('ref-tutup')?.checked,
+      };
+      try{
+        const r = await ownFetch('/finance/refunds', {method: 'POST', body: JSON.stringify(body)});
+        ownRefundClose();
+        const msg = 'Refund ' + (r.kode || '') + ' ' + rp(r.nominal) + ' tercatat. Dari omzet ' + rp(r.dari_pendapatan)
+          + (r.jadi_pengeluaran ? ', jadi pengeluaran ' + rp(r.jadi_pengeluaran) : '')
+          + (r.komisi_dibalik ? ', komisi teknisi dibalik ' + rp(r.komisi_dibalik) : '') + '.';
+        ownAlert('ok', msg);
+        await ownRefunds();
+        try{ await ownFinSukses(); }catch(x){}
+      }catch(err){
+        ownAlert('err', 'Gagal: ' + (err.message || err));
+      }
     }
 
     // ---------- Pendapatan Sukses ----------
@@ -1492,31 +2326,489 @@
       }catch(err){ ownAlert('err', 'Gagal API: ' + err.message); }
     }
 
+    // ---------- LOG ANTI-FRAUD (tampilan padat) ----------
+    const AF_PAGE = 50;
+    let _afTmr = null;
+    function ownAfFilterChange(){
+      if(_afTmr) clearTimeout(_afTmr);
+      _afTmr = setTimeout(() => { window._afOffset = 0; ownAntifraud(); }, 250);
+    }
+    function ownAfReset(){
+      try{ clearTimeout(_afTmr); }catch(e){}
+      ['afLevel','afActor','afPola','afSince','afQ'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+      const cb = document.getElementById('afOnlyTinggi');
+      if(cb) cb.checked = false;
+      window._afOffset = 0;
+      ownAntifraud();
+    }
+    function ownAfSet(name, value){
+      const e = document.getElementById(name);
+      if(e) e.value = value || '';
+      window._afOffset = 0;
+      ownAntifraud();
+    }
+    function ownAfPage(step){
+      const off = (window._afOffset || 0) + step * AF_PAGE;
+      if(off < 0) return;
+      window._afOffset = off;
+      ownAntifraud();
+    }
+    function ownWaktu(iso){
+      if(!iso) return '-';
+      const d = new Date(iso);
+      if(isNaN(d)) return String(iso).slice(11, 16) || '-';
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+    function ownHari(iso){
+      if(!iso) return '-';
+      const d = new Date(iso);
+      if(isNaN(d)) return String(iso).slice(0, 10);
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    const AF_HARI = {
+      today: 'Hari ini', '1': 'Kemarin',
+    };
+    function ownHariLabel(iso){
+      const k = ownHari(iso);
+      const d = new Date(k);
+      const now = new Date();
+      const selisih = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                          - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+      if(selisih === 0) return 'HARI INI • ' + k;
+      if(selisih === 1) return 'KEMARIN • ' + k;
+      if(selisih > 1 && selisih < 7) return selisih + ' HARI LALU • ' + k;
+      return k;
+    }
+    function ownAfAktifChips(){
+      const g = id => { const e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+      const cb = document.getElementById('afOnlyTinggi');
+      const chips = [];
+      if(cb && cb.checked) chips.push(['afOnlyTinggi', 'Hanya janggal']);
+      if(g('afLevel'))    chips.push(['afLevel', 'Level: ' + g('afLevel')]);
+      if(g('afActor'))    chips.push(['afActor', 'Pelaku: ' + g('afActor')]);
+      if(g('afPola'))     chips.push(['afPola', 'Jenis: ' + g('afPola')]);
+      if(g('afSince'))    chips.push(['afSince', 'Sejak: ' + g('afSince')]);
+      if(g('afQ'))        chips.push(['afQ', 'Cari: "' + g('afQ') + '"']);
+      const box = document.getElementById('afActive');
+      if(!box) return;
+      if(!chips.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.style.display = 'flex';
+      box.innerHTML = '<span style="color:#6b7280;font-weight:600">Filter:</span>'
+        + chips.map(([id, label]) => `<span class="af-chip"><b>${esc(label)}</b><button title="Hapus filter" onclick="ownAfClear('${id}')">×</button></span>`).join('')
+        + `<button class="btn btn-ghost small" onclick="ownAfReset()">↺ Hapus semua</button>`;
+    }
+    function ownAfClear(id){
+      const e = document.getElementById(id);
+      if(!e) return;
+      if(e.type === 'checkbox') e.checked = false; else e.value = '';
+      window._afOffset = 0;
+      ownAntifraud();
+    }
+    async function ownAntifraud(){
+      const list = document.getElementById('afList');
+      if(!list) return;
+      list.innerHTML = '<div style="padding:18px;text-align:center;color:#8a8f98;font-size:12px">Memuat...</div>';
+      const g = id => { const e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+      const q = [];
+      if(g('afQ')) q.push('q=' + encodeURIComponent(g('afQ')));
+      if(g('afActor')) q.push('actor=' + encodeURIComponent(g('afActor')));
+      if(g('afPola')) q.push('pola=' + encodeURIComponent(g('afPola')));
+      const lvl = (document.getElementById('afOnlyTinggi') || {}).checked ? 'tinggi' : g('afLevel');
+      if(lvl) q.push('level=' + encodeURIComponent(lvl));
+      if(g('afSince')) q.push('since=' + encodeURIComponent(g('afSince')));
+      const off = window._afOffset || 0;
+      q.push('limit=' + AF_PAGE, 'offset=' + off);
+      try{
+        const d = await ownFetch('/audit/antifraud' + (q.length ? '?' + q.join('&') : ''));
+        const rows = Array.isArray(d) ? d : (d.rows || []);
+        ownSet('afTotal', d.total ?? rows.length);
+        ownSet('afTotalSub', rows.length ? `${rows.length} baris di halaman ini` : 'tidak ada yang cocok');
+        ownSet('afTinggi', d.jumlah_tinggi ?? '-');
+        ownSet('afNormal', d.jumlah_normal ?? '-');
+        ownSet('afCount', d.total ?? rows.length);
+        ownSet('afTokoLine', 'Jejak setiap aksi di ' + ((d.store && d.store.nama) || 'toko ini'));
+        // dropdown pelaku & jenis (dari data asli, selalu terisi walau hasil filter kosong)
+        try{
+          const sa = document.getElementById('afActor'), sp = document.getElementById('afPola');
+          if(sa){
+            const keep = sa.value;
+            sa.innerHTML = '<option value="">Semua pelaku</option>';
+            (d.aktor || []).forEach(a => {
+              const o = document.createElement('option');
+              o.value = a.nama;
+              o.textContent = `${a.nama} (${a.jumlah})${a.tinggi ? ' • ' + a.tinggi + ' janggal' : ''}`;
+              sa.appendChild(o);
+            });
+            sa.value = keep;
+          }
+          if(sp){
+            const keep = sp.value;
+            sp.innerHTML = '<option value="">Semua jenis</option>';
+            (d.pola || []).forEach(p => {
+              const o = document.createElement('option');
+              o.value = p.nama; o.textContent = `${p.ikon} ${p.nama} (${p.jumlah})`;
+              sp.appendChild(o);
+            });
+            sp.value = keep;
+          }
+        }catch(e){}
+        // chip pola (filter cepat) — pakai tombol agar bisa diklik & kelihatan aktif
+        const bar = document.getElementById('afPolaBar');
+        if(bar){
+          const cur = g('afPola');
+          bar.innerHTML = (d.pola || []).map(p =>
+            `<button class="af-actor-pill${cur === p.nama ? ' on' : ''}" title="${esc(p.nama)} — klik untuk filter" onclick="ownAfSet('afPola','${esc(cur === p.nama ? '' : p.nama)}')">${esc(p.ikon)} ${esc(p.nama)} <b>${p.jumlah}</b></button>`).join('')
+            || '<span style="font-size:11.5px;color:#8a8f98">Belum ada aktivitas tercatat</span>';
+        }
+        ownAfAktifChips();
+        // daftar padat + pemisah hari
+        if(!rows.length){
+          list.innerHTML = '<div style="padding:18px;text-align:center;color:#8a8f98;font-size:12px">Tidak ada aktivitas yang cocok — tekan <b>↺ Hapus semua</b> untuk kembali ke semua log</div>';
+        } else {
+          let html = '', hariTerakhir = '';
+          for(const r of rows){
+            const h = ownHariLabel(r.created_at);
+            if(h !== hariTerakhir){ html += `<div class="af-day">${esc(h)}</div>`; hariTerakhir = h; }
+            const janggal = r.level === 'tinggi';
+            const det = (r.detail || '').replace(/\s+/g, ' ');
+            html += `<div class="af-row${janggal ? ' ttinggi' : ''}" title="${esc(r.action)} — ${esc(det)}">`
+              + `<span class="t">${esc(ownWaktu(r.created_at))}</span>`
+              + `<span class="i">${esc(r.ikon)}</span>`
+              + `<span class="m"><span class="lbl">${esc(r.label)}</span>`
+                + (det ? ` <span class="det">— ${esc(det)}</span>` : '')
+                + (r.target ? ` <span class="tgt">· ${esc(r.target)}</span>` : '')
+              + `</span>`
+              + `<span class="who"><b onclick="ownAfSet('afActor', '${esc(r.actor)}')" title="Filter pelaku ini">${esc(r.actor)}</b>`
+                + (janggal ? '<span class="af-flag">JANGGAL</span>' : `<span style="color:#9ca3af">${esc(r.peran || '')}</span>`)
+              + `</span></div>`;
+          }
+          list.innerHTML = html;
+        }
+        const info = document.getElementById('afPageInfo');
+        const total = d.total ?? rows.length;
+        if(info) info.textContent = total ? `${off + 1}–${off + rows.length} dari ${total} aktivitas` : '0 aktivitas';
+        const next = document.querySelector('#afPager .btn:last-child');
+        const prev = document.querySelector('#afPager .btn:first-child');
+        if(next){ next.disabled = rows.length < AF_PAGE; next.style.opacity = rows.length < AF_PAGE ? '.4' : '1'; }
+        if(prev){ prev.disabled = off <= 0; prev.style.opacity = off <= 0 ? '.4' : '1'; }
+        ownDemoOff('afDemoNote');
+      }catch(e){
+        list.innerHTML = `<div style="padding:18px;color:#dc2626;text-align:center;font-size:12px">Gagal: ${esc(e.message).slice(0,140)}</div>`;
+      }
+    }
+
+    // ---------- KELOLA TIM: sub-tab Anggota / Kelola Cabang ----------
+    function ownTimTab(k){
+      window._ownTimTab = k || 'tim';
+      document.querySelectorAll('[data-owntim]').forEach(b => b.classList.toggle('active', b.dataset.owntim === window._ownTimTab));
+      ['tim','cabang'].forEach(x => {
+        const el = document.getElementById('ownTimPanel-' + x);
+        if(el) el.style.display = (x === window._ownTimTab) ? '' : 'none';
+      });
+      if(window._ownTimTab === 'cabang') return ownJaringan();
+      return ownTimMuatUlang();
+    }
+    function ownTimMuatUlang(){
+      return ownTokoKode().then(() => ownTeam());
+    }
+    function ownTokoGantiToko(){
+      // "Toko Tujuan" di form = satu-satunya kontrol toko: menukar kode, anggota, stat & pratinjau
+      window._tkTokoId = (document.getElementById('invToko') || {}).value || '';
+      ownInvPreview();
+      return ownTokoKode().then(() => ownTeam());
+    }
+    function ownTokoFilter(){
+      window._tkOffset = 0;
+      return ownTokoKode();
+    }
+    function ownTokoPicked(){
+      return window._tkTokoId
+        || ((document.getElementById('invToko') || {}).value)
+        || (window.BOSAuth ? window.BOSAuth.getActiveStoreId() : null)
+        || '';
+    }
+    async function ownTokoKode(){
+      const tb = document.getElementById('tbodyTokoKode');
+      if(!tb) return;
+      tb.innerHTML = '<tr><td colspan="6" style="text-align:center">Memuat...</td></tr>';
+      try{
+        const d = await ownFetch('/stores/manage/invites');
+        const toko = d.toko || [];
+        window._tkData = d;
+        // satu dropdown saja: Toko Tujuan di form
+        const inv = document.getElementById('invToko');
+        if(inv){
+          const want = toko.map(x => String(x.id));
+          const ada = Array.from(inv.options).map(o => o.value).filter(v => v !== '');
+          if(ada.join(',') !== want.join(',')){
+            inv.innerHTML = '<option value="">Pilih toko…</option>';
+            toko.forEach(x => {
+              const o = document.createElement('option');
+              o.value = x.id;
+              o.textContent = `${x.kode || ''} — ${x.nama}`;
+              inv.appendChild(o);
+            });
+          }
+          const keep = window._tkTokoId || inv.value || ownTokoPicked();
+          const akhir = want.includes(String(keep)) ? String(keep) : (want[0] || '');
+          inv.value = akhir;
+          window._tkTokoId = akhir;
+        }
+        const dipilih = String(window._tkTokoId || '');
+        const t = (d.toko || []).find(x => String(x.id) === dipilih);
+        // stat mengikuti toko terpilih
+        ownSet('tkAnggota', 0);
+        ownSet('tkAktif', t ? t.aktif : 0);
+        ownSet('tkTerpakai', t ? t.terpakai : 0);
+        ownSet('tkTotal', t ? t.total : 0);
+        ownSet('tkCtxLine', t ? `Menampilkan ${t.nama} (${t.kode || ''})` : 'Kode undangan, anggota & stat — semua mengikuti toko tujuan di bawah');
+        ownInvPreview();
+        if(!toko.length){ ownDemoOn('tokoDemoNote'); } else { ownDemoOff('tokoDemoNote'); }
+        // kode: hanya toko terpilih
+        const fStatus = (document.getElementById('invFilterStatus') || {}).value || '';
+        let rows = (d.rows || []).filter(r => String(r.store_id) === dipilih);
+        if(fStatus) rows = rows.filter(r => r.status === fStatus);
+        const badge = s => s === 'aktif'
+          ? '<span class="pill ok">🟢 aktif</span>'
+          : s === 'terpakai' ? '<span class="pill warn">🔵 terpakai</span>' : '<span class="pill" style="background:#f3f4f6;color:#6b7280">⚫ kadaluarsa</span>';
+        tb.innerHTML = rows.map(r => `<tr>`
+            + `<td><strong style="font-family:ui-monospace,monospace;font-size:12px">${esc(r.code)}</strong>`
+              + `<br><span style="font-size:10px;color:#8a8f98">dibuat ${esc(r.created_at || '-')}</span></td>`
+            + `<td style="font-size:11.5px">${esc(r.role || '-')}</td>`
+            + `<td style="text-align:center">${badge(r.status)}</td>`
+            + `<td style="font-size:11px">${r.sisa_hari === null || r.sisa_hari === undefined ? '∞' : (r.sisa_hari > 0 ? r.sisa_hari + ' hari' : 'habis')}</td>`
+            + `<td style="font-size:11.5px">${esc(r.used_by_username || '-')}</td>`
+            + `<td style="text-align:center">`
+              + (r.status === 'aktif'
+                  ? `<button class="btn btn-ghost small" onclick="ownCopyLink('${esc(r.code)}')">Salin</button> `
+                    + `<button class="btn btn-ghost small" onclick="ownRevokeKode('${esc(r.code)}')" title="Batalkan kode">✕</button>`
+                  : '<span style="font-size:11px;color:#8a8f98">selesai</span>')
+            + `</td></tr>`).join('')
+          || `<tr><td colspan="6" style="text-align:center;color:#8a8f98">${toko.length ? 'Belum ada kode untuk toko ini — buat di atas' : 'Belum ada toko yang bisa kamu kelola'}</td></tr>`;
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="6" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,140)}</td></tr>`;
+      }
+    }
+    function ownInvPreview(){
+      const box = document.getElementById('invPreview');
+      if(!box) return;
+      const sel = document.getElementById('invToko');
+      const id = sel ? sel.value : '';
+      const toko = ((window._tkData || {}).toko || []).find(x => String(x.id) === String(id));
+      const role = (document.getElementById('invRole') || {}).value || 'teknisi';
+      const days = parseInt((document.getElementById('invDays') || {}).value || '30', 10);
+      const n = Math.max(1, Math.min(10, parseInt((document.getElementById('invJumlah') || {}).value || '1', 10) || 1));
+      if(!toko){
+        box.innerHTML = 'Pilih <strong>toko tujuan</strong> dulu — kode hanya berlaku untuk toko yang dipilih.';
+        return;
+      }
+      box.innerHTML = `🏪 <strong>${esc(toko.nama)}</strong> (${esc(toko.kode || '-')}) · peran <strong>${esc(role)}</strong> · berlaku <strong>${days > 0 ? days + ' hari' : 'tanpa batas'}</strong> · <strong>${n} kode</strong>.`
+        + `<br>Setelah dibuat, kirim tautan <code>register.html?invite=KODE</code> ke orang yang diundang — saat daftar dia otomatis masuk ke toko ini.`;
+    }
+    async function ownBuatKode(){
+      const sel = document.getElementById('invToko');
+      const id = sel ? sel.value : '';
+      if(!id) return ownAlert('err', 'Pilih toko tujuan dulu');
+      const role = document.getElementById('invRole').value;
+      const days = parseInt(document.getElementById('invDays').value || '30', 10);
+      const n = Math.max(1, Math.min(10, parseInt(document.getElementById('invJumlah').value || '1', 10) || 1));
+      const toko = ((window._tkData || {}).toko || []).find(x => String(x.id) === String(id));
+      try{
+        const made = [];
+        for(let i = 0; i < n; i++){
+          made.push(await ownFetch(`/stores/${id}/invites`, {method: 'POST', body: JSON.stringify({role, expires_days: days})}));
+        }
+        const kode = made.map(m => m.code).join(' • ');
+        ownAlert('ok', `${made.length} kode dibuat untuk ${toko ? toko.nama : 'toko'}: ${kode}`);
+        await ownTokoKode();
+      }catch(e){ ownAlert('err', 'Gagal buat kode: ' + (e.message || e)); }
+    }
+    function ownCopyLink(code){
+      // directori dari halaman sekarang (owner.html & register.html satu folder)
+      const path = location.pathname || '/';
+      const dir = path.slice(0, path.lastIndexOf('/') + 1);
+      const link = `${location.origin}${dir}register.html?invite=${code}`;
+      const done = () => ownAlert('ok', 'Link disalin: ' + link);
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(link).then(done).catch(() => ownCopyFallback(link, done));
+      } else ownCopyFallback(link, done);
+    }
+    function ownCopyFallback(text, done){
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        done();
+      }catch(e){ ownAlert('err', 'Gagal salin — salin manual: ' + text); }
+    }
+    async function ownRevokeKode(code){
+      const row = ((window._tkData || {}).rows || []).find(r => r.code === code);
+      if(!row) return;
+      if(!confirm(`Batalkan kode ${code} untuk ${row.store_nama}? Tautan yang sudah dibagikan tidak akan bisa dipakai.`)) return;
+      try{
+        await ownFetch(`/stores/${row.store_id}/invites/${row.id}/revoke`, {method: 'POST'});
+        ownAlert('ok', 'Kode ' + code + ' dibatalkan.');
+        await ownTokoKode();
+      }catch(e){ ownAlert('err', 'Gagal batalkan: ' + (e.message || e)); }
+    }
+    function OWN_DUMMY_CABANG(){
+      return {cabang: [
+        {id: 1, nama: 'B_gadget (Toko Utama)', kode: 'BGJ', alamat: 'Jl. Margonda 12, Depok', wa: '085314711119',
+         owner_username: 'superadmin', is_active: true, role_saya: 'owner', jumlah_anggota: 5,
+         per_role: {owner: 1, admin: 1, teknisi: 3}, jumlah_teknisi: 3, total_service: 121, total_sukses: 50,
+         dalam_proses: 53, sukses_hari_ini: 2, omzet: 25719000, omzet_bulan_ini: 8600000,
+         jumlah_part: 41, nilai_stok: 42500000, stok_tipis: 4, total_refund: 450000,
+         total_kecelakaan: 0},
+        {id: 2, nama: 'B_gadget Cabang Depok', kode: 'BGD', alamat: 'Jl. Margonda 45, Depok', wa: '085314711120',
+         owner_username: 'superadmin', is_active: true, role_saya: 'owner', jumlah_anggota: 3,
+         per_role: {owner: 1, teknisi: 2}, jumlah_teknisi: 2, total_service: 38, total_sukses: 22,
+         dalam_proses: 11, sukses_hari_ini: 1, omzet: 9400000, omzet_bulan_ini: 3100000,
+         jumlah_part: 22, nilai_stok: 15800000, stok_tipis: 2, total_refund: 0,
+         total_kecelakaan: 0},
+        {id: 3, nama: 'B_gadget Cabang Bogor', kode: 'BGB', alamat: 'Jl. Pakuan 8, Bogor', wa: '085314711121',
+         owner_username: 'superadmin', is_active: true, role_saya: 'owner', jumlah_anggota: 2,
+         per_role: {owner: 1, teknisi: 1}, jumlah_teknisi: 1, total_service: 14, total_sukses: 9,
+         dalam_proses: 4, sukses_hari_ini: 0, omzet: 3900000, omzet_bulan_ini: 1200000,
+         jumlah_part: 11, nilai_stok: 6200000, stok_tipis: 3, total_refund: 0,
+         total_kecelakaan: 0}],
+        total: {cabang: 3, service: 173, sukses: 81, proses: 68, omzet: 39019000,
+                omzet_bulan_ini: 12900000, anggota: 10, teknisi: 6, nilai_stok: 64500000,
+                refund: 450000, kecelakaan: 0}};
+    }
+    async function ownJaringan(){
+      const tb = document.getElementById('tbodyCabang');
+      if(!tb) return;
+      tb.innerHTML = '<tr><td colspan="10" style="text-align:center">Memuat...</td></tr>';
+      try{
+        let d = await ownFetch('/stores/jaringan/ringkasan');
+        if(!d || !d.cabang || !d.cabang.length){
+          d = OWN_DUMMY_CABANG();
+          ownDemoOn('cabangDemoNote');
+        } else ownDemoOff('cabangDemoNote');
+        window._ownJaringan = d;
+        const t = d.total || {};
+        ownSet('cabTotal', t.cabang ?? d.cabang.length);
+        ownSet('cabTotalSub', d.cabang.length + ' toko/cabang aktif');
+        ownSet('cabOmzet', rp(t.omzet ?? 0));
+        ownSet('cabOmzetSub', `Bulan ini ${rp(t.omzet_bulan_ini ?? 0)}`);
+        ownSet('cabSvc', t.service ?? 0);
+        ownSet('cabSvcSub', `Sukses ${t.sukses ?? 0} • proses ${t.proses ?? 0}`);
+        ownSet('cabAnggota', t.anggota ?? 0);
+        ownSet('cabAnggotaSub', `Teknisi ${t.teknisi ?? 0} • nilai stok ${rp(t.nilai_stok ?? 0)}`);
+        const aktifId = (window.BOSAuth ? window.BOSAuth.getActiveStoreId() : null);
+        tb.innerHTML = d.cabang.map(s => {
+          const role = s.role_saya || '-';
+          const badge = s.is_active
+            ? '<span class="pill ok">aktif</span>'
+            : '<span class="pill warn">nonaktif</span>';
+          const isAktif = String(s.id) === String(aktifId);
+          const btn = isAktif
+            ? '<span class="pill" style="background:#04074a;color:#fff">sedang dibuka</span>'
+            : `<button class="btn btn-ghost small" onclick="ownCabangBuka(${s.id})">Buka →</button>`;
+          return `<tr>`
+            + `<td><strong>${esc(s.kode || '-')}</strong></td>`
+            + `<td><strong>${esc(s.nama || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(role)} • owner ${esc(s.owner_username || '-')}</span></td>`
+            + `<td style="font-size:11.5px">${esc(s.alamat || '-')}</td>`
+            + `<td style="font-size:11.5px">${esc(s.wa || '-')}</td>`
+            + `<td style="text-align:center">${s.jumlah_anggota ?? 0}<br><span style="font-size:10px;color:#8a8f98">tek ${s.jumlah_teknisi ?? 0}</span></td>`
+            + `<td style="text-align:center">${s.total_service ?? 0}<br><span style="font-size:10px;color:#8a8f98">proses ${s.dalam_proses ?? 0}</span></td>`
+            + `<td style="text-align:right;font-weight:700;color:#059669">${rp(s.omzet || 0)}<br><span style="font-size:10px;color:#8a8f98;font-weight:400">bln ${rp(s.omzet_bulan_ini || 0)}</span></td>`
+            + `<td style="text-align:right">${rp(s.nilai_stok || 0)}${(s.stok_tipis || 0) ? `<br><span style="font-size:10px;color:#dc2626">${s.stok_tipis} tipis</span>` : ''}</td>`
+            + `<td style="text-align:center">${badge}</td>`
+            + `<td style="text-align:center">${btn} <button class="btn btn-ghost small" onclick="ownCabangForm(true,${s.id})">✎</button></td>`
+            + `</tr>`;
+        }).join('') || '<tr><td colspan="10" style="text-align:center;color:#8a8f98">Belum ada cabang</td></tr>';
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="10" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,140)}</td></tr>`;
+      }
+    }
+    function ownCabangBuka(id){
+      try{ localStorage.setItem('active_store_id', String(id)); }catch(e){}
+      if(window.BOSAuth && window.BOSAuth.setActiveStoreId) window.BOSAuth.setActiveStoreId(id);
+      fillStoreSel();
+      ownJaringan();
+      ownAlert('ok', 'Toko aktif diganti. Muat ulang dashboard toko untuk lihat datanya.');
+    }
+    function ownCabangForm(buat, id){
+      const m = document.getElementById('cabangModal');
+      if(!buat){ m.classList.remove('show'); return; }
+      m.classList.add('show');
+      document.getElementById('cabangModalTitle').textContent = '✎ Ubah Data Toko / Cabang';
+      window._cabEdit = id || null;
+      document.getElementById('cab-nama').value = '';
+      document.getElementById('cab-alamat').value = '';
+      document.getElementById('cab-wa').value = '';
+      if(id){
+        // isi dari data yang sudah dimuat
+        try{
+          const arr = (window._ownJaringan && window._ownJaringan.cabang) || [];
+          const s = arr.find(x => String(x.id) === String(id));
+          if(s){
+            document.getElementById('cabangModalTitle').textContent = '✎ Ubah ' + (s.kode || '');
+            document.getElementById('cab-nama').value = s.nama || '';
+            document.getElementById('cab-alamat').value = s.alamat || '';
+            document.getElementById('cab-wa').value = s.wa || '';
+          }
+        }catch(e){}
+      } else {
+        document.getElementById('cabangModalTitle').textContent = '🏪 Cabang Baru';
+      }
+    }
+    async function ownCabangSave(){
+      const nama = (document.getElementById('cab-nama')?.value || '').trim();
+      if(!nama) return ownAlert('err', 'Nama toko/cabang wajib diisi');
+      const body = {nama: nama,
+                    alamat: (document.getElementById('cab-alamat')?.value || '').trim() || null,
+                    wa: (document.getElementById('cab-wa')?.value || '').trim() || null};
+      try{
+        if(window._cabEdit){
+          await ownFetch('/stores/' + window._cabEdit, {method: 'PATCH', body: JSON.stringify(body)});
+          ownAlert('ok', 'Data toko diperbarui.');
+        } else {
+          const created = await ownFetch('/stores', {method: 'POST', body: JSON.stringify(body)});
+          ownAlert('ok', 'Cabang dibuat: ' + (created.nama || '') + ' (kode ' + (created.kode || '') + ')');
+          // langsung seed ke switcher
+          try{
+            const stores = window.BOSAuth ? window.BOSAuth.getStores() : [];
+            if(window.BOSAuth && window.BOSAuth.setStores) window.BOSAuth.setStores(stores.concat([created]));
+            fillStoreSel();
+          }catch(e){}
+        }
+        document.getElementById('cabangModal').classList.remove('show');
+        window._cabEdit = null;
+        await ownJaringan();
+      }catch(e){
+        ownAlert('err', 'Gagal: ' + (e.message || e));
+      }
+    }
+
     async function ownTeam(){
-      const id = window.BOSAuth ? window.BOSAuth.getActiveStoreId() : null;
+      const id = ownTokoPicked();
       const tb = document.getElementById('tbodyTeam');
-      if (!id){ tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Tidak ada toko aktif</td></tr>'; return; }
+      if(!tb) return;
+      if (!id){ tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Pilih toko dulu</td></tr>'; ownSet('tkAnggota', 0); return; }
+      const t = ((window._tkData || {}).toko || []).find(x => String(x.id) === String(id));
+      ownSet('tkAnggota', t ? (t.total_anggota ?? t.jumlah_anggota ?? 0) : 0);
+      ownSet('tkAnggotaSub', t ? (t.nama || '') : 'memuat…');
       try{
         const members = await ownFetch(`/stores/${id}/members`);
-        tb.innerHTML = (members || []).map(m => {
+        const arr = members || [];
+        ownSet('tkAnggota', arr.length);
+        try{ document.getElementById('tkAnggotaNote').textContent = (t ? t.nama + ' • ' : '') + arr.length + ' anggota'; }catch(e){}
+        tb.innerHTML = arr.map(m => {
           const uname = m.username || m.nama || '-';
           const preview = (m.role === 'teknisi' || m.role_saya === 'teknisi')
-            ? `<a href="index.html?teknisi=${encodeURIComponent(uname)}" title="Lihat beranda kerja teknisi ini (mode preview, tetap login owner)">👁 Kerjaan</a>`
+            ? `<a href="index.html?teknisi=${encodeURIComponent(uname)}" title="Lihat beranda kerja teknisi ini (mode preview, tetap login owner)">👀 Kerjaan</a>`
             : '<span style="font-size:11px;color:#8a8f98">-</span>';
           return `<tr><td><strong>${esc(uname)}</strong></td><td>${esc(m.role || m.role_saya || '-')}</td><td>${m.is_active ? '<span class="pill ok">Aktif</span>' : '<span class="pill warn">Nonaktif</span>'}</td><td style="text-align:center">${preview}</td></tr>`;
-        }).join('') || '<tr><td colspan="4" style="text-align:center">Belum ada anggota</td></tr>';
-      }catch(e){ tb.innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,150)} (khusus owner/admin)</td></tr>`; }
+        }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Belum ada anggota di toko ini</td></tr>';
+      }catch(e){
+        tb.innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,150)} (khusus owner/admin toko ini)</td></tr>`;
+      }
     }
-    async function ownCreateInvite(){
-      const id = window.BOSAuth ? window.BOSAuth.getActiveStoreId() : null;
-      if (!id) return ownAlert('err', 'Tidak ada toko aktif');
-      const role = document.getElementById('teamInviteRole').value;
-      const days = parseInt(document.getElementById('teamInviteExpiry').value || '30', 10);
-      try{
-        const inv = await ownFetch(`/stores/${id}/invites`, {method: 'POST', body: JSON.stringify({role, expires_days: days})});
-        document.getElementById('teamInviteResult').innerHTML = `✅ Kode <strong style="font-family:monospace">${esc(inv.code)}</strong> — daftar via <code>register.html?invite=${esc(inv.code)}</code>`;
-      }catch(e){ ownAlert('err', 'Gagal buat invite: ' + e.message); }
-    }
+    // CATATAN: fungsi lama ownCreateInvite() dihapus — form undangan digabung ke
+    // tab "Anggota & Kode Undangan" (pakai ownBuatKode() + toko tujuan).
 
     // ---------- guard: owner/admin/superadmin only ----------
     (async function guard(){

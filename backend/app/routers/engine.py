@@ -203,6 +203,13 @@ def _kas_summary(db: Session, store_id: int, technician_id: int):
     komisi = sum((l.masuk_rp or 0) for l in leds if l.tipe == "komisi_cair")
     allowance = sum((l.masuk_rp or 0) for l in leds if l.tipe == "allowance")
     potong = sum((l.keluar_rp or 0) for l in leds if l.tipe == "potongan_cicilan")
+    refund = sum((l.keluar_rp or 0) for l in leds if l.tipe == "refund_balik")
+    # komisi_cair di ledger sudah NET dari cicilan hutang (masuk = komisi - potong).
+    # Jadi komisi_bruto = komisi + cicilan; potongan = cicilan + refund balik.
+    potongan = potong + refund
+    komisi_bruto = komisi + potong
+    total_diterima = komisi + allowance
+    netto = total_diterima - refund
     debts = db.query(models.TechDebt).filter(
         models.TechDebt.technician_id == technician_id,
         models.TechDebt.status == "belum").all()
@@ -221,8 +228,11 @@ def _kas_summary(db: Session, store_id: int, technician_id: int):
             mypend.append({"invoice": se.invoice, "kategori": se.kategori,
                            "jasa_bersih": se.jasa_bersih, "komisi": se.komisi_teknisi,
                            "status_service": svc.status})
-    return {"komisi_cair": komisi, "allowance": allowance, "potongan_cicilan": potong,
-            "total_diterima": komisi + allowance, "sisa_hutang": sisa,
+    return {"komisi_cair": komisi, "komisi_bruto": komisi_bruto,
+            "allowance": allowance, "potongan_cicilan": potong,
+            "potongan_refund": refund, "potongan": potongan,
+            "total_diterima": komisi + allowance, "netto": netto,
+            "sisa_hutang": sisa,
             "pending_count": len(mypend), "pending": mypend,
             "riwayat": [{"id": l.id, "tanggal": l.tanggal, "invoice": l.invoice, "tipe": l.tipe,
                          "masuk": l.masuk_rp, "keluar": l.keluar_rp,
@@ -488,3 +498,60 @@ def list_debts(store_id: Optional[int] = Query(None), status: Optional[str] = Qu
                     "dicicil": d.sudah_dicicil, "sisa": d.sisa,
                     "sebab": d.sebab, "status": d.status, "created_at": d.created_at})
     return out
+
+
+@router.get("/potongans")
+def list_potongans(store_id: Optional[int] = Query(None), technician_id: Optional[int] = Query(None),
+                   tipe: Optional[str] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Semua POTONGAN dari buku kas teknisi (keluar_rp > 0): cicilan hutang + refund balik.
+    Owner/admin. Sisa hutang per teknisi ikut dilampirkan."""
+    store = resolve_store(db, current, store_id)
+    if store is None:
+        store = default_store(db)
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh lihat potongan")
+    sid = store.id if store else None
+    q = db.query(models.CommissionLedger).filter(
+        models.CommissionLedger.keluar_rp > 0)
+    if sid:
+        q = q.filter(models.CommissionLedger.store_id == sid)
+    if technician_id:
+        q = q.filter(models.CommissionLedger.technician_id == technician_id)
+    if tipe:
+        q = q.filter(models.CommissionLedger.tipe == tipe)
+    leds = q.order_by(models.CommissionLedger.id.desc()).limit(300).all()
+    techs = {t.id: t for t in db.query(models.Technician).all()}
+    rows = []
+    for l in leds:
+        t = techs.get(l.technician_id)
+        rows.append({"id": l.id, "tanggal": l.tanggal, "teknisi": t.nama if t else f"#{l.technician_id}",
+                     "technician_id": l.technician_id,
+                     "level": (t.level or "junior") if t else None,
+                     "invoice": l.invoice, "tipe": l.tipe, "keluar": l.keluar_rp,
+                     "sisa_hutang": l.sisa_hutang_saat_itu, "keterangan": l.keterangan})
+    # ringkasan: seluruh toko (tidak ikut filter) supaya kartu stat stabil
+    base = db.query(models.CommissionLedger).filter(models.CommissionLedger.keluar_rp > 0)
+    if sid:
+        base = base.filter(models.CommissionLedger.store_id == sid)
+    alls = base.all()
+    cicil = sum(int(l.keluar_rp or 0) for l in alls if l.tipe == "potongan_cicilan")
+    refund = sum(int(l.keluar_rp or 0) for l in alls if l.tipe == "refund_balik")
+    debts = db.query(models.TechDebt).filter(models.TechDebt.status == "belum")
+    if sid:
+        debts = debts.filter(models.TechDebt.store_id == sid)
+    sisa = sum(int(d.sisa or 0) for d in debts.all())
+    per_tech = {}
+    for l in alls:
+        nm = techs[l.technician_id].nama if l.technician_id in techs else f"#{l.technician_id}"
+        per_tech[nm] = per_tech.get(nm, 0) + int(l.keluar_rp or 0)
+    today = datetime.date.today()
+    bln = sum(int(l.keluar_rp or 0) for l in alls
+              if str(l.tanggal or "")[:7] == today.strftime("%Y-%m"))
+    return {"rows": rows,
+            "ringkasan": {"total": sum(int(l.keluar_rp or 0) for l in alls),
+                          "cicilan": cicil, "refund": refund, "lainnya": sum(int(l.keluar_rp or 0) for l in alls
+                          if l.tipe not in ("potongan_cicilan", "refund_balik")),
+                          "jumlah": len(alls), "bulan_ini": bln,
+                          "sisa_hutang": sisa, "per_teknisi": per_tech}}

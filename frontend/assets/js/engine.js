@@ -57,7 +57,7 @@ function setLapTekTab(t){
   if(t==='kas') renderKasTeknisi();
 }
 function kasRowHtml(l){
-  const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko'}[l.tipe]||l.tipe;
+  const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', refund_balik:'↩️ Refund dibalik', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko'}[l.tipe]||l.tipe;
   return `<tr><td>${_esc(l.tanggal||'')}</td><td>${_esc(l.invoice||'-')}</td><td>${tipe}</td><td style="text-align:right;color:#059669;font-weight:700">${l.masuk?_rp(l.masuk):''}</td><td style="text-align:right;color:#dc2626">${l.keluar?_rp(l.keluar):''}</td><td style="font-size:11px">${_esc(l.ket||'')}</td></tr>`;
 }
 async function renderKasTeknisi(){
@@ -72,10 +72,10 @@ async function renderKasTeknisi(){
     if(!sel?.value) { if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center">Belum ada teknisi</td></tr>'; return; }
     const j = await apiFetch(`/engine/kas/teknisi/${sel.value}`);
     document.getElementById('kasKomisi').textContent = _rp(j.komisi_cair);
-    document.getElementById('kasKomisiSub').textContent = `${j.nama} (${j.level}) • total diterima ${_rp(j.total_diterima)}`;
+    document.getElementById('kasKomisiSub').textContent = `${j.nama} (${j.level}) • potongan ${_rp(j.potongan||0)} • diterima ${_rp(j.netto ?? j.total_diterima)}`;
     document.getElementById('kasAllowance').textContent = _rp(j.allowance);
     document.getElementById('kasHutang').textContent = _rp(j.sisa_hutang);
-    document.getElementById('kasPending').textContent = `${j.pending_count} pending • potong ${_rp(j.potongan_cicilan)}`;
+    document.getElementById('kasPending').textContent = `${j.pending_count} pending • komisi bruto ${_rp(j.komisi_bruto ?? j.komisi_cair)}`;
     tbody.innerHTML = (j.riwayat||[]).map(kasRowHtml).join('') || '<tr><td colspan="6" style="text-align:center">Belum ada riwayat</td></tr>';
     // pending list (Part UP disembunyikan dulu sesuai request)
     const pendWrap = document.getElementById('kasPendingList');
@@ -95,7 +95,7 @@ async function renderKasSaya(){
   try{
     const j = await apiFetch('/engine/kas/saya');
     document.getElementById('kasSayaSub').textContent = `${j.nama} (${j.level}) • transparan`;
-    document.getElementById('kasSayaLevel').textContent = `${j.level} • total ${_rp(j.total_diterima)}`;
+    document.getElementById('kasSayaLevel').textContent = `${j.level} • total ${_rp(j.netto ?? j.total_diterima)}`;
     // hari ini & bulan ini dari riwayat (hari lokal WIB, bukan UTC)
     const _d = new Date();
     const today = _d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');

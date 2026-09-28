@@ -5,6 +5,7 @@ from ..database import get_db
 from .. import schemas, crud
 from ..store_ctx import resolve_store, ensure_in_store, default_store
 from .auth import get_current_user, require_superadmin
+from ..audit import log_action
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -45,7 +46,11 @@ def create_sparepart(
     existing = sq.first()
     if existing:
         raise HTTPException(status_code=400, detail="Nama part sudah ada di toko ini — pakai Edit")
-    return crud.create_sparepart(db, payload, store_id=store.id if store else None)
+    sp = crud.create_sparepart(db, payload, store_id=store.id if store else None)
+    log_action(db, "stok.create", target=sp.nama,
+               detail=f"Masuk {sp.masuk} • stok {sp.stok} • beli {sp.harga_beli} • jual {sp.harga} • {sp.merk}/{sp.kategori}",
+               actor=current, store_id=store.id if store else None)
+    return sp
 
 @router.put("/spareparts/{sp_id}", response_model=schemas.SparepartOut)
 def update_sparepart(
@@ -70,9 +75,17 @@ def update_sparepart(
             raise HTTPException(status_code=400, detail="Nama sudah dipakai item lain")
     if not current:
         raise HTTPException(status_code=401, detail="Belum login")
+    lama = {k: getattr(sp, k, None) for k in ("nama", "stok", "harga", "harga_beli", "keluar")}
     sp = crud.update_sparepart(db, sp_id, payload)
     if not sp:
         raise HTTPException(status_code=404, detail="Sparepart tidak ditemukan")
+    ubah = []
+    for k, v in lama.items():
+        if getattr(sp, k, None) != v:
+            ubah.append(f"{k} {v} -> {getattr(sp, k, None)}")
+    if ubah:
+        log_action(db, "stok.update", target=sp.nama, detail="; ".join(ubah)[:400],
+                   actor=current, store_id=_sid(store))
     return sp
 
 @router.delete("/spareparts/{sp_id}")
@@ -90,6 +103,9 @@ def delete_sparepart(
     ok = crud.delete_sparepart(db, sp_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Sparepart tidak ditemukan")
+    log_action(db, "stok.hapus", target=sp.nama,
+               detail=f"Hapus {sp.merk}/{sp.kategori} • stok {sp.stok} • harga {sp.harga}",
+               actor=current, store_id=_sid(store))
     return {"message": f"{sp_id} dihapus"}
 
 @router.post("/spareparts/{sp_id}/pakai", response_model=schemas.SparepartOut)
