@@ -7,7 +7,7 @@
   <meta name="description" content="Dashboard owner BOS SERVICE: pengaturan toko, laporan keuangan teknisi & sparepart, kelola tim. Owner/admin only.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=black1">
+  <link rel="stylesheet" href="assets/css/style.css?v=black2">
   <link rel="stylesheet" href="assets/css/bos.css?v=mobile1">
   <style>
     html.guard-lock body{visibility:hidden}
@@ -133,6 +133,10 @@
           <button class="menu-item" data-own="inventori" onclick="ownShow('inventori')">
             <span class="mi">◈</span> Inventori
           </button>
+          <div class="menu-category">LAPORAN</div>
+          <button class="menu-item" data-own="laporan" onclick="ownShow('laporan')">
+            <span class="mi">📊</span> Laporan
+          </button>
           <div class="menu-category">KONTROL</div>
           <button class="menu-item" data-own="toko" onclick="ownShow('toko')">
             <span class="mi">🏪</span> Profil Toko
@@ -145,6 +149,10 @@
           </button>
           <button class="menu-item" data-own="tim" onclick="ownShow('tim')">
             <span class="mi">👥</span> Kelola Tim
+          </button>
+          <button class="menu-item" data-own="approval" onclick="ownShow('approval')" id="menu-approval-own" style="display:none">
+            <span class="mi">✅</span> Persetujuan Akun
+            <span class="badge" id="own-badge-pending" style="background:#f59e0b;display:none">0</span>
           </button>
           <div class="menu-category">NAVIGASI</div>
           <a class="menu-item" href="index.html" style="text-decoration:none">
@@ -218,7 +226,7 @@
             </div>
             <div class="stat-card" style="border-left:4px solid #dc2626">
               <div class="stat-head"><span>Pengeluaran Hari Ini</span><span class="stat-icon">🧾</span></div>
-              <h3 id="outHari" style="color:#dc2626">-</h3><p class="trend" id="outHariSub">frontend dulu — API menyusul</p>
+              <h3 id="outHari" style="color:#dc2626">-</h3><p class="trend" id="outHariSub">pengeluaran hari ini</p>
             </div>
             <div class="stat-card" onclick="ownShow('keuangan')" style="cursor:pointer;border-left:4px solid #ef4444">
               <div class="stat-head"><span>Hutang Teknisi</span><span class="stat-icon">⚠</span></div>
@@ -496,35 +504,128 @@
           </div>
         </section>
 
-        <!-- PENGELUARAN -->
+        <!-- PENGELUARAN: real (API /finance/expenses) + laba-rugi sederhana -->
         <section class="view" id="view-own-keluar">
           <div class="card">
             <div class="card-head toolbar">
               <div class="toolbar-left"><h3>🧾 Pengeluaran</h3><span class="muted">Belanja + operasional toko</span></div>
-              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownKeluar()">↻</button></div>
+              <div class="toolbar-right">
+                <select id="outFilterKat" onchange="ownKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option>Sewa</option><option>Listrik</option><option>Internet</option><option>Gaji</option><option>Belanja Part</option><option>Operasional</option><option>Lainnya</option></select>
+                <button class="btn btn-ghost small" onclick="ownKeluar()">↻</button>
+                <button class="btn btn-dark small" onclick="ownOutOpen()">+ Catat Keluar</button>
+              </div>
             </div>
             <div class="stats" style="margin-bottom:10px">
               <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Hari Ini</span></div><h3 id="outHariBig" style="color:#dc2626">-</h3><p class="trend" id="outHariBigSub">-</p></div>
-              <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="outBulan">-</h3><p class="trend">akumulasi tercatat</p></div>
+              <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="outBulan">-</h3><p class="trend" id="outBulanSub">akumulasi tercatat</p></div>
+              <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Total Tercatat</span></div><h3 id="outTotal">-</h3><p class="trend" id="outTotalSub">-</p></div>
             </div>
-            <div id="outNote" style="font-size:12.5px;color:#8a8f98;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:12px;text-align:center">Modul backend pengeluaran menyusul — tabel di bawah akan terisi otomatis setelah API ada.</div>
-            <div class="table-wrap" style="margin-top:10px"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keperluan</th><th style="text-align:right">Nominal</th><th>Keterangan</th></tr></thead><tbody id="tbodyKeluar"><tr><td colspan="4" style="text-align:center">Belum ada data</td></tr></tbody></table></div>
+            <div id="outKatRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keperluan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Metode</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyKeluar"><tr><td colspan="7" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📉 Laba - Rugi Sederhana</h3><span class="muted">Omzet cair − semua beban</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownKeluar()">↻</button></div>
+            </div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card"><div class="stat-head"><span>Laba Hari Ini</span></div><h3 id="labaHari">-</h3><p class="trend" id="labaHariSub">-</p></div>
+              <div class="stat-card"><div class="stat-head"><span>Laba Bulan Ini</span></div><h3 id="labaBulan">-</h3><p class="trend" id="labaBulanSub">-</p></div>
+            </div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Komponen</th><th style="text-align:right">Hari Ini</th><th style="text-align:right">Bulan Ini</th></tr></thead><tbody id="tbodyLaba"><tr><td colspan="3" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rumus: Omzet cair bruto + profit barang/jasa − komisi teknisi − uang hadir − refund nominal − beban toko kecelakaan − pengeluaran = <strong>Laba bersih</strong>.</p>
+          </div>
+          <div class="modal" id="outModal">
+            <div class="modal-box" style="max-width:480px">
+              <button class="modal-close" onclick="ownOutClose()">×</button>
+              <h3 style="margin-bottom:4px">🧾 Catat Pengeluaran</h3>
+              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Sewa, listrik, gaji, belanja part — otomatis masuk Total Keluar Kas Toko + Laba-Rugi.</p>
+              <form id="outForm" onsubmit="ownOutSave(event)">
+                <div class="form-grid">
+                  <div class="field"><label>Keperluan *</label><input id="out-keperluan" required placeholder="Sewa ruko Oktober"></div>
+                  <div class="field"><label>Nominal (Rp) *</label><input id="out-nominal" type="number" min="1" required placeholder="2500000" oninput="ownOutPreview()"><span id="out-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                  <div class="field"><label>Kategori *</label><select id="out-kategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Operasional</option><option>Sewa</option><option>Listrik</option><option>Internet</option><option>Gaji</option><option>Belanja Part</option><option>Lainnya</option></select></div>
+                  <div class="field"><label>Metode</label><select id="out-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
+                  <div class="field"><label>Tanggal</label><input id="out-tanggal" type="date"></div>
+                  <div class="field"><label>Keterangan</label><input id="out-ket" placeholder="Opsional"></div>
+                </div>
+                <div id="out-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownOutClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Pengeluaran</button></div>
+              </form>
+            </div>
           </div>
         </section>
 
-        <!-- PENJUALAN -->
+        <!-- PENJUALAN: real (API /sales) — struk kasir toko -->
         <section class="view" id="view-own-penjualan">
           <div class="card">
             <div class="card-head toolbar">
-              <div class="toolbar-left"><h3>🛒 Penjualan</h3><span class="muted">Pergerakan barang keluar (proxy sementara)</span></div>
+              <div class="toolbar-left"><h3>🛒 Penjualan</h3><span class="muted">Struk kasir: barang + jasa</span></div>
               <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownPenjualan()">↻</button></div>
             </div>
             <div class="stats" style="margin-bottom:10px">
-              <div class="stat-card"><div class="stat-head"><span>Unit Keluar</span></div><h3 id="jualUnit">-</h3><p class="trend">total qty keluar gudang</p></div>
-              <div class="stat-card"><div class="stat-head"><span>Nilai Keluar</span></div><h3 id="jualNilai">-</h3><p class="trend">harga × qty keluar</p></div>
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Omzet Hari Ini</span></div><h3 id="jualHari">-</h3><p class="trend" id="jualHariSub">-</p></div>
+              <div class="stat-card"><div class="stat-head"><span>Omzet Bulan Ini</span></div><h3 id="jualBulan">-</h3><p class="trend" id="jualBulanSub">-</p></div>
+              <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Profit Barang/Jasa</span></div><h3 id="jualProfit">-</h3><p class="trend" id="jualProfitSub">jual − beli</p></div>
             </div>
-            <div id="jualNote" style="font-size:12px;color:#8a8f98;margin-bottom:10px">Modul kasir penjualan menyusul — sementara memakai data barang keluar gudang.</div>
-            <div class="table-wrap"><table class="table compact"><thead><tr><th>Barang</th><th style="text-align:center">Keluar</th><th style="text-align:center">Stok</th><th style="text-align:right">Harga</th></tr></thead><tbody id="tbodyJual"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Kode</th><th>Tanggal</th><th>Item</th><th>Pelanggan</th><th style="text-align:right">Total</th><th style="text-align:right">Profit</th><th>Bayar</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyJual"><tr><td colspan="9" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="card-head"><h3>🏆 Barang/Jasa Terlaris</h3><span class="muted">by qty</span></div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Nama</th><th style="text-align:center">Qty</th><th style="text-align:right">Omzet</th><th style="text-align:right">Profit</th></tr></thead><tbody id="tbodyJualTop"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+          </div>
+        </section>
+
+        <!-- LAPORAN: pindahan dari dashboard toko (laporan-service/teknisi/penjualan) — saling melengkapi Ringkasan+Finsukses+Bayar -->
+        <section class="view" id="view-own-laporan">
+          <div class="tabs" style="margin-bottom:12px">
+            <button class="tab active" data-ownlap="service" onclick="ownLapTab('service')">📄 Service</button>
+            <button class="tab" data-ownlap="teknisi" onclick="ownLapTab('teknisi')">👷 Teknisi</button>
+            <button class="tab" data-ownlap="jual" onclick="ownLapTab('jual')">📊 Penjualan</button>
+          </div>
+          <div id="ownLapPanel-service">
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>📄 Laporan Service</h3><span class="count-pill" id="lapSvcTotal">0 masuk</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="lapSvcRate">0% sukses</span></div>
+                <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownLaporan()">↻</button><button class="btn btn-dark small" onclick="ownLapSvcCSV()">⬇ Export CSV</button></div>
+              </div>
+              <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Total <strong>Masuk / Sukses / Failed / Garansi</strong> per tanggal masuk. Melengkapi <strong>Ringkasan</strong> (harian) + <strong>Pendapatan Sukses</strong> (nominal cair).</p>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>📥 Masuk</span></div><h3 id="lapSvcMasuk">0</h3><p class="trend" id="lapSvcMasukSub">total barang</p></div>
+                <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>✅ Sukses</span></div><h3 id="lapSvcSukses">0</h3><p class="trend" id="lapSvcSuksesSub">-</p></div>
+                <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>❌ Failed</span></div><h3 id="lapSvcFailed">0</h3><p class="trend" id="lapSvcFailedSub">-</p></div>
+                <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="stat-head"><span>🔁 Garansi</span></div><h3 id="lapSvcGaransi">0</h3><p class="trend" id="lapSvcGaransiSub">klaim garansi</p></div>
+              </div>
+              <div class="tabs" style="margin-bottom:10px">
+                <button class="tab active" data-lapsvc="harian" onclick="ownLapSvcTab('harian')">Harian</button>
+                <button class="tab" data-lapsvc="mingguan" onclick="ownLapSvcTab('mingguan')">Mingguan</button>
+                <button class="tab" data-lapsvc="bulanan" onclick="ownLapSvcTab('bulanan')">Bulanan</button>
+              </div>
+              <div class="table-wrap"><table class="table"><thead><tr><th>Periode</th><th style="text-align:center">Masuk</th><th style="text-align:center">Sukses</th><th style="text-align:center">Failed</th><th style="text-align:center">Garansi</th></tr></thead><tbody id="tbodyLapSvc"><tr><td colspan="5" style="text-align:center;padding:24px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+            </div>
+          </div>
+          <div id="ownLapPanel-teknisi" style="display:none">
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>👷 Laporan Teknisi</h3><span class="muted">Handle • Sukses • Rating — melengkapi Performa di Ringkasan + Kas di Keuangan</span></div>
+                <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownLaporan()">↻</button></div>
+              </div>
+              <div class="table-wrap"><table class="table"><thead><tr><th>Teknisi</th><th style="text-align:center">Handle</th><th style="text-align:center">Sukses</th><th style="text-align:center">Failed</th><th>Rating</th></tr></thead><tbody id="tbodyLapTek"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+              <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rincian kas per teknisi tetap di <strong>Keuangan → Kas Teknisi → Rincian Kas</strong>.</p>
+            </div>
+          </div>
+          <div id="ownLapPanel-jual" style="display:none">
+            <div class="card">
+              <div class="card-head toolbar">
+                <div class="toolbar-left"><h3>📊 Laporan Penjualan</h3><span class="muted">Nominal cair + sparepart terlaris — melengkapi Pendapatan + Pembayaran + Penjualan</span></div>
+                <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownLaporan()">↻</button></div>
+              </div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-head"><span>Total Penjualan Cair</span></div><h3 id="lapJualTotal">-</h3><p class="trend" id="lapJualTotalSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Sparepart Terlaris</span></div><h3 id="lapJualTop">-</h3><p class="trend" id="lapJualTopSub">by qty keluar</p></div>
+              </div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Struk</th><th style="text-align:center">Qty</th><th style="text-align:center">Item</th><th style="text-align:right">Total</th></tr></thead><tbody id="tbodyLapJual"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
           </div>
         </section>
 
@@ -536,8 +637,9 @@
               <div class="toolbar-left"><h3>Sparepart</h3><span class="count-pill" id="sparepartCount">0 item</span><span id="sparepartWarning" style="display:none;background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Stok tipis</span></div>
               <div class="toolbar-right">
                 <div class="search-box small"><span>⌕</span><input id="searchSparepart" placeholder="Cari part, kategori, merk..." oninput="ownInvRenderSp()" onkeydown="if(event.key==='Escape'){this.value='';ownInvRenderSp()}"></div>
-                <select id="filterMerkSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select>
+                <select id="filterMerkSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>ROBOT</option><option>OLIKE</option><option>BASEUS</option><option>ANKER</option><option>UNEED</option><option>KAKU</option><option>HIPPO</option><option>ORIGINAL</option><option>GENERIC</option><option>LAIN</option></select>
                 <select id="filterKategoriSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select>
+                <button class="btn btn-ghost small" onclick="ownAccPreset()" title="Tampilkan hanya Aksesoris">🎧 Asesories</button>
                 <label title="Rumus harga jual otomatis = beli + margin%" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#4b5563;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:7px 10px;white-space:nowrap">⚡ Margin <input id="ownMargin" type="number" min="0" max="1000" value="8" onchange="oMarginSave()" style="width:48px;padding:3px 6px;border:1px solid #d9d9de;border-radius:7px;font-size:12px;text-align:center">%</label>
                 <button class="btn btn-dark small" onclick="ownInvToggleAdd()">+ Tambah Item</button>
               </div>
@@ -548,8 +650,8 @@
               <form id="spAddForm" onsubmit="ownInvSpAdd(event)">
                 <div class="form-grid">
                   <div class="field"><label>Nama Part *</label><input id="sp-nama" required placeholder="LCD iPhone 11, Baterai Samsung..."></div>
-                  <div class="field"><label>Merk *</label><select id="sp-merk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
-                  <div class="field"><label>Kategori *</label><select id="sp-kategori" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                  <div class="field"><label>Merk * (bebas ketik)</label><input id="sp-merk" required list="ownMerkList" placeholder="Contoh: Samsung / Robot" autocomplete="off"><datalist id="ownMerkList"></datalist></div>
+                  <div class="field"><label>Kategori *</label><select id="sp-kategori" required onchange="oMerkFill('ownMerkList', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
                   <div class="field"><label>Barang Masuk *</label><input id="sp-masuk" type="number" min="0" required placeholder="0"></div>
                   <div class="field"><label>Harga Beli (Rp)</label><input id="sp-beli" type="text" inputmode="numeric" placeholder="300.000" oninput="oRpLive('sp-beli');oAutoJual('sp-beli','sp-harga')"><span style="font-size:11px;color:#8a8f98">Modal dari supplier → Jual terisi otomatis</span></div>
                   <div class="field"><label>Harga Jual (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="550.000" oninput="oRpLive('sp-harga','sp-harga-preview');this.dataset.auto=''"><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
@@ -575,8 +677,8 @@
                 <input type="hidden" id="spEditId">
                 <div class="field" style="margin-bottom:10px"><label>Nama Part *</label><input id="spEditNama" required placeholder="LCD iPhone 11"></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-                  <div class="field"><label>Merk *</label><select id="spEditMerk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
-                  <div class="field"><label>Kategori</label><select id="spEditKategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                  <div class="field"><label>Merk * (bebas ketik)</label><input id="spEditMerk" required list="ownMerkListEdit" placeholder="Contoh: Robot" autocomplete="off"><datalist id="ownMerkListEdit"></datalist></div>
+                  <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="oMerkFill('ownMerkListEdit', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                   <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
@@ -825,6 +927,61 @@
             </div>
           </div>
         </section>
+
+        <!-- PERSETUJUAN AKUN: pindahan tab SUPERADMIN dashboard toko — khusus superadmin -->
+        <section class="view" id="view-own-approval">
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>✅ Persetujuan Akun</h3><span class="count-pill" id="ownApprovalCount">0 menunggu</span><span class="muted">khusus superadmin</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownApproval()">↻ Refresh</button></div>
+            </div>
+            <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Daftar admin / teknisi yang baru register dan <strong>belum aktif</strong>. Akun yang belum disetujui tidak bisa login.</p>
+            <div class="table-wrap">
+              <table class="table"><thead><tr><th>#</th><th>Username</th><th>Role</th><th>Status</th><th>Tanggal Daftar</th><th style="text-align:center">Aksi</th></tr></thead>
+              <tbody id="tbodyOwnApproval"><tr><td colspan="6" style="text-align:center;padding:24px;color:#8a8f98">Memuat...</td></tr></tbody></table>
+            </div>
+            <div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;font-size:12px;color:#92400e">
+              <strong>Alur:</strong> Teknisi/Admin daftar di <code>login.html → Register</code> (is_active = false) → muncul di sini → superadmin klik <strong>Setujui</strong> → akun bisa login. Klik <strong>Tolak</strong> = hapus akun.
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>Semua Akun Terdaftar</h3><span class="count-pill" id="ownAllUsersCount">0 user</span></div>
+              <div class="toolbar-right">
+                <div class="search-box small"><span>⌕</span><input id="ownSearchUser" placeholder="Cari username..." oninput="ownFilterUsers()"></div>
+                <select id="ownFilterRole" onchange="ownFilterUsers()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Role</option><option value="superadmin">Superadmin</option><option value="admin">Admin</option><option value="kasir">Kasir</option><option value="teknisi">Teknisi</option><option value="owner">Owner</option></select>
+                <select id="ownFilterStatus" onchange="ownFilterUsers()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Status</option><option value="aktif">Aktif</option><option value="beku">Beku/Pending</option></select>
+              </div>
+            </div>
+            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Kelola akun yg sudah terdaftar: <strong>Edit</strong> username/role/password, <strong>Bekukan</strong> (nonaktifkan login), atau <strong>Hapus</strong>. Hanya superadmin.</p>
+            <div class="table-wrap">
+              <table class="table"><thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Dibuat</th><th>Last Login</th><th style="text-align:center">Aksi</th></tr></thead>
+              <tbody id="tbodyOwnAllUsers"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class="modal" id="ownUserEditModal">
+            <div class="modal-box" style="max-width:440px">
+              <button class="modal-close" onclick="ownCloseUserModal()">×</button>
+              <h3 style="margin-bottom:4px">Edit Akun</h3>
+              <p style="font-size:12px;color:#8a8f98;margin-bottom:14px" id="ownEditUserSub">Ubah username, role, atau password</p>
+              <form id="ownUserEditForm" onsubmit="ownSubmitUserEdit(event)">
+                <input type="hidden" id="ownEditUserId">
+                <div class="field" style="margin-bottom:10px"><label>Username</label><input id="ownEditUsername" required minlength="3" placeholder="username"></div>
+                <div class="field" style="margin-bottom:10px"><label>Role</label>
+                  <select id="ownEditRole" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec">
+                    <option value="admin">Admin</option><option value="kasir">Kasir</option><option value="teknisi">Teknisi</option><option value="owner">Owner</option><option value="superadmin">Superadmin</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:6px"><label>Password Baru (kosongkan jika tidak ganti)</label><input id="ownEditPassword" type="password" placeholder="minimal 6 karakter, kosong = tidak ganti"></div>
+                <p style="font-size:11px;color:#8a8f98;margin-bottom:14px">Kosongkan password jika tidak ingin mengganti.</p>
+                <div style="display:flex;gap:10px">
+                  <button type="button" class="btn btn-ghost" style="flex:1" onclick="ownCloseUserModal()">Batal</button>
+                  <button type="submit" class="btn btn-dark" style="flex:1">Simpan Perubahan</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -841,11 +998,13 @@
       bayar: ['Pembayaran', 'Tunai • Transfer • QRIS • Belum bayar'],
       keluar: ['Pengeluaran', 'Belanja + operasional toko'],
       penjualan: ['Penjualan', 'Pergerakan barang & jasa'],
+      laporan: ['Laporan', 'Service • Teknisi • Penjualan (pindahan dashboard toko)'],
       inventori: ['Inventori', 'Sparepart + alat'],
       toko: ['Profil Toko', 'Nama, WA & alamat — tampil di nota'],
       engine: ['Aturan Business Engine', 'Komisi, kuota 2:1, cicilan'],
       antifraud: ['Log Anti-fraud', 'Jejak setiap aksi — yang janggal ditandai'],
       tim: ['Kelola Tim', 'Anggota, undangan & jaringan cabang'],
+      approval: ['Persetujuan Akun', 'Setujui / kelola akun — khusus superadmin'],
     };
     function ownShow(v){
       document.querySelectorAll('[data-own]').forEach(b=>b.classList.toggle('active', b.dataset.own===v));
@@ -870,11 +1029,13 @@
           bayar: () => ownBayar(),
           keluar: () => ownKeluar(),
           penjualan: () => ownPenjualan(),
+          laporan: () => ownLaporan(),
           inventori: () => { ownInvResetFilters(); return ownInvLoad(); },
           toko: () => ownStoreProfile(),
           engine: () => ownEngine(),
           antifraud: () => { window._afOffset = 0; return ownAntifraud(); },
           tim: () => ownTimTab(window._ownTimTab || 'tim'),
+          approval: () => ownApproval(),
         };
         if(loaders[v]) loaders[v]().catch(() => {});
       }catch(e){}
@@ -955,7 +1116,7 @@
       // Tombol ↻ pojok kanan atas: bersihkan juga search/filter inventori → kembali ke semua
       try{ ownInvResetFilters(); }catch(e){}
       try{ const s = document.getElementById('potTeknisi'); if(s) delete s.dataset.filled; }catch(e){}
-      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownPenjualan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan()]);
+      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownPenjualan(), ownLaporan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan(), ownApproval()]);
       // Jika mode demo (toko kosong), pastikan kartu operasional ikut angka contoh
       // (ownStats dari /stats backend tetap 0 untuk toko kosong).
       try{
@@ -1253,10 +1414,12 @@
           set('finTunai', rp(tT)); set('finTunaiSub', `${cntM('Tunai')} service`);
           set('finTransfer', rp(tTr)); set('finTransferSub', `${cntM('Transfer')} service`);
           set('finQris', rp(tQ)); set('finQrisSub', `${cntM('QRIS')} service`);
-          // Pengeluaran Hari Ini — FRONTEND DULU: API backend (/engine/expenses) menyusul.
-          // Demo: angka contoh agar layout bisa dinilai. Real: placeholder sampai API ada.
-          set('outHari', demo ? rp(275000) : 'Rp 0');
-          set('outHariSub', demo ? 'contoh • belanja part + operasional' : 'modul API menyusul');
+          // Pengeluaran Hari Ini — real dari /finance/expenses/ringkasan.
+          try{
+            const xr = await ownFetch('/finance/expenses/ringkasan');
+            set('outHari', rp(xr.nominal_hari_ini || 0));
+            set('outHariSub', (xr.hari_ini || 0) + ' catatan hari ini');
+          }catch(e){ set('outHari', 'Rp 0'); set('outHariSub', 'belum ada data'); }
           // range + chart + tabel 7 hari
           const fmtTgl = iso => { try{ const [y, m, d] = iso.split('-'); return `${d}/${m}`; }catch(e){ return iso; } };
           try{ document.getElementById('finRange').textContent = `${fmtTgl(last7[0])} — ${fmtTgl(last7[6])}`; }catch(e){}
@@ -1908,42 +2071,447 @@
       }catch(e){ tb.innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`; }
     }
 
-    // ---------- Pengeluaran (frontend dulu, API menyusul) ----------
-    async function ownKeluar(){
-      const demo = window._ownDemo;
+    // ---------- Pengeluaran (real: GET/POST/DELETE /finance/expenses) + Laba-Rugi ----------
+    function ownOutOpen(){
       try{
-        document.getElementById('outHariBig').textContent = demo ? rp(275000) : 'Rp 0';
-        document.getElementById('outHariBigSub').textContent = demo ? 'contoh • belanja part + operasional' : 'modul API menyusul';
-        document.getElementById('outBulan').textContent = demo ? rp(1850000) : 'Rp 0';
-        document.getElementById('outNote').style.display = demo ? 'none' : '';
+        document.getElementById('out-tanggal').value = new Date().toISOString().slice(0, 10);
+        ownOutPreview();
+        document.getElementById('outModal').classList.add('show');
+      }catch(e){}
+    }
+    function ownOutClose(){ try{ document.getElementById('outModal').classList.remove('show'); }catch(e){} }
+    function ownOutPreview(){
+      try{
+        const n = parseInt(String(document.getElementById('out-nominal').value || '').replace(/\D/g, '')) || 0;
+        document.getElementById('out-nominalInfo').textContent = rp(n);
+        const k = document.getElementById('out-keperluan').value || '-';
+        const c = document.getElementById('out-kategori').value || '-';
+        document.getElementById('out-preview').innerHTML = `Akan dicatat: <strong>${esc(k)}</strong> [${esc(c)}] sebesar <strong>${rp(n)}</strong> — masuk Total Keluar Kas Toko + Laba-Rugi.`;
+      }catch(e){}
+    }
+    async function ownOutSave(e){
+      e.preventDefault();
+      const body = {
+        keperluan: document.getElementById('out-keperluan').value.trim(),
+        nominal: parseInt(String(document.getElementById('out-nominal').value || '').replace(/\D/g, '')) || 0,
+        kategori: document.getElementById('out-kategori').value,
+        metode: document.getElementById('out-metode').value,
+        tanggal: document.getElementById('out-tanggal').value || undefined,
+        keterangan: document.getElementById('out-ket').value.trim() || undefined,
+      };
+      try{
+        await ownFetch('/finance/expenses', {method: 'POST', body: JSON.stringify(body)});
+        ownOutClose();
+        try{ document.getElementById('outForm').reset(); }catch(_){}
+        await ownKeluar();
+      }catch(err){ try{ ownAlert('err', 'Gagal simpan: ' + err.message); }catch(_){} }
+    }
+    async function ownOutDel(id){
+      if(!confirm('Hapus catatan pengeluaran ini? (salah input)')) return;
+      try{ await ownFetch('/finance/expenses/' + id, {method: 'DELETE'}); await ownKeluar(); }
+      catch(e){ try{ ownAlert('err', 'Gagal hapus: ' + e.message); }catch(_){} }
+    }
+    async function ownKeluar(){
+      const tb = document.getElementById('tbodyKeluar');
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      const kat = document.getElementById('outFilterKat')?.value || '';
+      try{
+        const qs = kat ? '?kategori=' + encodeURIComponent(kat) : '';
+        const [rows, ring] = await Promise.all([
+          ownFetch('/finance/expenses' + qs),
+          ownFetch('/finance/expenses/ringkasan'),
+        ]);
+        const arr = Array.isArray(rows) ? rows : [];
+        set('outHariBig', rp(ring.nominal_hari_ini || 0));
+        set('outHariBigSub', (ring.hari_ini || 0) + ' catatan hari ini');
+        set('outBulan', rp(ring.nominal_bulan_ini || 0));
+        set('outBulanSub', (ring.bulan_ini || 0) + ' catatan bulan ini');
+        set('outTotal', rp(ring.total_nominal || 0));
+        set('outTotalSub', (ring.total || 0) + ' catatan semua');
+        try{
+          document.getElementById('outKatRow').innerHTML = Object.entries(ring.per_kategori || {})
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => `<span style="font-size:11.5px;background:#f9fafb;border:1px solid #ececec;border-radius:99px;padding:4px 10px"><strong>${esc(k)}</strong> ${rp(v)}</span>`).join('')
+            || '<span style="font-size:11.5px;color:#8a8f98">Belum ada pengeluaran</span>';
+        }catch(e){}
+        tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
+          || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
+        await ownLaba();
+      }catch(e){
+        if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`;
+      }
+    }
+    async function ownLaba(){
+      // Laba bersih = omzet cair − komisi − hadir − refund − beban toko celaka − pengeluaran
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const _d = new Date();
+        const today = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
+        const ym = today.slice(0, 7);
+        const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
+        const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0, 10);
+        const arr = await ownServices();
+        const ok = arr.filter(d => SUKSES.includes(d.status));
+        const sum = (list) => list.reduce((s, d) => s + (Number(d.biaya) || 0), 0);
+        const omH = sum(ok.filter(d => actDate(d) === today)), omB = sum(ok.filter(d => actDate(d).slice(0, 7) === ym));
+        let komH = 0, komB = 0, hadH = 0, hadB = 0;
+        try{
+          const techs = await ownFetch('/technicians');
+          const list = Array.isArray(techs) ? techs : [];
+          for(const t of list){
+            try{
+              const j = await ownFetch(`/engine/kas/teknisi/${t.id}`);
+              (j.riwayat || []).forEach(l => {
+                const m = Number(l.masuk) || 0; if(!m) return;
+                const tt = String(l.tanggal || '').slice(0, 10);
+                const isHad = l.tipe === 'allowance';
+                if(tt === today){ if(isHad) hadH += m; else komH += m; }
+                if(tt.slice(0, 7) === ym){ if(isHad) hadB += m; else komB += m; }
+              });
+            }catch(e){}
+          }
+        }catch(e){}
+        let refH = 0, refB = 0, celH = 0, celB = 0, outH = 0, outB = 0, jualH = 0, jualB = 0;
+        try{
+          const rf = await ownFetch('/finance/refunds');
+          (Array.isArray(rf) ? rf : []).forEach(r => {
+            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
+            if(tt === today) refH += n;
+            if(tt.slice(0, 7) === ym) refB += n;
+          });
+        }catch(e){}
+        try{
+          const ac = await ownFetch('/finance/accidents');
+          (Array.isArray(ac) ? ac : []).forEach(a => {
+            const n = Number(a.beban_toko) || 0; if(!n) return;
+            const tt = String(a.tanggal || '').slice(0, 10);
+            if(tt === today) celH += n;
+            if(tt.slice(0, 7) === ym) celB += n;
+          });
+        }catch(e){}
+        try{
+          const ex = await ownFetch('/finance/expenses');
+          (Array.isArray(ex) ? ex : []).forEach(r => {
+            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
+            if(tt === today) outH += n;
+            if(tt.slice(0, 7) === ym) outB += n;
+          });
+        }catch(e){}
+        try{
+          const sl = await ownFetch('/sales?limit=300');
+          (Array.isArray(sl) ? sl : []).forEach(s => {
+            const n = Number(s.profit) || 0, tt = String(s.tanggal || '').slice(0, 10);
+            if(tt === today) jualH += n;
+            if(tt.slice(0, 7) === ym) jualB += n;
+          });
+        }catch(e){}
+        const labaH = omH + jualH - komH - hadH - refH - celH - outH;
+        const labaB = omB + jualB - komB - hadB - refB - celB - outB;
+        const row = (label, h, b) => `<tr><td>${label}</td><td style="text-align:right">${rp(h)}</td><td style="text-align:right">${rp(b)}</td></tr>`;
+        document.getElementById('tbodyLaba').innerHTML =
+          row('➕ Omzet cair bruto', omH, omB) +
+          row('➕ Profit barang/jasa', jualH, jualB) +
+          row('➖ Komisi teknisi', -komH, -komB) +
+          row('➖ Uang hadir', -hadH, -hadB) +
+          row('➖ Refund nominal', -refH, -refB) +
+          row('➖ Beban toko kecelakaan', -celH, -celB) +
+          row('➖ Pengeluaran operasional', -outH, -outB) +
+          `<tr style="background:#f9fafb;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${labaH < 0 ? '#dc2626' : '#059669'}">${rp(labaH)}</td><td style="text-align:right;color:${labaB < 0 ? '#dc2626' : '#059669'}">${rp(labaB)}</td></tr>`;
+        set('labaHari', rp(labaH)); set('labaHariSub', `omzet ${rp(omH)} − beban ${rp(omH - labaH)}`);
+        set('labaBulan', rp(labaB)); set('labaBulanSub', `omzet ${rp(omB)} − beban ${rp(omB - labaB)}`);
+      }catch(e){
+        try{ document.getElementById('tbodyLaba').innerHTML = `<tr><td colspan="3" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`; }catch(_){}
+      }
+    }
+
+    // ---------- Penjualan (real: GET/DELETE /sales + ringkasan) ----------
+    async function ownPenjualan(){
+      const tb = document.getElementById('tbodyJual');
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const [rows, ring] = await Promise.all([
+          ownFetch('/sales?limit=100'),
+          ownFetch('/sales/ringkasan'),
+        ]);
+        const arr = Array.isArray(rows) ? rows : [];
+        set('jualHari', rp(ring.omzet_hari_ini || 0)); set('jualHariSub', (ring.hari_ini || 0) + ' struk hari ini');
+        set('jualBulan', rp(ring.omzet_bulan_ini || 0)); set('jualBulanSub', (ring.bulan_ini || 0) + ' struk bulan ini');
+        set('jualProfit', rp(ring.profit_bulan_ini || 0)); set('jualProfitSub', 'profit bulan ini (jual − beli)');
+        tb.innerHTML = arr.map(s => {
+          const items = (s.items || []).map(i => `${esc(i.nama || '')} x${i.qty}`).join('<br>');
+          return `<tr><td style="font-size:11px"><strong>${esc(s.kode || ('#' + s.id))}</strong></td><td style="white-space:nowrap">${esc(String(s.tanggal || '').slice(0, 10))}</td><td style="font-size:11px">${items}</td><td>${esc(s.pelanggan || '-')}</td><td style="text-align:right;font-weight:700">${rp(s.total || 0)}</td><td style="text-align:right;color:#059669">${rp(s.profit || 0)}</td><td>${esc(s.metode || '-')}</td><td style="font-size:11px">${esc(s.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownJualVoid(${s.id}, '${esc(s.kode || '')}')">Void</button></td></tr>`;
+        }).join('') || '<tr><td colspan="9" style="text-align:center;color:#8a8f98">Belum ada struk — catat di Dashboard Toko → Penjualan</td></tr>';
+        try{
+          document.getElementById('tbodyJualTop').innerHTML = ((ring.terlaris || []).map(t => `<tr><td><strong>${esc(t.nama)}</strong></td><td style="text-align:center">${t.qty}</td><td style="text-align:right">${rp(t.omzet)}</td><td style="text-align:right;color:#059669">${rp(t.profit)}</td></tr>`).join('')) || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Belum ada data</td></tr>';
+        }catch(e){}
+      }catch(e){ tb.innerHTML = `<tr><td colspan="9" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    function ownAccPreset(){
+      try{
+        const s = document.getElementById('filterKategoriSp');
+        s.value = (s.value === 'Aksesoris') ? '' : 'Aksesoris';
+        ownInvRenderSp();
+      }catch(e){}
+    }
+    async function ownJualVoid(id, kode){
+      if(!confirm(`Void struk ${kode}? Stok barang kembali, struk dihapus.`)) return;
+      try{ await ownFetch('/sales/' + id, {method: 'DELETE'}); await ownPenjualan(); }
+      catch(e){ try{ ownAlert('err', 'Gagal void: ' + e.message); }catch(_){} }
+    }
+
+    // ---------- Laporan (pindahan dashboard toko) — saling melengkapi Ringkasan/Finsukses/Bayar ----------
+    let _ownLapTab = 'service', _ownLapSvcTab = 'harian', _ownLapSvcRows = [];
+    function ownLapTab(t){
+      _ownLapTab = t;
+      document.querySelectorAll('[data-ownlap]').forEach(b=>b.classList.toggle('active', b.dataset.ownlap===t));
+      ['service','teknisi','jual'].forEach(k=>{ try{ document.getElementById('ownLapPanel-'+k).style.display = k===t ? '' : 'none'; }catch(e){} });
+    }
+    function ownLapSvcTab(t){
+      _ownLapSvcTab = t;
+      document.querySelectorAll('[data-lapsvc]').forEach(b=>b.classList.toggle('active', b.dataset.lapsvc===t));
+      ownLapSvcRender();
+    }
+    async function ownLaporan(){
+      ownLapTab(window._ownLapTab || _ownLapTab || 'service');
+      await Promise.allSettled([ownLapService(), ownLapTeknisi(), ownLapJual()]);
+    }
+    async function ownLapService(){
+      const tb = document.getElementById('tbodyLapSvc');
+      try{
+        const arr = await ownServices();
+        const isSukses = s => ['Service Sukses','Sudah Diambil','Selesai'].includes(s);
+        const isFailed = s => s === 'Service Failed';
+        const isGaransi = s => s === 'Garansi';
+        const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+        const masuk = arr.length, suks = arr.filter(d=>isSukses(d.status)).length;
+        const fail = arr.filter(d=>isFailed(d.status)).length, gar = arr.filter(d=>isGaransi(d.status)).length;
+        set('lapSvcTotal', masuk + ' masuk'); set('lapSvcRate', (masuk ? Math.round(suks/masuk*100) : 0) + '% sukses');
+        set('lapSvcMasuk', masuk); set('lapSvcMasukSub', 'total barang');
+        set('lapSvcSukses', suks); set('lapSvcSuksesSub', (masuk ? Math.round(suks/masuk*100) : 0) + '% dari masuk');
+        set('lapSvcFailed', fail); set('lapSvcFailedSub', (masuk ? Math.round(fail/masuk*100) : 0) + '% dari masuk');
+        set('lapSvcGaransi', gar);
+        // bucket per periode basis tanggal masuk (d.date)
+        const key = d => {
+          const t = String(d.date || '').slice(0,10); if(!t) return 'tanpa-tanggal';
+          if(_ownLapSvcTab === 'harian') return t;
+          const dt = new Date(t + 'T00:00:00');
+          if(_ownLapSvcTab === 'mingguan'){ const day = (dt.getDay()+6)%7; dt.setDate(dt.getDate()-day); return dt.toISOString().slice(0,10); }
+          return t.slice(0,7);
+        };
+        const map = {};
+        arr.forEach(d=>{ const k = key(d); map[k] = map[k] || {p:k, masuk:0, sukses:0, failed:0, garansi:0}; map[k].masuk++; if(isSukses(d.status)) map[k].sukses++; if(isFailed(d.status)) map[k].failed++; if(isGaransi(d.status)) map[k].garansi++; });
+        _ownLapSvcRows = Object.values(map).sort((a,b)=>String(b.p).localeCompare(String(a.p)));
+        ownLapSvcRender();
+      }catch(e){ tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,120)}</td></tr>`; }
+    }
+    function ownLapSvcRender(){
+      const tb = document.getElementById('tbodyLapSvc'); if(!tb) return;
+      tb.innerHTML = _ownLapSvcRows.map(r=>`<tr><td><strong>${esc(r.p)}</strong></td><td style="text-align:center">${r.masuk}</td><td style="text-align:center;color:#059669;font-weight:700">${r.sukses}</td><td style="text-align:center;color:#dc2626">${r.failed}</td><td style="text-align:center;color:#7c3aed">${r.garansi}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data</td></tr>';
+    }
+    function ownLapSvcCSV(){
+      const rows = [['periode','masuk','sukses','failed','garansi'], ..._ownLapSvcRows.map(r=>[r.p,r.masuk,r.sukses,r.failed,r.garansi])];
+      const csv = rows.map(r=>r.join(',')).join('\n');
+      const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+      const a = document.createElement('a'); a.href = url; a.download = 'laporan_service_' + _ownLapSvcTab + '.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+    async function ownLapTeknisi(){
+      const tb = document.getElementById('tbodyLapTek');
+      try{
+        const arr = await ownServices();
+        const g = {};
+        arr.forEach(d=>{
+          const t = d.teknisi || 'Tanpa Teknisi';
+          g[t] = g[t] || {n:t, handle:0, sukses:0, failed:0};
+          g[t].handle++;
+          if(['Service Sukses','Sudah Diambil','Selesai'].includes(d.status)) g[t].sukses++;
+          if(d.status === 'Service Failed') g[t].failed++;
+        });
+        const rows = Object.values(g).sort((a,b)=>b.sukses-a.sukses);
+        tb.innerHTML = rows.map(r=>{
+          const rate = r.handle ? Math.round(r.sukses/r.handle*100) : 0;
+          const star = rate >= 90 ? '★★★★★' : rate >= 70 ? '★★★★☆' : rate >= 50 ? '★★★☆☆' : '★★☆☆☆';
+          return `<tr><td><strong>${esc(r.n)}</strong></td><td style="text-align:center">${r.handle}</td><td style="text-align:center;color:#059669;font-weight:700">${r.sukses}</td><td style="text-align:center;color:#dc2626">${r.failed}</td><td>${star} <span style="color:#8a8f98;font-size:11px">${rate}%</span></td></tr>`;
+        }).join('') || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data</td></tr>';
+      }catch(e){ tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0,120)}</td></tr>`; }
+    }
+    async function ownLapJual(){
+      try{
+        const arr = await ownServices();
+        const ok = arr.filter(d=>['Service Sukses','Sudah Diambil','Selesai'].includes(d.status));
+        const tot = ok.reduce((s,d)=>s+(Number(d.biaya)||0),0);
+        let omJual = 0, topName = '-', topQty = '';
+        try{
+          const ring = await ownFetch('/sales/ringkasan');
+          omJual = ring.omzet || 0;
+          const t0 = (ring.terlaris || [])[0];
+          if(t0){ topName = t0.nama; topQty = t0.qty + ' pcs • ' + rp(t0.omzet); }
+        }catch(e){}
+        try{
+          document.getElementById('lapJualTotal').textContent = rp(tot + omJual);
+          document.getElementById('lapJualTotalSub').textContent = ok.length + ' service cair + omzet barang';
+        }catch(e){}
+        try{
+          document.getElementById('lapJualTop').textContent = topName;
+          document.getElementById('lapJualTopSub').textContent = topQty || 'belum ada struk';
+        }catch(e){}
+        try{
+          const rows = await ownFetch('/sales?limit=20');
+          const sl = Array.isArray(rows) ? rows : [];
+          document.getElementById('tbodyLapJual').innerHTML = sl.map(s=>`<tr><td><strong>${esc(s.kode||('#'+s.id))}</strong><br><span style="font-size:11px;color:#8a8f98">${esc(String(s.tanggal||'').slice(0,10))}</span></td><td style="text-align:center"><strong>${(s.items||[]).reduce((a,i)=>a+(i.qty||0),0)}</strong></td><td style="text-align:center">${(s.items||[]).length} item</td><td style="text-align:right">${rp(s.total||0)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center">Belum ada struk</td></tr>';
+        }catch(e){}
       }catch(e){}
     }
 
-    // ---------- Penjualan (proxy barang keluar gudang, modul kasir menyusul) ----------
-    async function ownPenjualan(){
-      const tb = document.getElementById('tbodyJual');
+    // ---------- Persetujuan Akun (pindahan tab SUPERADMIN dashboard toko — khusus superadmin) ----------
+    let _ownApprovalCache = [], _ownAllUsersCache = [];
+    function _ownIsSuper(){
       try{
-        let arr = [];
+        if(window.BOSAuth && window.BOSAuth.myActiveRole) return window.BOSAuth.myActiveRole() === 'superadmin';
+      }catch(e){}
+      return String(localStorage.getItem('role') || '').toLowerCase() === 'superadmin';
+    }
+    async function ownApproval(){
+      const tb = document.getElementById('tbodyOwnApproval');
+      const countEl = document.getElementById('ownApprovalCount');
+      const allCount = document.getElementById('ownAllUsersCount');
+      if(!_ownIsSuper()){
+        if(tb) tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#dc2626">⛔ Khusus superadmin — kamu login sebagai non-superadmin</td></tr>`;
+        const at = document.getElementById('tbodyOwnAllUsers');
+        if(at) at.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:#dc2626">⛔ Khusus superadmin</td></tr>`;
+        return;
+      }
+      if(tb) tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#8a8f98">Memuat pending...</td></tr>`;
+      try{
+        const pending = await ownFetch('/auth/pending');
+        _ownApprovalCache = Array.isArray(pending) ? pending : [];
+        if(countEl) countEl.textContent = _ownApprovalCache.length + ' menunggu';
         try{
-          const rows = await ownFetch('/inventory/spareparts');
-          arr = Array.isArray(rows) ? rows : (rows.rows || []);
-        }catch(e){ arr = []; }
-        if(!arr.length) arr = OWN_DUMMY_SPAREPART();
-        document.getElementById('jualUnit').textContent = arr.reduce((s, r) => s + (Number(r.keluar) || 0), 0) + ' pcs';
-        document.getElementById('jualNilai').textContent = rp(arr.reduce((s, r) => s + (Number(r.harga) || 0) * (Number(r.keluar) || 0), 0));
-        tb.innerHTML = [...arr].sort((a, b) => (b.keluar || 0) - (a.keluar || 0)).slice(0, 20).map(r => `<tr><td>${esc(r.nama)}</td><td style="text-align:center"><strong>${r.keluar || 0}</strong></td><td style="text-align:center">${r.stok ?? 0}</td><td style="text-align:right">${rp(r.harga || 0)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center">Belum ada data</td></tr>';
-      }catch(e){ tb.innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`; }
+          const b = document.getElementById('own-badge-pending');
+          if(b){ b.textContent = _ownApprovalCache.length; b.style.display = _ownApprovalCache.length ? 'inline-block' : 'none'; }
+        }catch(e){}
+        tb.innerHTML = !_ownApprovalCache.length
+          ? `<tr><td colspan="6" style="text-align:center;padding:24px;color:#059669">✅ Tidak ada akun menunggu persetujuan</td></tr>`
+          : _ownApprovalCache.map((u,i)=>`
+          <tr>
+            <td>${i+1}</td>
+            <td><strong>${esc(u.username)}</strong></td>
+            <td style="text-transform:capitalize">${esc(u.role)}</td>
+            <td><span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Menunggu</span></td>
+            <td style="font-size:12px;color:#6b7280">${u.created_at ? new Date(u.created_at).toLocaleString('id-ID') : '-'}</td>
+            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+              <button class="btn btn-dark small" style="padding:6px 10px;font-size:11px" onclick="ownApproveUser(${u.id})">✓ Setujui</button>
+              <button class="btn btn-ghost small" style="padding:6px 10px;font-size:11px" onclick="ownOpenEditUser(${u.id})">✎ Edit</button>
+              <button class="btn btn-ghost small" style="padding:6px 10px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownRejectUser(${u.id}, '${esc(u.username)}')">✕ Tolak</button>
+            </div></td>
+          </tr>`).join('');
+        try{
+          const all = await ownFetch('/auth/users');
+          _ownAllUsersCache = Array.isArray(all) ? all : [];
+          if(allCount) allCount.textContent = _ownAllUsersCache.length + ' user';
+          ownRenderUsers();
+        }catch(e){}
+      }catch(e){
+        if(tb) tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#dc2626">Gagal: ${esc(e.message).slice(0,200)}</td></tr>`;
+      }
+    }
+    function ownRenderUsers(){
+      const tb = document.getElementById('tbodyOwnAllUsers'); if(!tb) return;
+      const q = (document.getElementById('ownSearchUser')?.value || '').toLowerCase();
+      const fRole = document.getElementById('ownFilterRole')?.value || '';
+      const fStatus = document.getElementById('ownFilterStatus')?.value || '';
+      let arr = [..._ownAllUsersCache];
+      if(q) arr = arr.filter(u => String(u.username||'').toLowerCase().includes(q) || String(u.role||'').toLowerCase().includes(q));
+      if(fRole) arr = arr.filter(u => u.role === fRole);
+      if(fStatus === 'aktif') arr = arr.filter(u => u.is_active);
+      if(fStatus === 'beku') arr = arr.filter(u => !u.is_active);
+      arr.sort((a,b)=> (a.role==='superadmin'?-1:b.role==='superadmin'?1:0) || ((b.is_active?1:0) - (a.is_active?1:0)));
+      const me = (window.BOSAuth && window.BOSAuth.myUsername) ? window.BOSAuth.myUsername() : localStorage.getItem('username');
+      tb.innerHTML = !arr.length
+        ? `<tr><td colspan="6" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada user sesuai filter</td></tr>`
+        : arr.map(u=>{
+          const isMe = u.username === me, isSuper = u.role === 'superadmin';
+          const dis = (isSuper || isMe) ? 'disabled style="opacity:.45;cursor:not-allowed"' : '';
+          const badge = u.is_active
+            ? '<span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px;font-size:11px">Aktif</span>'
+            : '<span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Beku</span>';
+          return `<tr style="${!u.is_active?'background:#fffbeb':''}">
+            <td><strong>${esc(u.username)}</strong>${isMe?' <span style="font-size:10px;background:#111;color:#fff;padding:2px 6px;border-radius:8px">Anda</span>':''}</td>
+            <td style="text-transform:capitalize;font-size:11px">${esc(u.role)}</td>
+            <td>${badge}</td>
+            <td style="font-size:11px;color:#6b7280">${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID') : '-'}</td>
+            <td style="font-size:11px;color:#6b7280">${u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'}</td>
+            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+              <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px" onclick="ownOpenEditUser(${u.id})" ${isSuper?'disabled style="opacity:.45;cursor:not-allowed"':''}>✎ Edit</button>
+              <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px" onclick="ownToggleFreeze(${u.id})" ${dis}>${u.is_active?'❄ Bekukan':'✓ Aktifkan'}</button>
+              <button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownDeleteUser(${u.id}, '${esc(u.username)}')" ${dis}>🗑 Hapus</button>
+            </div></td>
+          </tr>`;
+        }).join('');
+    }
+    function ownFilterUsers(){ ownRenderUsers(); }
+    function ownOpenEditUser(id){
+      const u = _ownAllUsersCache.find(x=>x.id===id) || _ownApprovalCache.find(x=>x.id===id);
+      if(!u) return;
+      document.getElementById('ownEditUserId').value = u.id;
+      document.getElementById('ownEditUsername').value = u.username;
+      document.getElementById('ownEditRole').value = u.role;
+      document.getElementById('ownEditPassword').value = '';
+      document.getElementById('ownEditUserSub').textContent = `Edit ${u.username} • ${u.role} • ${u.is_active?'Aktif':'Beku'}`;
+      document.getElementById('ownUserEditModal').classList.add('show');
+    }
+    function ownCloseUserModal(){ document.getElementById('ownUserEditModal').classList.remove('show'); }
+    async function ownSubmitUserEdit(e){
+      e.preventDefault();
+      const id = parseInt(document.getElementById('ownEditUserId').value);
+      const payload = {username: document.getElementById('ownEditUsername').value.trim(), role: document.getElementById('ownEditRole').value};
+      const pw = document.getElementById('ownEditPassword').value;
+      if(pw) payload.password = pw;
+      try{
+        await ownFetch('/auth/users/' + id, {method:'PUT', body: JSON.stringify(payload)});
+        ownCloseUserModal();
+        await ownApproval();
+      }catch(err){ try{ ownAlert('err', 'Gagal edit: ' + err.message); }catch(_){} }
+    }
+    async function ownToggleFreeze(id){
+      const u = _ownAllUsersCache.find(x=>x.id===id);
+      if(!confirm(`Yakin ingin ${u && u.is_active ? 'bekukan (nonaktifkan login)' : 'aktifkan kembali'} akun "${u?u.username:id}"?`)) return;
+      try{ await ownFetch('/auth/toggle/' + id, {method:'POST', body: '{}'}); await ownApproval(); }
+      catch(e){ try{ ownAlert('err', 'Gagal: ' + e.message); }catch(_){} }
+    }
+    async function ownDeleteUser(id, username){
+      if(!confirm(`Hapus akun "${username}"? Tidak bisa dibatalkan. User harus register ulang.`)) return;
+      try{ await ownFetch('/auth/users/' + id, {method:'DELETE'}); await ownApproval(); }
+      catch(e){ try{ ownAlert('err', 'Gagal hapus: ' + e.message); }catch(_){} }
+    }
+    async function ownApproveUser(id){
+      if(!confirm('Setujui akun ini? Akun akan bisa login.')) return;
+      try{ await ownFetch('/auth/approve/' + id, {method:'POST', body: '{}'}); await ownApproval(); }
+      catch(e){ try{ ownAlert('err', 'Gagal approve: ' + e.message); }catch(_){} }
+    }
+    async function ownRejectUser(id, username){
+      if(!confirm(`Tolak & hapus akun "${username}"? Tidak bisa dibatalkan.`)) return;
+      try{ await ownFetch('/auth/reject/' + id, {method:'POST', body: '{}'}); await ownApproval(); }
+      catch(e){ try{ ownAlert('err', 'Gagal tolak: ' + e.message); }catch(_){} }
     }
 
     // ---------- Inventori owner: port dashboard toko (search, filter, inline edit, modal, tambah, alat) + kolom Beli ----------
     const O_MERK = ['IPHONE','SAMSUNG','XIAOMI','OPPO','VIVO','INFINIX'];
+    const O_MERK_ACC = ['ROBOT','OLIKE','BASEUS','ANKER','UNEED','KAKU','HIPPO','ORIGINAL','GENERIC','LAIN'];
     let ownInvSp = [], ownInvAlat = [], ownInvTechs = [];
-    function oNormMerk(m){ if(!m) return 'LAIN'; const up = String(m).trim().toUpperCase(); return O_MERK.includes(up) ? up : 'LAIN'; }
+    function oNormMerk(m){ if(!m || !String(m).trim()) return 'LAIN'; return String(m).trim().toUpperCase().slice(0, 40); }
+    function oMerkListFor(kat){ return kat === 'Aksesoris' ? O_MERK_ACC : [...O_MERK, 'LAIN']; }
+    function oMerkFill(selId, kat){
+      // selId menunjuk <datalist> saran (input bebas ketik).
+      try{
+        const sel = document.getElementById(selId); if(!sel) return;
+        sel.innerHTML = oMerkListFor(kat).map(m => `<option value="${m}">`).join('');
+      }catch(e){}
+    }
     function oParseRp(s){ if(!s) return 0; return parseInt(String(s).replace(/\./g, '').replace(/[^0-9]/g, '')) || 0; }
     function oFmtAngka(n){ const x = Number(n || 0); return x ? x.toLocaleString('id-ID') : ''; }
     function oToday(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
     function oFmtTgl(s){ if(!s) return '-'; const p = String(s).slice(0, 10).split('-'); if(p.length !== 3) return s; const B = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; return `${p[2]}-${B[parseInt(p[1], 10) - 1] || p[1]}-${p[0]}`; }
-    function oMerkBadge(m){ const s = {IPHONE:'background:#04074a;color:#fff;border-color:#04074a',SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe',XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa',OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0',VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe',INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a',LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'}; return s[m] || s['LAIN']; }
+    function oMerkBadge(m){ const s = {IPHONE:'background:#04074a;color:#fff;border-color:#04074a',SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe',XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa',OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0',VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe',INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a',ROBOT:'background:#fff7ed;color:#9a3412;border-color:#fed7aa',OLIKE:'background:#ecfdf5;color:#047857;border-color:#a7f3d0',BASEUS:'background:#eff6ff;color:#1e40af;border-color:#bfdbfe',ANKER:'background:#111827;color:#f9fafb;border-color:#111827',UNEED:'background:#f5f3ff;color:#5b21b6;border-color:#ddd6fe',KAKU:'background:#fffbeb;color:#92400e;border-color:#fde68a',HIPPO:'background:#fdf2f8;color:#be185d;border-color:#fbcfe8',ORIGINAL:'background:#ecfdf5;color:#065f46;border-color:#6ee7b7',GENERIC:'background:#f3f4f6;color:#374151;border-color:#d1d5db',LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'}; return s[m] || s['LAIN']; }
     function oKondisiBadge(k){ if(k === 'Baik') return 'background:#ecfdf5;color:#059669;border-color:#a7f3d0'; if(k === 'Perlu Kalibrasi') return 'background:#fffbeb;color:#b45309;border-color:#fde68a'; if(k === 'Rusak') return 'background:#fef2f2;color:#dc2626;border-color:#fecaca'; if(k === 'Dipinjam') return 'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe'; return 'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'; }
     function oRpLive(inputId, prevId){ const inp = document.getElementById(inputId); const prev = document.getElementById(prevId); if(!inp) return; const n = oParseRp(inp.value); inp.value = n ? n.toLocaleString('id-ID') : ''; if(prev){ prev.textContent = rp(n); prev.style.display = n ? 'inline' : 'none'; } }
     // Rumus jual otomatis: beli + margin% (margin bisa diganti di form kecil toolbar, tersimpan lokal)
@@ -2110,6 +2678,9 @@
       const c = document.getElementById('ownSpAddCard');
       if(!c) return;
       c.style.display = (force === true || c.style.display === 'none') ? '' : 'none';
+      if(c.style.display !== 'none'){
+        try{ oMerkFill('ownMerkList', document.getElementById('sp-kategori')?.value || 'Display'); }catch(e){}
+      }
     }
     async function ownInvSpAdd(e){
       e.preventDefault();
@@ -2140,8 +2711,9 @@
       if(!it) return ownAlert('err', 'Item tidak ditemukan');
       document.getElementById('spEditId').value = it.id;
       document.getElementById('spEditNama').value = it.nama;
-      document.getElementById('spEditMerk').value = oNormMerk(it.merk);
       document.getElementById('spEditKategori').value = it.kategori;
+      oMerkFill('ownMerkListEdit', it.kategori);
+      document.getElementById('spEditMerk').value = oNormMerk(it.merk);
       document.getElementById('spEditMasuk').value = it.masuk;
       document.getElementById('spEditKeluar').value = it.keluar;
       document.getElementById('spEditStok').value = it.stok;
@@ -2840,7 +3412,14 @@
       document.getElementById('ownWrap').style.display = 'block';
       try{ document.documentElement.classList.remove('guard-lock'); }catch(_){}
       fillStoreSel();
+      // Persetujuan Akun di Kontrol: hanya superadmin yang lihat menunya
+      try{ document.getElementById('menu-approval-own').style.display = (role === 'superadmin') ? '' : 'none'; }catch(e){}
       await ownLoadAll();
+      try{
+        const h = String(location.hash || '').toLowerCase();
+        if(h === '#laporan') ownShow('laporan');
+        else if(h === '#approval' && role === 'superadmin') ownShow('approval');
+      }catch(e){}
     })();
   </script>
 </body>

@@ -25,6 +25,24 @@ let data = [];
 // ---------- Inventory Sparepart ----------
 const INVENTORY_KEY = 'b_gadget_inventory_v1';
 const MERK_HITS = ['IPHONE','SAMSUNG','XIAOMI','OPPO','VIVO','INFINIX'];
+// Merk asesories (bukan merk HP): dropdown merk ikut kategori barang.
+const MERK_ACC = ['ROBOT','OLIKE','BASEUS','ANKER','UNEED','KAKU','HIPPO','ORIGINAL','GENERIC','LAIN'];
+function merkListFor(kategori){ return kategori==='Aksesoris' ? MERK_ACC : [...MERK_HITS, 'LAIN']; }
+// Isi ulang <select> merk sesuai kategori; pertahankan pilihan lama bila masih valid.
+function fillMerkOptions(sel, kategori, keep){
+  // Kompat lama: sel bisa <select> (diisi opsi) atau <datalist> (diisi saran).
+  if(!sel) return;
+  const list = merkListFor(kategori);
+  if(sel.tagName === 'DATALIST'){
+    sel.innerHTML = list.map(m=>`<option value="${m}">`).join('');
+    return;
+  }
+  const raw = String(keep !== undefined ? keep : sel.value || '').trim();
+  const up = raw.toUpperCase();
+  const label = m => m==='LAIN' ? 'LAIN' : m.charAt(0)+m.slice(1).toLowerCase();
+  sel.innerHTML = (raw === '' ? '<option value="" disabled selected>Pilih merk</option>' : '') + list.map(m=>`<option value="${m}">${label(m)}</option>`).join('');
+  sel.value = list.includes(up) ? up : (raw === '' ? '' : list[list.length-1]);
+}
 const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 // Backend campur: date/diambil_at = lokal WIB, created_at/updated_at = UTC (SQLite CURRENT_TIMESTAMP).
 // Untuk grouping "hari ini" pakai hari lokal: diambil_at (lokal) dulu, else updated_at dikonversi UTC->lokal, else date.
@@ -40,9 +58,9 @@ function _localDayUTC(ts){
 const defaultInventory = []; // kosong — biar tes input baru benar-benar 0 (sebelumnya dummy 7 item dihapus sesuai request)
 let inventory = [];
 function normalizeMerk(m){
-  if(!m) return 'LAIN';
-  const up=String(m).trim().toUpperCase();
-  return MERK_HITS.includes(up) ? up : 'LAIN';
+  // Merk bebas diketik — hanya rapikan huruf (saran di datalist, bukan batasan).
+  if(!m || !String(m).trim()) return 'LAIN';
+  return String(m).trim().toUpperCase().slice(0, 40);
 }
 function inferMerkFromNama(nama){
   if(!nama) return 'LAIN';
@@ -330,7 +348,7 @@ function openNotaModal(id, mode){
   const titleEl=document.querySelector('#notaModal h3');
   if(titleEl) titleEl.textContent = (_notaMode==='ambil') ? 'Nota Pengambilan' : 'Nota Digital';
   document.getElementById('notaSub').textContent=`${d.id} • ${d.device} • ${d.nama}${_notaMode==='ambil' ? ' • 📥 Pengambilan' : ''}`;
-  document.getElementById('notaPreview').textContent=buildNotaWA(d, _notaMode);
+  document.getElementById('notaPreview').innerHTML=buildNotaHTML(d, _notaMode);
   const sel=document.getElementById('notaSize');
   if(sel) sel.value=_notaSize;
   document.getElementById('notaModal').classList.add('show');
@@ -353,21 +371,34 @@ function sendNotaWA(id){
   showToast('Chat WA pelanggan dibuka — tekan kirim di WhatsApp');
 }
 function buildNotaHTML(d, mode){
+  // Desain modern: kop tegas + badge status + total box + footer rapi. Semua inline (aman cetak).
   const v=notaVars(d);
   const isAmbil=(mode||_notaMode)==='ambil';
-  const row=(k,val)=>`<tr><td style="vertical-align:top;white-space:nowrap">${k}</td><td style="padding:0 4px">:</td><td>${escapeHtml(val)}</td></tr>`;
+  const E=escapeHtml;
+  const head=`<div style="text-align:center;padding-bottom:6px">`
+    + `<div style="font-size:1.5em;font-weight:800;letter-spacing:.5px">◈ ${E(v.toko)}</div>`
+    + `<div style="font-size:.92em;opacity:.85">${E(v.alamat_toko)}${v.wa_toko && v.wa_toko!=='-' ? ' • WA '+E(v.wa_toko) : ''}</div></div>`;
+  const ruleDbl=`<div style="border-top:3px double #000;margin:6px 0"></div>`;
+  const rule=`<div style="border-top:1px dashed #000;margin:6px 0"></div>`;
+  const pill=(txt)=>`<span style="display:inline-block;border:1.5px solid #000;border-radius:99px;padding:1px 10px;font-weight:800;font-size:.95em;letter-spacing:.5px">${E(txt)}</span>`;
+  const row=(k,val)=>`<tr><td style="vertical-align:top;white-space:nowrap;opacity:.75">${E(k)}</td><td style="padding:0 5px">:</td><td style="font-weight:600">${E(val)}</td></tr>`;
+  const totalBox=(label,val,sub)=>`<div style="border:2px solid #000;border-radius:8px;padding:6px 10px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px">`
+    + `<span style="font-weight:800">${E(label)}${sub?`<br><span style="font-weight:400;font-size:.8em">${E(sub)}</span>`:''}</span>`
+    + `<span style="font-weight:800;font-size:1.35em">${E(val)}</span></div>`;
+  const foot=(lines)=>`<div style="text-align:center;font-size:.88em;margin-top:6px">${lines.map(E).join('<br>')}</div>`;
   if(isAmbil){
-    return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
-      + `<div style="text-align:center;font-weight:800;margin:6px 0">NOTA PENGAMBILAN</div>`
-      + `<hr><table>${row('Invoice',v.invoice)}${row('Tgl masuk',v.tanggal)}${row('Tgl diambil',v.diambil_at)}${row('Pelanggan',v.nama)}${row('Diambil oleh',v.diambil_oleh)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Teknisi',v.teknisi)}${row('Garansi s/d',v.garansi_sampai)}${row('Bayar',v.metode_bayar)}</table><hr>`
-      + `<div class="nota-total"><span>Total (LUNAS)</span><span>${escapeHtml(v.biaya)}</span></div><hr>`
-      + `<div class="nota-foot">Barang sudah diambil ${escapeHtml(v.diambil_oleh)} 🙏<br>Komplain? Hubungi WA di atas</div>`;
+    return head
+      + ruleDbl + `<div style="text-align:center;margin:2px 0">${pill('NOTA PENGAMBILAN • LUNAS')}</div>` + ruleDbl
+      + `<table style="width:100%;border-collapse:collapse">${row('Invoice',v.invoice)}${row('Masuk',v.tanggal)}${row('Diambil',v.diambil_at)}${row('Pelanggan',v.nama)}${row('Diambil oleh',v.diambil_oleh)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Garansi s/d',v.garansi_sampai)}${row('Bayar',v.metode_bayar)}</table>`
+      + rule + totalBox('TOTAL', v.biaya, 'lunas • '+v.metode_bayar)
+      + foot([`Barang sudah diambil oleh ${v.diambil_oleh}`, 'Terima kasih 🙏', `Komplain? WA ${v.wa_toko}`]);
   }
-  return `<div class="nota-head"><div class="nota-toko">${escapeHtml(v.toko)}</div><div>${escapeHtml(v.alamat_toko)}<br>WA: ${escapeHtml(v.wa_toko)}</div></div>`
-    + `<hr><table>${row('Invoice',v.invoice)}${row('Tanggal',v.tanggal)}${row('Pelanggan',v.nama)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Kondisi awal',v.keterangan)}${row('Kelengkapan',v.kelengkapan)}${row('Estimasi',v.estimasi)}${row('Teknisi',v.teknisi)}${row('Penerima',v.penerima)}</table><hr>`
-    + `<div class="nota-total"><span>Total Biaya</span><span>${escapeHtml(v.biaya)}</span></div>`
-    + `<div style="margin-top:6px;font-size:11px">🔍 Lacak status: ${escapeHtml(v.lacak)}</div><hr>`
-    + `<div class="nota-foot">Terima kasih 🙏<br>Komplain? Hubungi WA di atas</div>`;
+  return head
+    + ruleDbl + `<div style="text-align:center;margin:2px 0">${pill('TANDA TERIMA SERVICE')}</div>` + ruleDbl
+    + `<table style="width:100%;border-collapse:collapse">${row('Invoice',v.invoice)}${row('Tanggal',v.tanggal)}${row('Pelanggan',v.nama)}${row('Device',v.device)}${row('IMEI',v.imei)}${row('Keluhan',v.keluhan)}${row('Kondisi awal',v.keterangan)}${row('Kelengkapan',v.kelengkapan)}${row('Estimasi',v.estimasi)}${row('Teknisi',v.teknisi)}${row('Penerima',v.penerima)}</table>`
+    + rule + totalBox('ESTIMASI BIAYA', v.biaya, 'deal final saat pengambilan')
+    + `<div style="font-size:.85em;margin-top:4px">🔍 Lacak: ${E(v.lacak)}</div>`
+    + foot(['Simpan nota ini untuk pengambilan', 'Terima kasih 🙏', `Komplain? WA ${v.wa_toko}`]);
 }
 function printNota(id){
   const inv=id||_notaId;
@@ -398,7 +429,7 @@ const DEFAULT_WA_TPL = {
   sudah_diambil: "Halo {nama} 👋\nTerima kasih sudah service di {toko} 🙏\nInvoice: {invoice} • Device: {device}\nAda garansi — hubungi kami jika ada keluhan.",
   klaim_garansi: "Halo {nama} 👋\nHP {device} kami terima untuk KLAIM GARANSI 🔁\nInvoice baru: {invoice} (dari {garansi_dari})\nKeluhan: {keluhan}\n{toko} — terima kasih 🙏",
   nota_digital: "🧾 *NOTA SERVICE — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal: {tanggal}\nPelanggan: {nama}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nKondisi awal: {keterangan}\nKelengkapan: {kelengkapan}\nEstimasi selesai: {estimasi}\nBiaya: {biaya}\n🔍 Klik link ini untuk lacak status HP anda:\n{lacak}\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
-  nota_ambil: "🧾 *NOTA PENGAMBILAN — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal masuk: {tanggal}\nTanggal diambil: {diambil_at}\nPelanggan: {nama}\nDiambil oleh: {diambil_oleh}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nTeknisi: {teknisi}\nGaransi s/d: {garansi_sampai}\nMetode bayar: {metode_bayar}\nBiaya: {biaya} (LUNAS)\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
+  nota_ambil: "🧾 *NOTA PENGAMBILAN — {toko}*\n--------------------------\nInvoice: {invoice}\nTanggal masuk: {tanggal}\nTanggal diambil: {diambil_at}\nPelanggan: {nama}\nDiambil oleh: {diambil_oleh}\nDevice: {device} ({imei})\nKeluhan: {keluhan}\nGaransi s/d: {garansi_sampai}\nMetode bayar: {metode_bayar}\nBiaya: {biaya} (LUNAS)\n--------------------------\n{toko} — {alamat_toko}\nWA: {wa_toko}\nTerima kasih 🙏",
 };
 const WA_TPL_LABELS = {service_masuk:'Service Masuk 📥', bisa_diambil:'Bisa Diambil ✅', gagal:'Gagal ❌', sudah_diambil:'Sudah Diambil 📤', klaim_garansi:'Klaim Garansi 🔁', nota_digital:'Nota Digital 🧾', nota_ambil:'Nota Pengambilan 📥', umum:'Umum 💬'};
 function storeDisplayName(){
@@ -782,7 +813,6 @@ function applyRoleMenu(){
     'pelanggan', 'tambah-pelanggan',
     'service-masuk', 'inventory-tambah',
     'transaksi-penjualan', 'transaksi-pembayaran', 'transaksi-pendapatan',
-    'laporan-service', 'laporan-penjualan',
     'pengaturan', 'kelola-tim', 'approval-akun'
   ];
   TEK_HIDE.forEach(v=>{
@@ -2017,9 +2047,18 @@ function switchView(view, clearSearch){
     'pelanggan', 'tambah-pelanggan',
     'service-masuk', 'inventory-tambah',
     'transaksi-penjualan', 'transaksi-pembayaran', 'transaksi-pendapatan',
-    'laporan-service', 'laporan-penjualan',
     'pengaturan', 'kelola-tim', 'approval-akun'
   ]);
+  // LAPORAN pindah ke Owner Space (owner.html#laporan). Deep-link lama tetap diarahkan.
+  if(['laporan-service','laporan-teknisi','laporan-penjualan'].includes(view)){
+    try{ location.href = 'owner.html#laporan'; }catch(e){}
+    return;
+  }
+  // PERSETUJUAN AKUN pindah ke Owner Space → Kontrol (owner.html#approval).
+  if(view === 'approval-akun'){
+    try{ location.href = 'owner.html#approval'; }catch(e){}
+    return;
+  }
   if(isTeknisiMode() && TEK_BLOCKED.has(view)){
     showToast('⛔ Modul ini khusus owner/admin — akun teknisi hanya: kerjaan saya + sparepart + kas saya');
     return;
@@ -2041,15 +2080,14 @@ function switchView(view, clearSearch){
     'service-failed':['Service Failed','Gagal diperbaiki — perlu follow-up'],
     'status-garansi':['Status Garansi','Service dalam masa garansi'],
     'inventory-sparepart':['Sparepart','Kelola stok: Masuk / Keluar / Stok Akhir / Harga — editable langsung'],
+    'inventory-asesoris':['Asesories','Daftar asesories (kategori Aksesoris) — stok & harga sama dengan Sparepart'],
     'inventory-stok':['Stok','Ringkasan stok inventory'],
     'inventory-alat':['Alat','Peralatan teknisi'],
     'inventory-tambah':['Tambah Sparepart','Tambah barang masuk & harga'],
-    'transaksi-penjualan':['Penjualan','Riwayat transaksi penjualan'],
+    'transaksi-penjualan':['Kasir Penjualan','Jual barang + jasa langsung, struk simple'],
     'transaksi-pembayaran':['Pembayaran','Metode & status pembayaran'],
     'transaksi-pendapatan':['Pendapatan Sukses','Rekap harga tercatat Service Sukses saja'],
-    'laporan-service':['Laporan Service','Rekap service per periode'],
-    'laporan-teknisi':['Laporan Teknisi','Performa teknisi — avatar sesuai foto profil'],
-    'laporan-penjualan':['Laporan Penjualan','Pendapatan & penjualan'],
+    'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],
     'profil':['Atur Profil','Kelola username & password akun Anda — avatar sinkron dengan sidebar'],
     'pengaturan':['Pengaturan Toko','Template pesan WhatsApp per status — owner/admin only'],
     'kelola-tim':['Kelola Tim','Undang kasir/teknisi/admin via kode invite toko — owner/admin only'],
@@ -2078,9 +2116,11 @@ function switchView(view, clearSearch){
   if(view==='status-garansi') renderStatusView('kanbanGaransi','Garansi');
   if(view==='transaksi-pendapatan') renderTransaksiPendapatan();
   if(view==='transaksi-pembayaran') renderTransaksiPembayaran();
+  if(view==='transaksi-penjualan'){ try{ kasirLoadBarang(); kasirLoadToday(); }catch(e){} }
   if(view==='inventory-sparepart') renderSparepart();
+  if(view==='inventory-asesoris') renderAsesoris();
   if(view==='inventory-alat') renderAlat();
-  if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); }
+  if(view==='inventory-tambah'){ /* focus nama */ setTimeout(()=>document.getElementById('sp-nama')?.focus(),100); try{ const k=document.getElementById('sp-kategori')?.value||''; fillMerkOptions(document.getElementById('merkList'), k || 'Display'); }catch(e){} }
   if(view==='laporan-teknisi') renderLaporanTeknisi();
   if(view==='laporan-service') renderLaporanService();
   if(view==='profil') loadProfil();
@@ -2099,7 +2139,7 @@ function switchView(view, clearSearch){
 function statGoMasuk(){ switchView('semua-service'); const s=document.getElementById('filterStatusSemua'); if(s){ s.value=''; renderSemuaService(); } }
 function statGoProses(){ switchView('proses'); setDeadlineFilter('all'); statusFilter='all'; document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all')); renderKanban(); }
 function statGoSukses(){ switchView('semua-service'); setTimeout(()=>{ const s=document.getElementById('filterStatusSemua'); if(s){ s.value='Service Sukses'; renderSemuaService(); }},80); }
-function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('laporan-penjualan'); }
+function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('transaksi-pendapatan'); }
 function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('overdue'),80); }
 function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
 function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
@@ -2443,7 +2483,7 @@ function renderLaporanTeknisi(){
 }
 // ---------- Sparepart Inventory (editable Merk/Masuk/Keluar/Stok Akhir/Harga) ----------
 function merkBadgeStyle(m){
-  const s={IPHONE:'background:#04074a;color:#fff;border-color:#04074a', SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe', XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa', OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe', INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a', LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'};
+  const s={IPHONE:'background:#04074a;color:#fff;border-color:#04074a', SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe', XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa', OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe', INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a', ROBOT:'background:#fff7ed;color:#9a3412;border-color:#fed7aa', OLIKE:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', BASEUS:'background:#eff6ff;color:#1e40af;border-color:#bfdbfe', ANKER:'background:#111827;color:#f9fafb;border-color:#111827', UNEED:'background:#f5f3ff;color:#5b21b6;border-color:#ddd6fe', KAKU:'background:#fffbeb;color:#92400e;border-color:#fde68a', HIPPO:'background:#fdf2f8;color:#be185d;border-color:#fbcfe8', ORIGINAL:'background:#ecfdf5;color:#065f46;border-color:#6ee7b7', GENERIC:'background:#f3f4f6;color:#374151;border-color:#d1d5db', LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'};
   return s[m]||s['LAIN'];
 }
 function renderSparepart(){
@@ -2465,8 +2505,10 @@ function renderSparepart(){
   // sort: merk hits dulu (IPHONE,SAMSUNG,etc) lalu stok tipis
   const merkOrder={IPHONE:0,SAMSUNG:1,XIAOMI:2,OPPO:3,VIVO:4,INFINIX:5,LAIN:6};
   filtered.sort((a,b)=> (merkOrder[normalizeMerk(a.merk)]??6) - (merkOrder[normalizeMerk(b.merk)]??6) || a.stok - b.stok);
+  const isTekSp=isTeknisiMode();
+  const disSp=isTekSp?'disabled':'';
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q||fCat||fMerk?' sesuai filter':''} — <a href="#" onclick="switchView('inventory-tambah');return false">Tambah item</a></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q||fCat||fMerk?' sesuai filter':''}${isTekSp?'':' — <a href="#" onclick="switchView(\'inventory-tambah\');return false">Tambah item</a>'}</td></tr>`;
   } else {
     tbody.innerHTML=filtered.map(it=>{
       const merkNorm=normalizeMerk(it.merk);
@@ -2477,17 +2519,17 @@ function renderSparepart(){
         <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar} → akhir ${it.stok}</span></div></td>
         <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${merkBadgeStyle(merkNorm)}">${escapeHtml(merkNorm)}</span></td>
         <td><span class="badge-status" style="background:#f3f4f6;border:1px solid #ececec;font-size:11px">${escapeHtml(it.kategori)}</span></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" id="sp-masuk-${it.id}" style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateSparepartField(${it.id},'masuk',this.value)"></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="sp-keluar-${it.id}" style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateSparepartField(${it.id},'keluar',this.value)"><div style="font-size:9px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${it.lastUsedBy? `<span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#2563eb;text-decoration:underline" title="Klik lihat riwayat pakai ${escapeHtml(it.nama)}">👷 ${escapeHtml(it.lastUsedBy)}</span> • <span onclick="openDetail('${escapeHtml(it.lastUsedInvoice)}')" style="cursor:pointer;color:#059669;text-decoration:underline" title="Buka service ${escapeHtml(it.lastUsedInvoice)}">${escapeHtml(it.lastUsedInvoice||'')}</span>` : '<span style="color:#9ca3af">belum dipakai</span>'}${it.log && it.log.length? ` • <span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#6b7280;text-decoration:underline" title="Lihat ${it.log.length} riwayat pakai">${it.log.length}x</span>` : ''}</div></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="sp-stok-${it.id}" style="width:80px;padding:6px 8px;border:1px solid ${it.stok<=2?'#fecaca':'#ececec'};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${it.stok<=2?'#dc2626':it.stok<=5?'#b45309':'#059669'}" onchange="updateSparepartField(${it.id},'stok',this.value)"></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" id="sp-masuk-${it.id}" ${disSp} style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateSparepartField(${it.id},'masuk',this.value)"></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="sp-keluar-${it.id}" ${disSp} style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateSparepartField(${it.id},'keluar',this.value)"><div style="font-size:9px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${it.lastUsedBy? `<span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#2563eb;text-decoration:underline" title="Klik lihat riwayat pakai ${escapeHtml(it.nama)}">👷 ${escapeHtml(it.lastUsedBy)}</span> • <span onclick="openDetail('${escapeHtml(it.lastUsedInvoice)}')" style="cursor:pointer;color:#059669;text-decoration:underline" title="Buka service ${escapeHtml(it.lastUsedInvoice)}">${escapeHtml(it.lastUsedInvoice||'')}</span>` : '<span style="color:#9ca3af">belum dipakai</span>'}${it.log && it.log.length? ` • <span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#6b7280;text-decoration:underline" title="Lihat ${it.log.length} riwayat pakai">${it.log.length}x</span>` : ''}</div></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="sp-stok-${it.id}" ${disSp} style="width:80px;padding:6px 8px;border:1px solid ${it.stok<=2?'#fecaca':'#ececec'};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${it.stok<=2?'#dc2626':it.stok<=5?'#b45309':'#059669'}" onchange="updateSparepartField(${it.id},'stok',this.value)"></td>
         <td style="font-size:11px;color:#4b5563;white-space:nowrap;text-align:center">${escapeHtml(formatTanggal(it.tgl))}</td>
-        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="sp-harga-${it.id}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
-        <td style="text-align:center">
+        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="sp-harga-${it.id}" placeholder="0" ${disSp} style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
+        <td style="text-align:center">${isTekSp?'<span style="font-size:11px;color:#8a8f98">read-only</span>':`
           <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveSparepartRow(${it.id})">💾 Simpan</button>
             <button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openSpEditModal(${it.id})">✎ Edit</button>
             <button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteSparepart(${it.id})">🗑</button>
-          </div>
+          </div>`}
         </td>
       </tr>`;
     }).join('');
@@ -2501,7 +2543,55 @@ function renderSparepart(){
     sumEl.textContent= `${inventory.length} item • Total nilai stok: ${formatRupiah(totalVal)} • Menampilkan ${filtered.length}`;
   }
 }
+// ---------- Asesories: view pisah, data sama (filter kategori Aksesoris) ----------
+function renderAsesoris(){
+  const tbody=document.getElementById('tbodyAsesoris');
+  const countEl=document.getElementById('asesorisCount');
+  const warnEl=document.getElementById('asesorisWarning');
+  const sumEl=document.getElementById('asesorisSummary');
+  if(!tbody) return;
+  const isTek=isTeknisiMode();
+  const q=(document.getElementById('searchAsesoris')?.value||'').toLowerCase();
+  let list=inventory.filter(i=>i.kategori==='Aksesoris');
+  if(q) list=list.filter(i=> (i.nama+(i.merk||'')).toLowerCase().includes(q));
+  list.sort((a,b)=>a.stok-b.stok);
+  const stokBadge=(s)=> s<=0 ? '<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">HABIS</span>' : s<=2 ? `<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s} tipis</span>` : `<span style="background:#ecfdf5;color:#059669;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s}</span>`;
+  tbody.innerHTML=list.map(it=>`<tr>
+    <td><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar}</span></td>
+    <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${merkBadgeStyle(normalizeMerk(it.merk))}">${escapeHtml(normalizeMerk(it.merk))}</span></td>
+    <td style="text-align:center">${stokBadge(it.stok)}</td>
+    <td style="text-align:right;font-weight:700">${formatRupiah(it.harga)}</td>
+    <td style="text-align:right;color:#4b5563">${formatRupiah((it.stok||0)*(it.harga||0))}</td>
+    <td style="text-align:center">${isTek ? '<span style="font-size:11px;color:#8a8f98">read-only</span>' : `<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" ${it.stok<=0?'disabled style="opacity:.45;padding:5px 8px;font-size:11px"':''} onclick="jualAsesoris(${it.id})">🛒 Jual</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openSpEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteSparepart(${it.id})">🗑</button></div>`}</td>
+  </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:18px;color:#8a8f98">Belum ada asesories — <a href="#" onclick="tambahAsesoris();return false">+ Tambah Asesories</a></td></tr>`;
+  if(countEl) countEl.textContent=list.length+' item';
+  const low=list.filter(i=>i.stok<=2).length;
+  if(warnEl){ warnEl.style.display=low?'inline-block':'none'; warnEl.textContent=low?`⚠ ${low} stok tipis`:''; }
+  if(sumEl){
+    const total=list.reduce((s,i)=>s+(i.stok||0)*(i.harga||0),0);
+    sumEl.textContent=`${list.length} item • Total nilai stok: ${formatRupiah(total)}`;
+  }
+  const addBtn=document.getElementById('btnTambahAsesoris');
+  if(addBtn) addBtn.style.display=isTek?'none':'';
+}
+function tambahAsesoris(){
+  switchView('inventory-tambah');
+  setTimeout(()=>{
+    const s=document.getElementById('sp-kategori'); if(s) s.value='Aksesoris';
+    fillMerkOptions(document.getElementById('merkList'), 'Aksesoris');
+  },120);
+}
+async function jualAsesoris(id){
+  switchView('transaksi-penjualan');
+  try{
+    await kasirLoadBarang();
+    const ada=_kasirBarang.find(x=>x.id===id);
+    if(!ada){ showToast('Barang belum sync ke kasir — refresh dulu'); return; }
+    kasirAddBarang(id);
+  }catch(e){ showToast('Gagal buka kasir: '+e.message); }
+}
 function updateSparepartField(id, field, val){
+  if(isTeknisiMode()){ showToast('⛔ Stok hanya owner/admin/kasir — teknisi pakai via Proses Service'); return; }
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
   const n=(field==='harga') ? parseRupiah(val) : (parseInt(val)||0);
@@ -2541,6 +2631,7 @@ function updateSparepartField(id, field, val){
   }
 }
 async function saveSparepartRow(id){
+  if(isTeknisiMode()){ showToast('⛔ Stok hanya owner/admin/kasir'); return; }
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
   // baca ulang dari input untuk pastikan
@@ -2562,9 +2653,11 @@ async function saveSparepartRow(id){
     saveInventory();
   }
   renderSparepart();
+  try{ renderAsesoris(); }catch(e){}
   showToast(`✅ ${it.nama} disimpan — Masuk ${it.masuk}, Keluar ${it.keluar}, Stok ${it.stok}, ${formatRupiah(it.harga)}`);
 }
 async function deleteSparepart(id){
+  if(isTeknisiMode()){ showToast('⛔ Stok hanya owner/admin/kasir'); return; }
   const it=inventory.find(x=>x.id===id);
   if(!it) return;
   if(!confirm(`Hapus "${it.nama}"?`)) return;
@@ -2578,6 +2671,7 @@ async function deleteSparepart(id){
     saveInventory();
   }
   renderSparepart();
+  try{ renderAsesoris(); }catch(e){}
   showToast(`🗑 ${it.nama} dihapus`);
 }
 async function handleSparepartAdd(e){
@@ -2606,8 +2700,9 @@ async function handleSparepartAdd(e){
       // reset preview
       const prev=document.getElementById('sp-harga-preview'); if(prev) prev.style.display='none';
       await loadInventory();
-      switchView('inventory-sparepart');
+      switchView(kategori==='Aksesoris' ? 'inventory-asesoris' : 'inventory-sparepart');
       renderSparepart();
+      try{ renderAsesoris(); }catch(e){}
       return;
     }catch(err){
       showToast('Gagal API, fallback lokal: '+err.message);
@@ -2618,15 +2713,18 @@ async function handleSparepartAdd(e){
   saveInventory();
   e.target.reset();
   showToast(`✅ ${nama} ditambahkan — Stok ${stok}`);
-  switchView('inventory-sparepart');
+  switchView(kategori==='Aksesoris' ? 'inventory-asesoris' : 'inventory-sparepart');
   renderSparepart();
+  try{ renderAsesoris(); }catch(e){}
 }
 function openSpEditModal(id){
+  if(isTeknisiMode()){ showToast('⛔ Stok hanya owner/admin/kasir'); return; }
   const it=inventory.find(x=>x.id===id);
   if(!it) return showToast('Item tidak ditemukan');
   document.getElementById('spEditId').value=it.id;
   document.getElementById('spEditNama').value=it.nama;
-  const mEl=document.getElementById('spEditMerk'); if(mEl) mEl.value=normalizeMerk(it.merk);
+  fillMerkOptions(document.getElementById('merkListEdit'), it.kategori);
+  document.getElementById('spEditMerk').value = normalizeMerk(it.merk);
   document.getElementById('spEditKategori').value=it.kategori;
   document.getElementById('spEditMasuk').value=it.masuk;
   document.getElementById('spEditKeluar').value=it.keluar;
@@ -2658,6 +2756,7 @@ async function submitSpEdit(e){
       await loadInventory();
       closeSpEditModal();
       renderSparepart();
+      try{ renderAsesoris(); }catch(e){}
       showToast(`✎ ${nama} diperbarui (sync)`);
       return;
     }catch(err){ showToast('Gagal API: '+err.message); return; }
@@ -2666,6 +2765,7 @@ async function submitSpEdit(e){
   saveInventory();
   closeSpEditModal();
   renderSparepart();
+  try{ renderAsesoris(); }catch(e){}
   showToast(`✎ ${nama} diperbarui`);
 }
 function resetSparepartDummy(){
@@ -2673,6 +2773,7 @@ function resetSparepartDummy(){
   inventory=[...defaultInventory];
   saveInventory();
   renderSparepart();
+  try{ renderAsesoris(); }catch(e){}
   showToast('🔄 Inventory direset ke dummy');
 }
 function openSparepartLog(id){
@@ -3024,8 +3125,10 @@ function renderAlat(){
   // sort: rusak/kalibrasi dulu
   const order={Rusak:0,'Perlu Kalibrasi':1,Dipinjam:2,Baik:3};
   filtered.sort((a,b)=> (order[a.kondisi]??9)-(order[b.kondisi]??9) || a.stok-b.stok);
+  const isTekAl=isTeknisiMode();
+  const disAl=isTekAl?'disabled':'';
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q||fK?' sesuai filter':''} — <a href="#" onclick="openAlatAddModal();return false">Tambah alat</a></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q||fK?' sesuai filter':''}${isTekAl?'':' — <a href="#" onclick="openAlatAddModal();return false">Tambah alat</a>'}</td></tr>`;
   } else {
     const peminjamOptions=['-', ...availableTechs.map(t=>t.username)];
     tbody.innerHTML=filtered.map(it=>{
@@ -3038,13 +3141,13 @@ function renderAlat(){
       return `
       <tr>
         <td><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><div style="font-size:10px;color:#8a8f98">#${it.id}</div></td>
-        <td><select id="alat-kondisi-${it.id}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${kondisiStyle}" onchange="updateAlatField(${it.id},'kondisi',this.value)">${kondisiOpts}</select></td>
+        <td><select id="alat-kondisi-${it.id}" ${disAl} style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${kondisiStyle}" onchange="updateAlatField(${it.id},'kondisi',this.value)">${kondisiOpts}</select></td>
         <td><select id="alat-peminjam-${it.id}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px" onchange="updateAlatField(${it.id},'peminjam',this.value)">${peminjamOpts}</select></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" id="alat-masuk-${it.id}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'masuk',this.value)"></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="alat-keluar-${it.id}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'keluar',this.value)"></td>
-        <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="alat-stok-${it.id}" style="width:70px;padding:6px 8px;border:1px solid ${stokBorder};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${stokColor}" onchange="updateAlatField(${it.id},'stok',this.value)"></td>
-        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="alat-harga-${it.id}" placeholder="0" style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
-        <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openAlatEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteAlat(${it.id})">🗑</button></div></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" id="alat-masuk-${it.id}" ${disAl} style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'masuk',this.value)"></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" id="alat-keluar-${it.id}" ${disAl} style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="updateAlatField(${it.id},'keluar',this.value)"></td>
+        <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="alat-stok-${it.id}" ${disAl} style="width:70px;padding:6px 8px;border:1px solid ${stokBorder};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${stokColor}" onchange="updateAlatField(${it.id},'stok',this.value)"></td>
+        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="alat-harga-${it.id}" placeholder="0" ${disAl} style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
+        <td style="text-align:center">${isTekAl?`<button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">📌 Pinjam</button>`:`<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openAlatEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteAlat(${it.id})">🗑</button></div>`}</td>
       </tr>`;
     }).join('');
   }
@@ -3058,6 +3161,7 @@ function renderAlat(){
   }
 }
 function updateAlatField(id, field, val){
+  if(isTeknisiMode() && field!=='peminjam'){ showToast('⛔ Alat hanya owner/admin/kasir — kamu boleh pinjam/kembalikan'); return; }
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return;
   if(field==='kondisi') it.kondisi=val;
@@ -3109,6 +3213,7 @@ function updateAlatField(id, field, val){
   }
 }
 async function saveAlatRow(id){
+  const tekOnly=isTeknisiMode();
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return;
   const kEl=document.getElementById(`alat-kondisi-${id}`);
@@ -3125,16 +3230,19 @@ async function saveAlatRow(id){
   if(hEl) it.harga=parseRupiah(hEl.value);
   if(USE_API){
     try{
-      await apiAlatUpdate(id, {kondisi: it.kondisi, peminjam: it.peminjam, masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga});
+      const payload = tekOnly ? {peminjam: it.peminjam} : {kondisi: it.kondisi, peminjam: it.peminjam, masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga};
+      await apiAlatUpdate(id, payload);
       await loadAlat();
     }catch(e){ showToast('Gagal simpan API: '+e.message); return; }
   } else {
+    if(tekOnly){ showToast('⛔ Offline: pinjam alat butuh koneksi'); return; }
     saveAlat();
   }
   renderAlat();
-  showToast(`✅ ${it.nama} disimpan — ${it.kondisi} • ${it.peminjam} • Stok ${it.stok} • ${formatRupiah(it.harga)}`);
+  showToast(tekOnly ? `📌 ${it.nama} → ${it.peminjam}` : `✅ ${it.nama} disimpan — ${it.kondisi} • ${it.peminjam} • Stok ${it.stok} • ${formatRupiah(it.harga)}`);
 }
 async function deleteAlat(id){
+  if(isTeknisiMode()){ showToast('⛔ Alat hanya owner/admin/kasir'); return; }
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return;
   if(!confirm(`Hapus alat "${it.nama}"?`)) return;
@@ -3149,6 +3257,7 @@ async function deleteAlat(id){
   showToast(`🗑 ${it.nama} dihapus`);
 }
 function openAlatAddModal(){
+  if(isTeknisiMode()){ showToast('⛔ Alat hanya owner/admin/kasir'); return; }
   document.getElementById('alatEditId').value='';
   document.getElementById('alatModalTitle').textContent='+ Tambah Alat';
   document.getElementById('alatEditNama').value='';
@@ -3162,6 +3271,7 @@ function openAlatAddModal(){
   document.getElementById('alatEditModal').classList.add('show');
 }
 function openAlatEditModal(id){
+  if(isTeknisiMode()){ showToast('⛔ Alat hanya owner/admin/kasir'); return; }
   const it=alatInventory.find(x=>x.id===id);
   if(!it) return showToast('Alat tidak ditemukan');
   document.getElementById('alatModalTitle').textContent='✎ Edit Alat';
@@ -3972,6 +4082,121 @@ function renderStatusView(targetId, statusName){
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
   if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();
   if(document.getElementById('view-laporan-service')?.classList.contains('active')) renderLaporanService();
+}
+// ---------- Kasir Penjualan (barang potong stok + jasa, struk simple) ----------
+let _kasirBarang = [], _kasirCart = [], _kasirStruk = null;
+function _kasirRp(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
+async function kasirLoadBarang(){
+  const tb = document.getElementById('tbodyKasirBarang');
+  try{
+    const rows = await apiFetch('/inventory/spareparts');
+    _kasirBarang = Array.isArray(rows) ? rows : [];
+    kasirRenderBarang();
+  }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#dc2626">Gagal: ${escapeHtml(e.message).slice(0,120)}</td></tr>`; }
+}
+function kasirRenderBarang(){
+  const tb = document.getElementById('tbodyKasirBarang'); if(!tb) return;
+  const q = (document.getElementById('kasirSearch')?.value || '').toLowerCase();
+  const list = _kasirBarang.filter(b => !q || String(b.nama||'').toLowerCase().includes(q) || String(b.kategori||'').toLowerCase().includes(q)).slice(0, 60);
+  tb.innerHTML = list.map(b=>{
+    const stok = Number(b.stok)||0;
+    return `<tr><td><strong>${escapeHtml(b.nama||'-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${escapeHtml(b.kategori||'')} • ${escapeHtml(b.merk||'')}</span></td><td style="text-align:center;${stok<=0?'color:#dc2626;font-weight:700':''}">${stok}</td><td style="text-align:right">${_kasirRp(b.harga)}</td><td style="text-align:center"><button class="btn btn-dark small" style="padding:4px 10px" ${stok<=0?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="kasirAddBarang(${b.id})">+</button></td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Tidak ada barang — tambah di Sparepart dulu</td></tr>';
+}
+function kasirAddBarang(id){
+  const b = _kasirBarang.find(x=>x.id===id); if(!b) return;
+  const ada = _kasirCart.find(x=>x.tipe==='barang' && x.sparepart_id===id);
+  const stok = Number(b.stok)||0;
+  if(ada){ if(ada.qty+1 > stok){ showToast('⚠ Stok tidak cukup (sisa '+stok+')'); return; } ada.qty++; }
+  else _kasirCart.push({tipe:'barang', sparepart_id:id, nama:b.nama, harga:Number(b.harga)||0, qty:1, stok});
+  kasirRenderCart();
+}
+function kasirAddJasa(){
+  const nama = (document.getElementById('jasa-nama')?.value || '').trim();
+  const harga = parseInt(String(document.getElementById('jasa-harga')?.value || '').replace(/\D/g,'')) || 0;
+  if(!nama){ showToast('Isi nama jasa dulu'); return; }
+  if(harga<=0){ showToast('Isi harga jasa dulu'); return; }
+  _kasirCart.push({tipe:'jasa', nama, harga, qty:1});
+  document.getElementById('jasa-nama').value=''; document.getElementById('jasa-harga').value='';
+  kasirRenderCart();
+}
+function kasirQty(ix, d){
+  const it = _kasirCart[ix]; if(!it) return;
+  const nq = it.qty + d;
+  if(nq<=0){ _kasirCart.splice(ix,1); }
+  else{
+    if(it.tipe==='barang'){
+      const b = _kasirBarang.find(x=>x.id===it.sparepart_id);
+      const stok = b ? Number(b.stok)||0 : it.stok||0;
+      if(nq > stok){ showToast('⚠ Stok tidak cukup (sisa '+stok+')'); return; }
+    }
+    it.qty = nq;
+  }
+  kasirRenderCart();
+}
+function kasirDel(ix){ _kasirCart.splice(ix,1); kasirRenderCart(); }
+function kasirClear(){ _kasirCart = []; kasirRenderCart(); }
+function kasirRenderCart(){
+  const tb = document.getElementById('tbodyKasirCart'); if(!tb) return;
+  tb.innerHTML = _kasirCart.map((it,ix)=>`<tr><td><strong>${escapeHtml(it.nama)}</strong><br><span style="font-size:10.5px;color:#8a8f98">${it.tipe==='jasa'?'🔧 Jasa':'📦 Barang'} • ${_kasirRp(it.harga)}</span></td><td style="text-align:center;white-space:nowrap"><button class="btn btn-ghost small" style="padding:3px 8px" onclick="kasirQty(${ix},-1)">−</button> <strong>${it.qty}</strong> <button class="btn btn-ghost small" style="padding:3px 8px" onclick="kasirQty(${ix},1)">+</button></td><td style="text-align:right;font-weight:700">${_kasirRp(it.harga*it.qty)}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:3px 8px;color:#dc2626" onclick="kasirDel(${ix})">×</button></td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Keranjang kosong</td></tr>';
+  const tot = _kasirCart.reduce((s,it)=>s+it.harga*it.qty,0);
+  document.getElementById('kasirTotal').textContent = _kasirRp(tot);
+  document.getElementById('kasirCount').textContent = _kasirCart.length + ' item';
+}
+async function kasirSave(){
+  if(!_kasirCart.length){ showToast('Keranjang masih kosong'); return; }
+  const body = {
+    metode: document.getElementById('kasir-metode')?.value || 'Tunai',
+    pelanggan: (document.getElementById('kasir-pelanggan')?.value || '').trim() || undefined,
+    items: _kasirCart.map(it=> it.tipe==='jasa'
+      ? {tipe:'jasa', nama:it.nama, harga:it.harga, qty:it.qty}
+      : {tipe:'barang', sparepart_id:it.sparepart_id, qty:it.qty}),
+  };
+  try{
+    const s = await apiFetch('/sales', {method:'POST', body: JSON.stringify(body)});
+    _kasirStruk = s;
+    kasirStrukShow(s);
+    kasirClear();
+    try{ document.getElementById('kasir-pelanggan').value=''; }catch(e){}
+    kasirLoadBarang(); kasirLoadToday();
+    showToast('✅ Struk ' + (s.kode||'') + ' tersimpan');
+  }catch(e){ showToast('Gagal simpan: ' + String(e.message).slice(0,200)); }
+}
+async function kasirLoadToday(){
+  const tb = document.getElementById('tbodyKasirToday'); if(!tb) return;
+  try{
+    const _d = new Date();
+    const today = _d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');
+    const rows = await apiFetch('/sales?since='+today+'&limit=50');
+    const arr = Array.isArray(rows)?rows:[];
+    tb.innerHTML = arr.map(s=>`<tr><td style="font-size:11px"><strong>${escapeHtml(s.kode||('#'+s.id))}</strong><br><span style="color:#8a8f98">${(s.items||[]).length} item</span></td><td style="text-align:right;font-weight:700">${_kasirRp(s.total)}</td><td style="font-size:11px">${escapeHtml(s.metode||'')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:3px 8px" onclick='kasirStrukShow(${JSON.stringify(s).replace(/'/g,"&#39;")})'>👁</button></td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Belum ada struk hari ini</td></tr>';
+  }catch(e){ tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#8a8f98">-</td></tr>'; }
+}
+function kasirStrukShow(s){
+  _kasirStruk = s;
+  const toko = (typeof storeDisplayName==='function' ? storeDisplayName() : (document.getElementById('brandStoreName')?.textContent || 'B_gadget'));
+  const L = [];
+  L.push(`<div style="text-align:center;font-weight:800;font-size:14px">${escapeHtml(toko)}</div>`);
+  L.push(`<div style="text-align:center">*** STRUK PENJUALAN ***</div>`);
+  L.push(`<div>${escapeHtml(s.kode||'')} • ${escapeHtml(String(s.tanggal||'').slice(0,10))}</div>`);
+  if(s.pelanggan) L.push(`<div>Yth: ${escapeHtml(s.pelanggan)}</div>`);
+  L.push(`<div>${'-'.repeat(32)}</div>`);
+  (s.items||[]).forEach(it=>{ L.push(`<div>${escapeHtml(it.nama||'')} x${it.qty}</div><div style="text-align:right">${_kasirRp((it.harga_jual||0)*it.qty)}</div>`); });
+  L.push(`<div>${'-'.repeat(32)}</div>`);
+  L.push(`<div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px"><span>TOTAL</span><span>${_kasirRp(s.total)}</span></div>`);
+  L.push(`<div>Bayar: ${escapeHtml(s.metode||'')}</div>`);
+  L.push(`<div style="text-align:center;margin-top:6px">Terima kasih 🙏</div>`);
+  document.getElementById('strukBody').innerHTML = L.join('');
+  document.getElementById('strukModal').classList.add('show');
+}
+function kasirStrukClose(){ document.getElementById('strukModal').classList.remove('show'); }
+function cetakStruk(){
+  const s = _kasirStruk; if(!s) return;
+  const toko = (typeof storeDisplayName==='function' ? storeDisplayName() : 'B_gadget');
+  const rows = (s.items||[]).map(it=>`<tr><td>${escapeHtml(it.nama||'')}<br><small>${it.qty} x ${_kasirRp(it.harga_jual)}</small></td><td style="text-align:right">${_kasirRp((it.harga_jual||0)*it.qty)}</td></tr>`).join('');
+  const w = window.open('', '_blank', 'width=300,height=500');
+  w.document.write(`<html><head><title>${escapeHtml(s.kode||'Struk')}</title><style>body{font-family:Inter,system-ui,sans-serif;font-size:12px;width:280px;margin:8px}table{width:100%;border-collapse:collapse}td{padding:2px 0;vertical-align:top}h3,p{margin:2px 0;text-align:center}</style></head><body><h3>${escapeHtml(toko)}</h3><p>*** STRUK PENJUALAN ***<br>${escapeHtml(s.kode||'')} • ${escapeHtml(String(s.tanggal||'').slice(0,10))}${s.pelanggan?'<br>Yth: '+escapeHtml(s.pelanggan):''}</p><hr><table>${rows}</table><hr><table><tr><td><b>TOTAL</b></td><td style="text-align:right"><b>${_kasirRp(s.total)}</b></td></tr></table><p>Bayar: ${escapeHtml(s.metode||'')}<br>Terima kasih</p><script>window.print()<\/script></body></html>`);
+  w.document.close();
 }
 let bayarFilter='all';
 function setBayarFilter(f){

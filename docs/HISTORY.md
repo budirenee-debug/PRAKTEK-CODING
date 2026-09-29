@@ -1,6 +1,6 @@
 # HISTORI SESI — POS → Platform BOS SERVICE
 
-> Terakhir update: 28 Sep 2026 (Owner Space + Modul Keuangan: Kecelakaan Kerja & Refund Dana).
+> Terakhir update: 29 Sep 2026 (Nota Modern).
 
 ## 1. Penanda Git (SUDAH push 23 Sep 2026, main sejajar origin/main)
 - `POS1` (4b8d28c, empty commit) — titik beku POS satu-toko sebelum platform.
@@ -89,6 +89,67 @@
 - **JANGAN** sunting file ini (`.html`/`.js`/`.md`) lewat `Get-Content -Raw` + `[System.IO.File]::WriteAllText` — PS 5.1 baca sebagai ANSI lalu tulis UTF-8 → semua emoji/— jadi rusak (pernah ruin 661 baris di `owner.html`; balikin dengan `git checkout --`). Pakai tool edit saja. Untuk baca dari shell: `[System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)`.
 - Snapshot nilai **lama** di endpoint PATCH/PUT harus diambil **sebelum** call crud (objek ORM sama, jadi sesudah update selalu sama → diff kosong, log tidak pernah tertulis).
 - Kalau hasil test "aneh" (filter mengembalikan 0 padahal data ada), cek dulu **huruf e yang hilang** di string query test (mis. `pola=Kuangan`), bukan blamed backend. Bandingkan `repr()` atau `[hex(ord(c)) for c in s]`.
+
+## 5b. LAPORAN PINDAH TOKO → OWNER (29 Sep 2026, belum commit)
+- Dashboard toko (`index.html`): kategori LAPORAN dihapus dari sidebar (laporan-service/teknisi/penjualan). `Kas Saya` tetap di toko (pindah ke grup TRANSAKSI) untuk teknisi personal. Stat Estimasi Pendapatan kini → `transaksi-pendapatan` (dulu `laporan-penjualan`). `script.js?v=ambil11`.
+- Deep-link lama `switchView('laporan-*')` otomatis redirect ke `owner.html#laporan` (tidak blank). Section laporan lama di `index.html` diberi banner "Pindah ke Owner Space" sebagai arsip kompatibilitas.
+- Dashboard owner (`owner.html`): menu baru **📊 Laporan** (kategori LAPORAN) + `view-own-laporan` 3 sub-tab: 📄 Service (Masuk/Sukses/Failed/Garansi per Harian/Mingguan/Bulanan + export CSV — pindahan toko, melengkapi Ringkasan harian + Pendapatan nominal), 👷 Teknisi (Handle/Sukses/Failed/Rating — melengkapi Performa Ringkasan + rincian Kas di Keuangan), 📊 Penjualan (total cair + sparepart terlaris — melengkapi Pendapatan+Bayar+Penjualan). Fungsi `ownLaporan/ownLapService/ownLapTeknisi/ownLapJual/ownLapSvcCSV`, loader di `ownShow` + `ownLoadAll`, deep-link `#laporan` di guard.
+- Data lewat `ownServices()` (cache + dummy DEMO) + `GET /inventory/spareparts` — pola sama seperti Ringkasan. Uji: `node --check` script.js + inline owner LULUS; semua ID view/tbody/stat terverifikasi ada.
+
+## 5c. KAS TOKO + SUPERADMIN → KONTROL (29 Sep 2026, belum commit)
+- **Kas Saya → 🏪 Kas Toko** (`index.html` TRANSAKSI, `script.js?v=ambil12`, `engine.js?v=eng4`): menu ganti nama; view jadi 2 sub-tab — 🏪 Arus Toko (owner/admin: 3 stat Total Masuk / Total Keluar / Sisa Kas + tabel riwayat gabungan max 120 baris, Masuk = cair bruto, Keluar = komisi+hadir teknisi + refund nominal + beban toko celaka, Sisa = Masuk−Keluar; sumber `/services` + `/engine/kas/teknisi/{id}` + `/finance/refunds` + `/finance/accidents`, semua try/catch 403) dan 👤 Kas Saya (personal, fungsi lama `renderKasSaya` utuh). Teknisi otomatis ke Kas Saya + tab Arus Toko disembunyikan (pola Buku Kas). Gotcha: refund dihitung nominal penuh (dari omzet + jadi pengeluaran) supaya tidak double-count lawan bruto.
+- **SUPERADMIN gabung Kontrol Owner**: sidebar toko bersih (kategori SUPERADMIN + menu approval dihapus; `refreshPendingBadge` null-safe, bell/banner tetap → redirect). `switchView('approval-akun')` → `owner.html#approval`. Owner: menu ✅ Persetujuan Akun di KONTROL (khusus superadmin, `menu-approval-own` di-hide untuk owner/admin di guard) + `view-own-approval` (tabel pending + semua user + modal edit, ID baru `tbodyOwnApproval/...`) + fungsi `ownApproval/ownApproveUser/ownRejectUser/ownToggleFreeze/ownDeleteUser/ownOpenEditUser` via `ownFetch` (`/auth/pending|/users|/approve|/reject|/toggle`, PUT/DELETE users). Loader di `ownShow` + `ownLoadAll`, deep-link `#approval`.
+- Uji: 19 assertion ID/fungsi OK + `node --check` script.js/engine.js/inline owner LULUS.
+
+## 5d. MODUL PENGELUARAN + LABA-RUGI (29 Sep 2026, belum commit)
+- **Backend** (`models.py` + `routers/finance.py`, tabel auto-create via `create_all`, tanpa migrasi): tabel `expenses` (tanggal/kategori/keperluan/nominal/metode/keterangan/dibuat_oleh, scope `store_id`). Endpoint `GET /finance/expenses` (filter kategori/since), `GET /finance/expenses/ringkasan` (hari/bulan/total + per_kategori), `POST` (validasi keperluan/nominal/kategori 7 macam/metode), `DELETE` (salah input). Baca: owner/admin/kasir/superadmin (kasir baca agar Kas Toko jujur, teknisi 403); tulis: owner/admin/superadmin. Audit `finance.expense` + `finance.expense_hapus` (masuk Log Anti-fraud pola Keuangan). Uji TestClient di DB temp: 12/12 LULUS (401/400/404/CRUD/ringkasan).
+- **Owner** (`owner.html`): view Pengeluaran 100% real — stat Hari/Bulan/Total + chip per kategori + filter + tabel (aksi hapus) + modal + Catat Keluar (preview live). Kartu **Laba-Rugi Sederhana** (`ownLaba`): Omzet cair − komisi − hadir − refund − beban toko celaka − pengeluaran = laba bersih (hari + bulan, merah jika minus). Ringkasan `outHari` kini real (dulu hardcode Rp275rb).
+- **Kas Toko** (`engine.js?v=eng5`): Total Keluar + riwayat ikut `🧾 Pengeluaran` dari `/finance/expenses` (try/catch, kasir bisa baca). Rumus Sisa Kas tetap konsisten (bruto − semua keluar).
+- Catatan: refund `jadi_pengeluaran` masih angka di tabel refunds (belum auto-jadi baris expenses — disengaja, agar tidak double-count; Laba-Rugi hitung refund dari nominal).
+
+## 5e. KASIR PENJUALAN + STRUK SIMPLE (29 Sep 2026, belum commit)
+- **Keputusan:** asesories masuk aplikasi ini (kategori Aksesoris di tabel `spareparts`), tidak pisah aplikasi — stok satu kebenaran + profit otomatis (jual−beli).
+- **Backend** (`models.py` Sale/SaleItem + `routers/sales.py` prefix `/sales`, daftar di `main.py`, auto-create): `POST /sales` (item barang: harga ikut master anti-markup + cek stok → 400 jika kurang, potong stok/keluar; item jasa: nama+harga manual; kode `JL-YYYYMM-XXXX`), `GET /sales`, `GET /sales/ringkasan` (omzet/profit/hari/bulan/per_metode/terlaris), `DELETE` void (stok balik + audit `sale.create`/`sale.void` pola Keuangan). Guard: owner/admin/kasir (teknisi 403). Uji TestClient DB temp: 16/16 LULUS — termasuk bug FK void yang ketemu saat uji (item harus kehapus+flush dulu sebelum struk, sudah fix).
+- **Toko** (`index.html` + `script.js?v=ambil13`): tab Penjualan mati → **kasir beneran** (cari barang + tombol +, jasa manual, keranjang qty +/−, pelanggan opsional, metode, total, Simpan → modal **struk simple** monospace + 🖨 Cetak via jendela print). Struk hari ini + refresh otomatis. Teknisi tetap diblokir (kasir only).
+- **Owner:** Penjualan proxy gudang → real (omzet hari/bulan, profit, tabel struk + Void, terlaris dari `/sales/ringkasan`). Laporan → Penjualan ikut real (total service+barang, struk terbaru). **Kas Toko** (`engine.js?v=eng6`): Masuk +🛒 omzet barang. **Laba-Rugi**: baris baru ➕ Profit barang/jasa.
+- Konsistensi: HPP barang tidak dipotong dobel (keluar saat belanja via Pengeluaran, profit dihitung jual−beli).
+
+## 5f. VIEW ASESORIES PISAH (29 Sep 2026, belum commit)
+- Dashboard toko: menu baru **🎧 Asesories** (INVENTORY) + `view-inventory-asesoris` — tabel sendiri (Nama/Merk/Stok badge/Nilai/Harga, search, count, warning tipis, summary nilai) tapi **data sama** (`inventory` array, filter `kategori==='Aksesoris'`). Aksi per baris: 🛒 Jual (loncat ke Kasir + masuk keranjang), ✎ Edit (modal sparepart yang sama), 🗑 Hapus. + Tambah Asesories (form tambah dengan kategori terpreset Aksesoris; sukses tambah balik ke view ini). Teknisi: read-only (tanpa tombol, ikut pola Sparepart).
+- Sinkron dua arah: edit/hapus/tambah/reset di mana pun me-render ulang kedua view (`renderAsesoris` dipanggil di save/delete/submit/reset + redirect tambah). Tanpa ID ganda (view Asesories tanpa input inline).
+- Owner: tombol 🎧 Asesories di toolbar Inventori = toggle filter kategori Aksesoris (data tetap satu tabel).
+- `script.js?v=ambil14`. Verifikasi 7 cek + `node --check` LULUS.
+
+## 5g. MERK ASESORIES SENDIRI (29 Sep 2026, belum commit)
+- Daftar merk asesories: ROBOT, OLIKE, BASEUS, ANKER, UNEED, KAKU, HIPPO, ORIGINAL, GENERIC, LAIN (bukan merk HP).
+- **Backend** (`schemas.py` + `crud.py` create/update): allowlist dibuka untuk 9 merk asesories. Gotcha yang ketemu saat uji: validator schema lolos tapi `crud` memaksa jadi LAIN (2 daftar terpisah) — keduanya disamakan. Uji TestClient: ROBOT tersimpan, IPHONE tetap, merk ngaco tetap LAIN, jual ROBOT via kasir OK (4/4).
+- **Toko** (`script.js?v=ambil15`): `MERK_ACC` + `merkListFor/fillMerkOptions` — dropdown merk di form Tambah & modal Edit **otomatis ganti isi ikut kategori** (Aksesoris → merk asesories, lainnya → merk HP), placeholder aman. Badge warna sendiri per merk. Filter merk + kategori di Sparepart ikut lengkap (termasuk Aksesoris yang dulu absen).
+- **Owner:** `O_MERK_ACC` + `oMerkFill`, modal tambah/edit ikut dinamis, filter merk + badge ikut 9 merk baru.
+- Verifikasi 8 cek + `node --check` + compile LULUS.
+
+## 5h. MERK BEBAS KETIK (29 Sep 2026, belum commit)
+- Dropdown merk diganti **input bebas + saran** (datalist): ketik apa pun bisa (maks 40 huruf, otomatis kapital), saran mengikuti kategori (Aksesoris → Robot/Olike/dll, lainnya → merk HP). Berlaku form Tambah + modal Edit, toko + Owner.
+- **Backend** (`schemas.py` + `crud.py`): allowlist dihapus total (sebelumnya 2 lapis: schema + crud) — hanya rapikan huruf. Uji: merk bebas tersimpan, update bebas, jual via kasir OK (3/3).
+- Filter merk dropdown tetap (opsi umum + 9 merk asesories); merk bebas di luar itu ketemu via search. Badge merk baru tampil abu-abu netral.
+- `script.js?v=ambil16`. Verifikasi 8 cek + `node --check` + compile LULUS.
+
+## 5i. AUDIT OTORITAS PER ROLE (29 Sep 2026, belum commit)
+- Temuan 4 lubang, semua ditutup + diuji 14/14 TestClient (user owner/kasir/teknisi beneran + membership):
+  1. Teknisi bisa tulis stok via API (tombol UI sembunyi tapi backend lolos) → `inventory.py` tambah `_toko_writer` (superadmin/owner/admin/kasir) di create/update sparepart+alat. Teknisi stok 403, kasir 201/200.
+  2. Teknisi bisa lompat status langsung Sudah Diambil (= cair komisi, bypass alur kasir) → `services.py` `TERMINAL_STATUS` (Bisa Diambil/Sudah Diambil/Sukses/Selesai/Failed/Garansi) 403 untuk teknisi di PUT + PATCH. Operasional (Dikerjakan dll) tetap 200.
+  3. Teknisi bisa ubah harga service → PATCH `biaya` 403 untuk teknisi (harga milik kasir/owner).
+  4. Owner tidak bisa hapus stok (backend superadmin-only padahal tombol ada di Owner) → DELETE sparepart/alat dibuka untuk owner/admin (scope toko sendiri). Teknisi hapus tetap 403.
+- Pengecualian disengaja: teknisi boleh ubah **peminjam** alat (pinjam/kembali, kondisi ikut otomatis) — backend hanya terima key peminjam; UI Alat teknisi: semua dikunci kecuali dropdown peminjam + tombol 📌 Pinjam. Sparepart teknisi full read-only (pakai via Proses Service).
+- Frontend (`script.js?v=ambil17`): input stok disabled + tombol aksi disembunyikan untuk teknisi (sparepart/alat), guard console di semua fungsi tulis.
+- Yang sudah benar (tidak diubah): superadmin full; register legacy tanpa owner; owner/admin kelola tim + engine + finance tulis; kasir kasir+status+stok; teknisi own-scope + kas saya + check-in; dev.html superadmin-only; track publik aman.
+- Verifikasi: guard 14/14 + `node --check` + compile LULUS.
+
+## 5j. NOTA MODERN (29 Sep 2026, belum commit)
+- `buildNotaHTML` ditulis ulang (masuk + ambil): kop ◈ tegas, garis ganda, badge pill status (TANDA TERIMA / PENGAMBILAN • LUNAS), baris label redup + nilai tebal, **total box** berbingkai, footer terstruktur. Semua inline style (aman cetak thermal 58/80 + A4). Isi data & template WA tidak diubah.
+- Preview modal: `<pre>` teks polos → render HTML asli (WYSIWYG, yang dilihat = yang tercetak). Tombol Ukuran/Cetak/WA tetap.
+- `script.js?v=ambil18`. Uji: render masuk+ambil 7/7 (kop/badge/total/lacak/tanpa undefined) + `node --check` LULUS.
+- Revisi: baris **Teknisi dihapus dari nota pengambilan** (cetak + template WA default frontend & backend; nota masuk tetap ada). Template custom toko yang sudah tersimpan tidak ikut berubah — hapus manual di Pengaturan → Template WA bila perlu. `script.js?v=ambil19`.
+- Revisi font: nota + struk ikut font mockup TUSER — monospace (`Courier New`) dibuang, semua ukuran (58/80/A4) + struk kasir + preview pakai Inter/system sans. CSS `?v=black2` (4 halaman), `script.js?v=ambil20`.
 
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3→BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.

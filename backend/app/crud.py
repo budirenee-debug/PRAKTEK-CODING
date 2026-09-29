@@ -487,10 +487,8 @@ def create_sparepart(db: Session, payload: schemas.SparepartCreate, store_id=Non
     stok = payload.stok
     if stok is None:
         stok = max(0, (payload.masuk or 0) - (payload.keluar or 0))
-    # merk normalisasi
-    merk = (payload.merk or "LAIN").upper()
-    if merk not in ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]:
-        merk = "LAIN"
+    # merk bebas — hanya rapikan huruf
+    merk = (payload.merk or "LAIN").upper().strip()[:40] or "LAIN"
     sp = models.Sparepart(
         store_id=store_id,
         nama=payload.nama.strip(),
@@ -513,11 +511,9 @@ def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate):
     if not sp:
         return None
     data = payload.model_dump(exclude_unset=True)
-    # merk upper
+    # merk bebas — hanya rapikan huruf
     if "merk" in data and data["merk"]:
-        data["merk"] = data["merk"].upper()
-        if data["merk"] not in ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]:
-            data["merk"] = "LAIN"
+        data["merk"] = str(data["merk"]).upper().strip()[:40] or "LAIN"
     for k,v in data.items():
         setattr(sp, k, v)
     # jika masuk/keluar berubah dan stok tidak di-set manual, auto

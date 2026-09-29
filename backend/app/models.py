@@ -339,6 +339,55 @@ class Refund(Base):
     created_at = Column(DateTime, default=func.now())
 
 
+class Expense(Base):
+    """Pengeluaran operasional toko: sewa, listrik, gaji pokok, belanja part, dll."""
+    __tablename__ = "expenses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    kategori = Column(String(40), default="Operasional", index=True)  # Sewa/Listrik/Internet/Gaji/Belanja Part/Operasional/Lainnya
+    keperluan = Column(String(200), nullable=False)  # mis. "Sewa ruko Oktober"
+    nominal = Column(Integer, default=0)
+    metode = Column(String(20), default="Tunai")  # Tunai / Transfer / QRIS
+    keterangan = Column(String(255), nullable=True)
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Sale(Base):
+    """Penjualan kasir: barang (potong stok) + jasa langsung. Struk simple."""
+    __tablename__ = "sales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    kode = Column(String(30), nullable=True, index=True)  # JL-YYYYMM-XXXX
+    pelanggan = Column(String(120), nullable=True)
+    metode = Column(String(20), default="Tunai")  # Tunai / Transfer / QRIS
+    total = Column(Integer, default=0)
+    profit = Column(Integer, default=0)  # sum(jual-beli)*qty; jasa = harga*qty
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class SaleItem(Base):
+    """Item per struk. Snapshot harga agar riwayat tidak berubah saat master diedit."""
+    __tablename__ = "sale_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tipe = Column(String(20), default="barang", index=True)  # barang / jasa
+    sparepart_id = Column(Integer, ForeignKey("spareparts.id"), nullable=True)
+    nama_snapshot = Column(String(160), nullable=True)
+    qty = Column(Integer, default=1)
+    harga_jual = Column(Integer, default=0)
+    harga_beli = Column(Integer, default=0)
+    profit = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+
+
 class CommissionLedger(Base):
     """Buku kas resmi. Sumber untuk Laporan Teknisi Tab2 & Kas Saya."""
     __tablename__ = "commission_ledgers"

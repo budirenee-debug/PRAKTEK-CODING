@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=black1">
+    <link rel="stylesheet" href="assets/css/style.css?v=black2">
     <style>html.guard-lock body{visibility:hidden}</style>
     <script>
     // Guard dini anti-bocor: sembunyikan body sampai lolos auth.
@@ -93,6 +93,9 @@
                     <button class="menu-item" data-view="inventory-sparepart">
                         <span class="mi">◈</span> Sparepart
                     </button>
+                    <button class="menu-item" data-view="inventory-asesoris">
+                        <span class="mi">🎧</span> Asesories
+                    </button>
                     <button class="menu-item" data-view="inventory-alat">
                         <span class="mi">⚒</span> Alat
                     </button>
@@ -111,19 +114,8 @@
                         <span class="mi">💰</span> Pendapatan Sukses
                         <span class="badge" id="badge-pendapatan">0</span>
                     </button>
-
-                    <div class="menu-category">LAPORAN</div>
-                    <button class="menu-item" data-view="laporan-service">
-                        <span class="mi">📄</span> Laporan Service
-                    </button>
-                    <button class="menu-item" data-view="laporan-teknisi">
-                        <span class="mi">👷</span> Laporan Teknisi
-                    </button>
-                    <button class="menu-item" data-view="laporan-penjualan">
-                        <span class="mi">📊</span> Laporan Penjualan
-                    </button>
                     <button class="menu-item" data-view="kas-saya">
-                        <span class="mi">💰</span> Kas Saya
+                        <span class="mi">🏪</span> Kas Toko
                     </button>
 
                     <div class="menu-category">AKUN</div>
@@ -140,11 +132,6 @@
                         <span class="mi">👤</span> Atur Profil
                     </button>
 
-                    <div class="menu-category" id="cat-superadmin" style="display:none">SUPERADMIN</div>
-                    <button class="menu-item" data-view="approval-akun" id="menu-approval" style="display:none">
-                        <span class="mi">🛡️</span> Persetujuan Akun
-                        <span class="badge" id="badge-pending" style="background:#f59e0b;display:none">0</span>
-                    </button>
                 </nav>
             </div>
 
@@ -228,7 +215,7 @@
                         <h3 id="stat-selesai">5</h3>
                         <p class="trend up">▲ Service sukses tepat waktu 92% • klik →</p>
                     </div>
-                    <div class="stat-card dark" onclick="statGoPendapatan()" style="cursor:pointer" title="Lihat Laporan Penjualan →">
+                    <div class="stat-card dark" onclick="statGoPendapatan()" style="cursor:pointer" title="Lihat Pendapatan Sukses →">
                         <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
                         <h3>Rp 2.850.000</h3>
                         <p>Hari ini • belum termasuk sparepart • klik →</p>
@@ -476,8 +463,8 @@
                         <div class="toolbar-left"><h3>Sparepart</h3><span class="count-pill" id="sparepartCount">0 item</span><span id="sparepartWarning" style="display:none;background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Stok tipis</span></div>
                         <div class="toolbar-right">
                             <div class="search-box small"><span>⌕</span><input id="searchSparepart" placeholder="Cari part, kategori, merk..."></div>
-                            <select id="filterMerkSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select>
-                            <select id="filterKategoriSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select>
+                            <select id="filterMerkSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>ROBOT</option><option>OLIKE</option><option>BASEUS</option><option>ANKER</option><option>UNEED</option><option>KAKU</option><option>HIPPO</option><option>ORIGINAL</option><option>GENERIC</option><option>LAIN</option></select>
+                            <select id="filterKategoriSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select>
                             <button class="btn btn-dark small" onclick="switchView('inventory-tambah')">+ Tambah Item</button>
                         </div>
                     </div>
@@ -502,8 +489,8 @@
                             <input type="hidden" id="spEditId">
                             <div class="field" style="margin-bottom:10px"><label>Nama Part *</label><input id="spEditNama" required placeholder="LCD iPhone 11"></div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-                                <div class="field"><label>Merk *</label><select id="spEditMerk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
-                                <div class="field"><label>Kategori</label><select id="spEditKategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                                <div class="field"><label>Merk * (bebas ketik)</label><input id="spEditMerk" required list="merkListEdit" placeholder="Contoh: Robot" autocomplete="off"><datalist id="merkListEdit"></datalist></div>
+                                <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="fillMerkOptions(document.getElementById('merkListEdit'), this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
                             </div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                                 <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
@@ -516,6 +503,28 @@
                                 <button type="submit" class="btn btn-dark" style="flex:1">Simpan Perubahan</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </section>
+            <!-- INVENTORY: ASESORIES — view pisah, data sama (kategori Aksesoris) -->
+            <section class="view" id="view-inventory-asesoris">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>🎧 Asesories</h3><span class="count-pill" id="asesorisCount">0 item</span><span id="asesorisWarning" style="display:none;background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Stok tipis</span></div>
+                        <div class="toolbar-right">
+                            <div class="search-box small"><span>⌕</span><input id="searchAsesoris" placeholder="Cari asesories..." oninput="renderAsesoris()"></div>
+                            <button class="btn btn-dark small" id="btnTambahAsesoris" onclick="tambahAsesoris()">+ Tambah Asesories</button>
+                        </div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">🎧 Daftar khusus kategori <strong>Aksesoris</strong> (softcase, charger, tempered glass...) — stok & harga <strong>sama persis</strong> dengan Sparepart, laku di <strong>Kasir</strong> otomatis kepotong.</p>
+                    <div class="table-wrap">
+                        <table class="table compact" id="tableAsesoris">
+                            <thead><tr><th style="min-width:140px">Nama</th><th style="min-width:90px">Merk</th><th style="text-align:center;min-width:80px">Stok</th><th style="text-align:right;min-width:110px">Harga Jual</th><th style="text-align:right;min-width:110px">Nilai</th><th style="text-align:center;min-width:170px">Aksi</th></tr></thead>
+                            <tbody id="tbodyAsesoris"><tr><td colspan="6" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:#8a8f98">
+                        <span id="asesorisSummary">0 item • Total nilai stok: Rp 0</span>
                     </div>
                 </div>
             </section>
@@ -573,8 +582,8 @@
                 <form id="spAddForm" onsubmit="handleSparepartAdd(event)">
                     <div class="form-grid">
                         <div class="field"><label>Nama Part *</label><input id="sp-nama" required placeholder="LCD iPhone 11, Baterai Samsung..."></div>
-                        <div class="field"><label>Merk *</label><select id="sp-merk" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>LAIN</option></select></div>
-                        <div class="field"><label>Kategori *</label><select id="sp-kategori" required style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                        <div class="field"><label>Merk * (bebas ketik)</label><input id="sp-merk" required list="merkList" placeholder="Contoh: Samsung / Robot" autocomplete="off"><datalist id="merkList"></datalist></div>
+                        <div class="field"><label>Kategori *</label><select id="sp-kategori" required onchange="fillMerkOptions(document.getElementById('merkList'), this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
                         <div class="field"><label>Barang Masuk *</label><input id="sp-masuk" type="number" min="0" required placeholder="0"><span style="font-size:11px;color:#8a8f98">Stok awal / barang baru masuk</span></div>
                         <div class="field"><label>Harga Satuan (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="550.000"><span style="font-size:11px;color:#8a8f98">Harga per unit</span><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
                         <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"><span style="font-size:11px;color:#8a8f98">Terpakai / terjual — default 0</span></div>
@@ -584,10 +593,50 @@
                 </form></div>
             </section>
 
-            <!-- TRANSAKSI -->
+            <!-- TRANSAKSI: KASIR PENJUALAN (barang potong stok + jasa langsung, struk simple) -->
             <section class="view" id="view-transaksi-penjualan">
-                <div class="card"><div class="card-head"><h3>Penjualan</h3><span class="count-pill">Hari ini • 0 transaksi</span></div>
-                <div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Status Bayar</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;padding:24px;color:#8a8f98">Belum ada transaksi — data akan muncul setelah ada penjualan</td></tr></tbody></table></div></div>
+                <div class="grid-2">
+                <div class="card">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>🛒 Kasir</h3><span class="count-pill" id="kasirCount">0 item</span></div>
+                        <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="kasirSearch" placeholder="Cari barang..." oninput="kasirRenderBarang()"></div></div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Klik <strong>+</strong> untuk masuk keranjang (stok otomatis berkurang saat simpan). Harga ikut master — siapkan di <strong>Sparepart</strong> (kategori Aksesoris untuk asesories).</p>
+                    <div class="table-wrap"><table class="table compact"><thead><tr><th>Barang</th><th style="text-align:center">Stok</th><th style="text-align:right">Harga</th><th style="text-align:center">+</th></tr></thead><tbody id="tbodyKasirBarang"><tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div class="card form-card" style="box-shadow:none;border:1px solid #ececec;margin-top:12px">
+                        <div class="card-head"><h3 style="font-size:13px">+ Jasa Langsung</h3><span class="muted">tanpa stok (mis. ongkos pasang)</span></div>
+                        <div style="display:grid;grid-template-columns:1fr 110px auto;gap:8px">
+                            <input id="jasa-nama" placeholder="Nama jasa">
+                            <input id="jasa-harga" type="text" inputmode="numeric" placeholder="Rp 0">
+                            <button class="btn btn-dark small" onclick="kasirAddJasa()">+ Tambah</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>🧾 Keranjang</h3><span class="muted" id="kasirPelInfo">-</span></div>
+                    <div class="table-wrap"><table class="table compact"><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Subtotal</th><th></th></tr></thead><tbody id="tbodyKasirCart"><tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Keranjang kosong</td></tr></tbody></table></div>
+                    <div class="form-grid" style="margin-top:12px">
+                        <div class="field"><label>Pelanggan (opsional)</label><input id="kasir-pelanggan" placeholder="Nama pembeli"></div>
+                        <div class="field"><label>Metode Bayar *</label><select id="kasir-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+                        <strong style="font-size:15px">Total: <span id="kasirTotal" style="color:#059669">Rp 0</span></strong>
+                        <div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="kasirClear()">Batal</button><button class="btn btn-dark" onclick="kasirSave()">Simpan & Struk →</button></div>
+                    </div>
+                    <div style="margin-top:14px"><div class="card-head"><h3 style="font-size:13px">Struk Hari Ini</h3><button class="btn btn-ghost small" onclick="kasirLoadToday()">↻</button></div>
+                    <div class="table-wrap"><table class="table compact"><thead><tr><th>Kode</th><th style="text-align:right">Total</th><th>Bayar</th><th></th></tr></thead><tbody id="tbodyKasirToday"><tr><td colspan="4" style="text-align:center;color:#8a8f98">-</td></tr></tbody></table></div></div>
+                </div>
+                </div>
+                <div class="modal" id="strukModal">
+                    <div class="modal-box" style="max-width:320px">
+                        <button class="modal-close" onclick="kasirStrukClose()">×</button>
+                        <div id="strukBody" style="font-family:Inter,system-ui,sans-serif;font-size:12px"></div>
+                        <div style="display:flex;gap:8px;margin-top:12px">
+                            <button class="btn btn-ghost" style="flex:1" onclick="kasirStrukClose()">Tutup</button>
+                            <button class="btn btn-dark" style="flex:1" onclick="cetakStruk()">🖨 Cetak</button>
+                        </div>
+                    </div>
+                </div>
             </section>
             <section class="view" id="view-transaksi-pembayaran">
                 <div class="card">
@@ -701,8 +750,9 @@
                 </div>
             </section>
 
-            <!-- LAPORAN -->
+            <!-- LAPORAN (DIPINDAH ke Owner Space: owner.html#laporan — section di bawah hanya arsip kompatibilitas, tidak ada di menu) -->
             <section class="view" id="view-laporan-service">
+                <div class="approval-banner" style="display:flex;background:#eff6ff;border-color:#bfdbfe;margin-bottom:12px"><div class="approval-banner-left"><div class="approval-banner-icon">📊</div><div><strong style="font-size:13px">Laporan pindah ke Owner Space</strong><p style="font-size:12px;color:#1e40af;margin-top:2px">Tab ini sudah pindah ke <a href="owner.html#laporan">Owner Space → Laporan</a> (saling melengkapi Ringkasan + Pendapatan + Bayar).</p></div></div><a class="btn btn-dark small" style="white-space:nowrap;text-decoration:none" href="owner.html#laporan">Buka →</a></div>
                 <div class="card">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>📋 Laporan Service</h3><span class="count-pill" id="lapSvcTotal">0 masuk</span><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="lapSvcRate">0% sukses</span></div>
@@ -748,16 +798,33 @@
                 </div>
                 </div>
             </section>
-            <!-- KAS SAYA (teknisi: milik sendiri, owner: sama tapi semua via laporan) -->
+            <!-- KAS TOKO: riwayat transaksi uang keseluruhan + sisa kas (sub-tab Saya = personal teknisi) -->
             <section class="view" id="view-kas-saya">
-                <div class="card"><div class="card-head"><h3>💰 Kas Saya</h3><span class="muted" id="kasSayaSub">Komisi + uang hadir — transparan</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasSaya()">↻ Refresh</button></div>
+                <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
+                <div class="tabs" style="margin-bottom:10px">
+                    <button class="tab active" data-kas="toko" onclick="setKasTab('toko')">🏪 Arus Toko</button>
+                    <button class="tab" data-kas="saya" onclick="setKasTab('saya')">👤 Kas Saya</button>
+                </div>
+                <div id="kasPanel-toko">
+                <div class="stats" style="margin-bottom:10px">
+                    <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Total Masuk</span></div><h3 id="kasTokoMasuk" style="color:#059669">Rp 0</h3><p class="trend" id="kasTokoMasukSub">pendapatan cair bruto</p></div>
+                    <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Keluar</span></div><h3 id="kasTokoKeluar" style="color:#dc2626">Rp 0</h3><p class="trend" id="kasTokoKeluarSub">komisi + hadir + refund + beban toko</p></div>
+                    <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Sisa Kas</span></div><h3 id="kasTokoSisa">Rp 0</h3><p class="trend">masuk − keluar</p></div>
+                </div>
+                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai). Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
+                <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                <div id="kasPanel-saya" style="display:none">
+                <div class="card-head" style="margin-bottom:10px"><h3 style="font-size:13px">👤 Kas Saya</h3><span class="muted" id="kasSayaSub">Komisi + uang hadir — transparan</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasSaya()">↻</button></div>
                 <div class="stats" style="margin-bottom:10px">
                     <div class="stat-card"><div class="stat-head"><span>Hari Ini Cair</span></div><h3 id="kasSayaHari">Rp 0</h3><p class="trend">komisi + hadir hari ini</p></div>
                     <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="kasSayaBulan">Rp 0</h3><p class="trend" id="kasSayaLevel">-</p></div>
                     <div class="stat-card" style="border-left:4px solid #ef4444"><div class="stat-head"><span>Sisa Hutang</span></div><h3 id="kasSayaHutang" style="color:#ef4444">Rp 0</h3><p class="trend" id="kasSayaPending">0 pending</p></div>
                 </div>
                 <div id="kasSayaKuota" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
-                <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div></div>
+                <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                </div>
             </section>
             <section class="view" id="view-laporan-penjualan">
                 <div class="card"><div class="card-head"><h3>Laporan Penjualan</h3><span class="muted">Pendapatan</span></div>
@@ -933,8 +1000,9 @@
                 </div>
             </section>
 
-            <!-- SUPERADMIN: PERSETUJUAN AKUN -->
+            <!-- SUPERADMIN: PERSETUJUAN AKUN (DIPINDAH ke Owner Space → Kontrol — section hanya arsip, tidak ada di menu) -->
             <section class="view" id="view-approval-akun">
+                <div class="approval-banner" style="display:flex;background:#eff6ff;border-color:#bfdbfe;margin-bottom:12px"><div class="approval-banner-left"><div class="approval-banner-icon">🛡️</div><div><strong style="font-size:13px">Persetujuan Akun pindah ke Owner Space</strong><p style="font-size:12px;color:#1e40af;margin-top:2px">Kelola di <a href="owner.html#approval">Owner Space → Kontrol → Persetujuan Akun</a> (khusus superadmin).</p></div></div><a class="btn btn-dark small" style="white-space:nowrap;text-decoration:none" href="owner.html#approval">Buka →</a></div>
                 <div class="card">
                     <div class="card-head toolbar">
                         <div class="toolbar-left">
@@ -1109,7 +1177,7 @@
             <div class="hasil-icon">🧾</div>
             <h3>Nota Digital</h3>
             <p class="hasil-sub" id="notaSub">—</p>
-            <pre id="notaPreview" style="text-align:left;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:12px;font-size:12px;white-space:pre-wrap;font-family:Inter,system-ui,sans-serif;max-height:260px;overflow:auto"></pre>
+            <div id="notaPreview" style="text-align:left;background:#fff;border:1px solid #ececec;border-radius:10px;padding:14px 12px;font-size:12px;max-height:300px;overflow:auto;color:#000"></div>
             <p style="font-size:11px;color:#8a8f98;margin-top:8px">WA tidak terkirim otomatis — tekan <strong>Kirim via WA</strong>, chat pelanggan terbuka dengan nota sudah tertulis, tinggal tekan kirim di WhatsApp.</p>
             <div class="field" style="text-align:left;margin-top:8px">
                 <label>🖨 Ukuran kertas cetak</label>
@@ -1156,7 +1224,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=role2"></script>
-    <script src="assets/js/script.js?v=ambil10"></script>
-    <script src="assets/js/engine.js?v=eng3"></script>
+    <script src="assets/js/script.js?v=ambil20"></script>
+    <script src="assets/js/engine.js?v=eng6"></script>
 </body>
 </html>

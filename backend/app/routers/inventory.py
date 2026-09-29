@@ -3,9 +3,25 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..database import get_db
 from .. import schemas, crud
-from ..store_ctx import resolve_store, ensure_in_store, default_store
+from ..store_ctx import resolve_store, ensure_in_store, default_store, store_role
 from .auth import get_current_user, require_superadmin
 from ..audit import log_action
+
+
+def _toko_writer(db, current, store):
+    """Tulis stok: owner/admin/kasir (terima barang) + superadmin. Teknisi via Pakai saja."""
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin", "kasir"]:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin/kasir yang boleh ubah stok — teknisi pakai via Proses Service")
+    return role
+
+
+def _toko_owner(db, current, store):
+    """Hapus item: owner/admin/superadmin (scope toko sendiri)."""
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh hapus item")
+    return role
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -39,6 +55,7 @@ def create_sparepart(
     if not current:
         raise HTTPException(status_code=401, detail="Belum login")
     store = _need_store(db, resolve_store(db, current, store_id))
+    _toko_writer(db, current, store)
     # cek duplikat nama di toko yang sama
     sq = db.query(crud.models.Sparepart).filter(crud.models.Sparepart.nama.ilike(payload.nama.strip()))
     if store is not None:
@@ -65,6 +82,7 @@ def update_sparepart(
     if not sp:
         raise HTTPException(status_code=404, detail="Sparepart tidak ditemukan")
     ensure_in_store(sp, store, "Sparepart")
+    _toko_writer(db, current, store)
     # cek duplikat nama kecuali diri sendiri (di toko yang sama)
     if payload.nama:
         dq = db.query(crud.models.Sparepart).filter(crud.models.Sparepart.nama.ilike(payload.nama.strip()), crud.models.Sparepart.id != sp_id)
@@ -93,13 +111,14 @@ def delete_sparepart(
     sp_id: int,
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current = Depends(require_superadmin),
+    current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
     sp = db.query(crud.models.Sparepart).filter(crud.models.Sparepart.id == sp_id).first()
     if not sp:
         raise HTTPException(status_code=404, detail="Sparepart tidak ditemukan")
     ensure_in_store(sp, store, "Sparepart")
+    _toko_owner(db, current, store)
     ok = crud.delete_sparepart(db, sp_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Sparepart tidak ditemukan")
@@ -150,6 +169,7 @@ def create_alat(
     if not current:
         raise HTTPException(status_code=401, detail="Belum login")
     store = _need_store(db, resolve_store(db, current, store_id))
+    _toko_writer(db, current, store)
     aq = db.query(crud.models.Alat).filter(crud.models.Alat.nama.ilike(payload.nama.strip()))
     if store is not None:
         aq = aq.filter(crud.models.Alat.store_id == store.id)
@@ -171,6 +191,21 @@ def update_alat(
     if not alat:
         raise HTTPException(status_code=404, detail="Alat tidak ditemukan")
     ensure_in_store(alat, store, "Alat")
+    from ..store_ctx import store_role as _sr
+    if _sr(db, current, store) == "teknisi":
+        # Teknisi hanya boleh pinjam/kembalikan alat (peminjam) — stok/harga/kondisi milik owner/admin/kasir.
+        keys = set(payload.model_dump(exclude_unset=True).keys())
+        if keys - {"peminjam"}:
+            raise HTTPException(status_code=403, detail="Teknisi hanya boleh ubah peminjam (pinjam/kembali) — stok milik owner/admin/kasir")
+        alat.peminjam = payload.peminjam
+        if (alat.kondisi or "") == "Baik" and (payload.peminjam or "-") != "-":
+            alat.kondisi = "Dipinjam"
+        elif (alat.kondisi or "") == "Dipinjam" and (payload.peminjam or "-") == "-":
+            alat.kondisi = "Baik"
+        db.commit()
+        db.refresh(alat)
+        return alat
+    _toko_writer(db, current, store)
     if payload.nama:
         dq = db.query(crud.models.Alat).filter(crud.models.Alat.nama.ilike(payload.nama.strip()), crud.models.Alat.id != alat_id)
         if store is not None:
@@ -190,13 +225,14 @@ def delete_alat(
     alat_id: int,
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current = Depends(require_superadmin),
+    current = Depends(get_current_user),
 ):
     store = resolve_store(db, current, store_id)
     alat = db.query(crud.models.Alat).filter(crud.models.Alat.id == alat_id).first()
     if not alat:
         raise HTTPException(status_code=404, detail="Alat tidak ditemukan")
     ensure_in_store(alat, store, "Alat")
+    _toko_owner(db, current, store)
     ok = crud.delete_alat(db, alat_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Alat tidak ditemukan")

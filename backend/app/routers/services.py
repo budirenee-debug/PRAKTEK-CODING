@@ -19,6 +19,11 @@ def _teknisi_scope(db, current, store):
         return teknisi_scope_names(current)
     return None
 
+
+# Status akhir/keuangan: hanya kasir/owner yang boleh menetapkan (serah-terima + deal + bayar).
+# Teknisi kerja sampai Dikerjakan/Menunggu Sparepart; anti-bypass cair komisi via console/API.
+TERMINAL_STATUS = {"Bisa Diambil", "Sudah Diambil", "Service Sukses", "Selesai", "Service Failed", "Garansi"}
+
 @router.get("", response_model=List[schemas.ServiceOut])
 def list_services(
     skip: int = 0,
@@ -119,13 +124,17 @@ def update_service(
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     ensure_in_store(existing, store, "Service")
     scope = _teknisi_scope(db, current, store)
+    data = payload.model_dump(exclude_unset=True)
     if scope is not None:
         if not is_own_or_free(existing.teknisi, scope):
             raise HTTPException(status_code=404, detail="Service tidak ditemukan")
-        new_tek = payload.model_dump(exclude_unset=True).get("teknisi")
+        new_tek = data.get("teknisi")
         if new_tek and new_tek not in scope:
             raise HTTPException(status_code=403, detail="Teknisi hanya bisa oper ke diri sendiri")
-    data = payload.model_dump(exclude_unset=True)
+        if data.get("status") in TERMINAL_STATUS:
+            raise HTTPException(status_code=403, detail="Status akhir hanya kasir/owner — selesaikan kerjaan, kasir yang serah-terima")
+        if "biaya" in data:
+            raise HTTPException(status_code=403, detail="Harga hanya kasir/owner yang boleh ubah")
     # Fix harga: sejak Sudah Diambil / Sukses, biaya dikunci (tidak bisa diubah lagi).
     # Deal harga + diambil_oleh wajib diisi SEBELUM status jadi diambil (via popup garansi).
     if existing.status in ("Sudah Diambil", "Service Sukses", "Selesai") and "biaya" in data:
@@ -197,6 +206,8 @@ def update_status(
     scope = _teknisi_scope(db, current, store)
     if scope is not None and not is_own_or_free(svc.teknisi, scope):
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    if scope is not None and status in TERMINAL_STATUS:
+        raise HTTPException(status_code=403, detail="Status akhir hanya kasir/owner — selesaikan kerjaan, kasir yang serah-terima")
     status_lama = svc.status
     svc.status = status
     # tgl pengambilan: dicatat persis saat jadi Sukses/Sudah Diambil

@@ -90,6 +90,110 @@ async function renderKasTeknisi(){
     if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
 }
+let _kasTab = 'toko';
+function setKasTab(t){
+  // Arus Toko khusus owner/admin/superadmin — teknisi pakai Kas Saya
+  try{
+    const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+      || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+    if(t === 'toko' && isTek){
+      t = 'saya';
+      try{ showToast('⛔ Arus Toko khusus owner — kamu pakai Kas Saya'); }catch(e){}
+    }
+  }catch(e){}
+  _kasTab = t;
+  document.querySelectorAll('[data-kas]').forEach(b=>b.classList.toggle('active', b.dataset.kas===t));
+  try{ document.getElementById('kasPanel-toko').style.display = t==='toko'?'':'none'; }catch(e){}
+  try{ document.getElementById('kasPanel-saya').style.display = t==='saya'?'':'none'; }catch(e){}
+  if(t==='toko') renderKasToko();
+  else renderKasSaya();
+}
+function _kasTokoRow(tanggal, ref, tipe, masuk, keluar, ket){
+  return `<tr><td style="white-space:nowrap">${_esc(tanggal||'-')}</td><td style="font-size:11px"><strong>${_esc(ref||'-')}</strong></td><td>${_esc(tipe||'')}</td><td style="text-align:right;color:#059669;font-weight:700">${masuk?_rp(masuk):''}</td><td style="text-align:right;color:#dc2626">${keluar?_rp(keluar):''}</td><td style="font-size:11px">${_esc(ket||'')}</td></tr>`;
+}
+async function renderKasToko(force){
+  const tbody = document.getElementById('tbodyKasToko');
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  try{
+    const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+      || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+    if(isTek){ setKasTab('saya'); return; }
+    if(tbody && !force && tbody.dataset.filled==='1' && _kasTab==='toko') return;
+    if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Menghitung arus kas toko...</td></tr>';
+    const SUKSES = ['Service Sukses','Sudah Diambil','Selesai'];
+    const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0,10);
+    let services = [];
+    try{ services = await apiFetch('/services?limit=500'); }catch(e){ services = []; }
+    const cair = (Array.isArray(services)?services:[]).filter(d=>SUKSES.includes(d.status));
+    let masukTotal = cair.reduce((s,d)=>s+(Number(d.biaya)||0),0);
+    const rows = cair.map(d=>({t: actDate(d), ref: d.invoice||'-', tipe: '💰 Pendapatan cair', masuk: Number(d.biaya)||0, keluar: 0, ket: `${d.device||''} • ${d.teknisi||''} • ${d.metode_bayar||'Belum bayar'}`}));
+    // Omzet barang/jasa kasir = masuk
+    try{
+      const sl = await apiFetch('/sales?limit=300');
+      (Array.isArray(sl)?sl:[]).forEach(s=>{
+        const n = Number(s.total)||0; if(n<=0) return; masukTotal += n;
+        rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kode||('#'+s.id), tipe: '🛒 Penjualan', masuk: n, keluar: 0, ket: `${(s.items||[]).length} item • ${s.metode||''}${s.pelanggan?' • '+s.pelanggan:''}`});
+      });
+    }catch(e){}
+    // Keluar ke teknisi: komisi + hadir (dari buku kas masing-masing)
+    let techKeluar = 0;
+    try{
+      const techs = await apiFetch('/technicians');
+      const list = Array.isArray(techs)?techs:[];
+      for(const t of list){
+        try{
+          const j = await apiFetch(`/engine/kas/teknisi/${t.id}`);
+          const nama = j.nama || t.nama || ('Teknisi '+t.id);
+          techKeluar += (Number(j.komisi_cair)||0) + (Number(j.allowance)||0);
+          (j.riwayat||[]).forEach(l=>{
+            if((Number(l.masuk)||0) > 0) rows.push({t: String(l.tanggal||'').slice(0,10), ref: l.invoice||'-', tipe: (l.tipe==='allowance'?'🕘 Hadir ':'💰 Komisi ') + nama, masuk: 0, keluar: Number(l.masuk)||0, ket: l.ket||''});
+          });
+        }catch(e){}
+      }
+    }catch(e){}
+    // Refund nominal = keluar (dari omzet + jadi pengeluaran)
+    let refundKeluar = 0;
+    try{
+      const rf = await apiFetch('/finance/refunds');
+      const rlist = Array.isArray(rf)?rf:(rf.rows||[]);
+      rlist.forEach(r=>{
+        const n = Number(r.nominal)||0; refundKeluar += n;
+        rows.push({t: String(r.tanggal||'').slice(0,10), ref: r.kode||r.invoice||'-', tipe: '💸 Refund', masuk: 0, keluar: n, ket: `${r.invoice||''} • ${r.alasan||''}`});
+      });
+    }catch(e){}
+    // Kecelakaan kerja: beban toko = keluar
+    let celakaKeluar = 0;
+    try{
+      const ac = await apiFetch('/finance/accidents');
+      const alist = Array.isArray(ac)?ac:(ac.rows||[]);
+      alist.forEach(a=>{
+        const n = Number(a.beban_toko)||0; if(n<=0) return; celakaKeluar += n;
+        rows.push({t: String(a.tanggal||'').slice(0,10), ref: a.invoice||'-', tipe: '🛠 Beban toko', masuk: 0, keluar: n, ket: `${a.teknisi||''} • ${a.kronologi||''}`});
+      });
+    }catch(e){}
+    // Pengeluaran operasional = keluar
+    let outKeluar = 0;
+    try{
+      const ex = await apiFetch('/finance/expenses');
+      const xlist = Array.isArray(ex)?ex:(ex.rows||[]);
+      xlist.forEach(r=>{
+        const n = Number(r.nominal)||0; if(n<=0) return; outKeluar += n;
+        rows.push({t: String(r.tanggal||'').slice(0,10), ref: r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`});
+      });
+    }catch(e){}
+    const keluarTotal = techKeluar + refundKeluar + celakaKeluar + outKeluar;
+    set('kasTokoMasuk', _rp(masukTotal)); set('kasTokoMasukSub', cair.length + ' service cair + omzet barang (bruto)');
+    set('kasTokoKeluar', _rp(keluarTotal)); set('kasTokoKeluarSub', `teknisi ${_rp(techKeluar)} • refund ${_rp(refundKeluar)} • toko ${_rp(celakaKeluar)} • keluar ${_rp(outKeluar)}`);
+    set('kasTokoSisa', _rp(masukTotal - keluarTotal));
+    rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
+    if(tbody){
+      tbody.innerHTML = rows.slice(0,120).map(r=>_kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket)).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
+      tbody.dataset.filled = '1';
+    }
+  }catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
+  }
+}
 async function renderKasSaya(){
   const tbody = document.getElementById('tbodyKasSaya');
   try{
@@ -156,11 +260,18 @@ async function operGaransi(invoice){
   window.switchView = function(view, clearSearch){
     if(orig) orig(view, clearSearch);
     try{
-      const titles = {'kas-saya':['Kas Saya','Komisi + uang hadir milikmu']};
+      const titles = {'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas']};
       if(titles[view]){ document.getElementById('page-title').textContent=titles[view][0]; document.getElementById('page-subtitle').textContent=titles[view][1]; }
       if(view==='pengaturan'){ loadEngineSettings(); }
       if(view==='laporan-teknisi'){ /* tab kas butuh list */ }
-      if(view==='kas-saya'){ renderKasSaya(); }
+      if(view==='kas-saya'){
+        try{
+          const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+            || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+          document.querySelectorAll('[data-kas="toko"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+          setKasTab(isTek ? 'saya' : (_kasTab || 'toko'));
+        }catch(e){ renderKasSaya(); }
+      }
     }catch(e){}
   };
 })();

@@ -355,6 +355,9 @@ details.card summary{list-style:none}
 details.card summary::-webkit-details-marker{display:none}
 details.card summary .darrow{display:inline-block;transition:transform .15s;color:#8a8f98;font-size:12px}
 details[open].card summary .darrow{transform:rotate(90deg)}
+/* PREVIEW NOTA MODERN (layar) */
+#notaPreview table{width:100%;border-collapse:collapse}
+#notaPreview{line-height:1.55}
 /* CETAK NOTA — hanya printArea yang keluar di kertas */
 #printArea{display:none}
 @page{size:auto;margin:10mm 8mm}
@@ -369,6 +372,6 @@ details[open].card summary .darrow{transform:rotate(90deg)}
   .nota-total{display:flex;justify-content:space-between;font-weight:800;font-size:1.2em}
   .nota-foot{text-align:center;font-size:.9em}
   .nota-paper.a4{width:100%;max-width:700px;font-size:14px;font-family:Inter,system-ui,sans-serif}
-  .nota-paper.t80{width:80mm;font-size:11px;font-family:'Courier New',monospace}
-  .nota-paper.t58{width:58mm;font-size:10px;font-family:'Courier New',monospace;word-break:break-word}
+  .nota-paper.t80{width:80mm;font-size:11px;font-family:Inter,system-ui,sans-serif}
+  .nota-paper.t58{width:58mm;font-size:10px;font-family:Inter,system-ui,sans-serif;word-break:break-word}
 }

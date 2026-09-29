@@ -304,7 +304,7 @@ class ServiceOut(BaseModel):
 # ---------- Sparepart (multi-PC sync) ----------
 class SparepartBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=120)
-    merk: str = Field(default="LAIN", max_length=20)
+    merk: str = Field(default="LAIN", max_length=40)
     kategori: str = Field(default="Display", max_length=30)
     masuk: int = Field(default=0, ge=0)
     keluar: int = Field(default=0, ge=0)
@@ -316,11 +316,10 @@ class SparepartBase(BaseModel):
     @field_validator('merk')
     @classmethod
     def validate_merk(cls, v):
-        if v is None:
+        # Merk bebas diketik (HP maupun asesories) — hanya rapikan huruf.
+        if v is None or not str(v).strip():
             return "LAIN"
-        up = v.upper().strip()
-        allowed = ["IPHONE","SAMSUNG","XIAOMI","OPPO","VIVO","INFINIX","LAIN"]
-        return up if up in allowed else "LAIN"
+        return str(v).upper().strip()[:40]
 
 class SparepartCreate(SparepartBase):
     pass

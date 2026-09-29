@@ -17,6 +17,7 @@ JENIS_ACC = ["part_rusak", "komponen_pelanggan", "catatan"]
 SUMBER = ["persediaan", "beli_luar"]
 SAPA_BAYAR = ["toko", "pelanggan"]
 METODE = ["Tunai", "Transfer", "QRIS"]
+KAT_EXPENSE = ["Sewa", "Listrik", "Internet", "Gaji", "Belanja Part", "Operasional", "Lainnya"]
 
 
 def _ctx(db, current, store_id, need_role=True):
@@ -340,6 +341,119 @@ def create_refund(payload: dict = Body(...), store_id: Optional[int] = Query(Non
             "wa_link": f"https://wa.me/?text=" + _wa_quote(
                 f"Refund {r.kode}\nInvoice: {invoice or '-'}\nNominal: Rp{nominal} ({metode})\n"
                 f"Alasan: {alasan}\nKomisi teknisi dibalik: Rp{komisi_dibalik}")}
+
+
+# ================= PENGELUARAN OPERASIONAL =================
+def _ctx_read(db, current, store_id):
+    """Baca pengeluaran: kasir boleh lihat (agar Kas Toko jujur), tulis tetap owner/admin."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    store = resolve_store(db, current, store_id)
+    if store is None:
+        store = default_store(db)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Toko tidak ditemukan")
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin", "kasir"]:
+        raise HTTPException(status_code=403, detail="Hanya tim toko yang boleh lihat pengeluaran")
+    return store, role
+
+
+def _expense_row(e: models.Expense):
+    return {"id": e.id, "tanggal": e.tanggal, "kategori": e.kategori,
+            "keperluan": e.keperluan, "nominal": e.nominal, "metode": e.metode,
+            "keterangan": e.keterangan, "dibuat_oleh": e.dibuat_oleh,
+            "created_at": e.created_at}
+
+
+@router.get("/expenses")
+def list_expenses(store_id: Optional[int] = Query(None), kategori: Optional[str] = Query(None),
+                  since: Optional[str] = Query(None),
+                  db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    q = db.query(models.Expense).filter(models.Expense.store_id == store.id)
+    if kategori:
+        q = q.filter(models.Expense.kategori == kategori)
+    if since:
+        try:
+            d0 = datetime.datetime.strptime(since[:10], "%Y-%m-%d").date()
+            q = q.filter(models.Expense.tanggal >= d0)
+        except Exception:
+            raise HTTPException(status_code=400, detail="since harus YYYY-MM-DD")
+    rows = q.order_by(models.Expense.tanggal.desc(), models.Expense.id.desc()).limit(300).all()
+    return [_expense_row(e) for e in rows]
+
+
+@router.get("/expenses/ringkasan")
+def ringkasan_expenses(store_id: Optional[int] = Query(None),
+                       db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    rows = db.query(models.Expense).filter(models.Expense.store_id == store.id).all()
+    today = datetime.date.today()
+    iso, ym = today.isoformat(), today.strftime("%Y-%m")
+    hari = [e for e in rows if str(e.tanggal or "") == iso]
+    bln = [e for e in rows if str(e.tanggal or "")[:7] == ym]
+    per_kat = {}
+    for e in rows:
+        k = e.kategori or "Lainnya"
+        per_kat[k] = per_kat.get(k, 0) + int(e.nominal or 0)
+    return {
+        "total": len(rows),
+        "total_nominal": sum(int(e.nominal or 0) for e in rows),
+        "hari_ini": len(hari),
+        "nominal_hari_ini": sum(int(e.nominal or 0) for e in hari),
+        "bulan_ini": len(bln),
+        "nominal_bulan_ini": sum(int(e.nominal or 0) for e in bln),
+        "per_kategori": per_kat,
+    }
+
+
+@router.post("/expenses")
+def create_expense(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Catat pengeluaran operasional. Tulis: owner/admin/superadmin saja."""
+    store, _ = _ctx(db, current, store_id)
+    keperluan = (payload.get("keperluan") or "").strip()
+    if not keperluan:
+        raise HTTPException(status_code=400, detail="keperluan wajib diisi")
+    nominal = int(payload.get("nominal") or 0)
+    if nominal <= 0:
+        raise HTTPException(status_code=400, detail="nominal harus > 0")
+    kategori = (payload.get("kategori") or "Operasional").strip()
+    if kategori not in KAT_EXPENSE:
+        raise HTTPException(status_code=400, detail="kategori harus: " + "/".join(KAT_EXPENSE))
+    metode = (payload.get("metode") or "Tunai").strip()
+    if metode not in METODE:
+        raise HTTPException(status_code=400, detail="metode harus Tunai/Transfer/QRIS")
+    e = models.Expense(store_id=store.id, tanggal=_parse_tgl(payload.get("tanggal")),
+                       kategori=kategori, keperluan=keperluan, nominal=nominal,
+                       metode=metode,
+                       keterangan=(payload.get("keterangan") or "").strip() or None,
+                       dibuat_oleh=getattr(current, "username", None))
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    log_action(db, "finance.expense", target=f"EXP-{e.id}",
+               detail=f"{kategori} {keperluan} nominal={nominal} metode={metode}",
+               actor=current, store_id=store.id)
+    return _expense_row(e)
+
+
+@router.delete("/expenses/{exp_id}")
+def delete_expense(exp_id: int, store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Hapus salah input. Tulis: owner/admin/superadmin saja."""
+    store, _ = _ctx(db, current, store_id)
+    e = db.query(models.Expense).filter(models.Expense.id == exp_id,
+                                        models.Expense.store_id == store.id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Pengeluaran tidak ditemukan di toko ini")
+    info = f"{e.kategori} {e.keperluan} nominal={e.nominal}"
+    db.delete(e)
+    db.commit()
+    log_action(db, "finance.expense_hapus", target=f"EXP-{exp_id}",
+               detail=info, actor=current, store_id=store.id)
+    return {"ok": True, "id": exp_id}
 
 
 def _wa_quote(t: str) -> str:
