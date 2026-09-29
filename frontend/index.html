@@ -217,8 +217,8 @@
                     </div>
                     <div class="stat-card dark" onclick="statGoPendapatan()" style="cursor:pointer" title="Lihat Pendapatan Sukses →">
                         <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
-                        <h3>Rp 2.850.000</h3>
-                        <p>Hari ini • belum termasuk sparepart • klik →</p>
+                        <h3 id="stat-estimasi">Rp 0</h3>
+                        <p id="stat-estimasi-sub">Pipeline aktif • belum termasuk sparepart • klik →</p>
                     </div>
                 </div>
                 <!-- DEADLINE BANNER STATS -->
@@ -846,7 +846,7 @@
                     <p style="font-size:12px;color:#8a8f98;margin-bottom:12px">Nama, alamat & <strong>nomor WA pelayanan konsumen</strong> — tampil di nota / info toko. Khusus owner/admin toko aktif.</p>
                     <div class="form-grid">
                         <div class="field"><label>Nama Toko *</label><input id="storeNama" placeholder="B_gadget"></div>
-                        <div class="field"><label>Kode Toko</label><input id="storeKode" disabled style="background:#f3f4f6;color:#6b7280" title="Kode tidak bisa diubah (prefix invoice)"></div>
+                        <div class="field"><label>Kode Toko</label><input id="storeKode" placeholder="BGJ" style="text-transform:uppercase"><span style="font-size:10px;color:#8a8f98">2-5 huruf/angka — prefix nomor nota baru (nota lama tidak berubah)</span></div>
                         <div class="field"><label>No. WA Pelayanan Konsumen *</label><input id="storeWa" placeholder="08xxxxxxxxxx" inputmode="tel"><span style="font-size:10px;color:#8a8f98">Contoh: 081234567890 — tombol Test di kanan untuk cek chat</span></div>
                         <div class="field"><label>Alamat Toko</label><input id="storeAlamat" placeholder="Jl. ..."></div>
                     </div>
@@ -1224,7 +1224,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=role2"></script>
-    <script src="assets/js/script.js?v=ambil20"></script>
-    <script src="assets/js/engine.js?v=eng6"></script>
+    <script src="assets/js/script.js?v=ambil22"></script>
+    <script src="assets/js/engine.js?v=eng7"></script>
 </body>
 </html>

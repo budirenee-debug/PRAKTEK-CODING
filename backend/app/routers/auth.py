@@ -175,10 +175,7 @@ def available_technicians(
         if t.nama not in names:
             names.add(t.nama)
             result.append({"username": t.nama, "role": "teknisi", "source": "technician", "is_active": True, "foto": t.foto})
-    # fallback jika kosong (DB baru) -> kembalikan legacy default
-    if not result:
-        for fallback in ["Andi", "Sinta", "Budi"]:
-            result.append({"username": fallback, "role": "teknisi", "source": "fallback", "is_active": True, "foto": None})
+    # Data sungguhan: tanpa fallback nama contoh — kosong berarti teknisi belum didaftarkan.
     return result
 
 @router.post("/approve/{user_id}", response_model=UserOut)

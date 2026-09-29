@@ -442,6 +442,18 @@ class StoreUpdate(BaseModel):
     nama: Optional[str] = Field(None, min_length=2, max_length=120)
     alamat: Optional[str] = Field(None, max_length=255)
     wa: Optional[str] = Field(None, max_length=20)
+    kode: Optional[str] = Field(None, min_length=2, max_length=5)
+
+    @field_validator('kode')
+    @classmethod
+    def validate_kode(cls, v):
+        if v is None:
+            return v
+        up = v.strip().upper()
+        import re
+        if not re.fullmatch(r"[A-Z0-9]{2,5}", up):
+            raise ValueError("Kode 2-5 huruf/angka tanpa spasi (mis. BGJ)")
+        return up
 
     @field_validator('wa')
     @classmethod

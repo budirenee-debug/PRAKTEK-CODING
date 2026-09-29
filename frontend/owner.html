@@ -747,7 +747,7 @@
             </div>
             <div class="form-grid">
               <div class="field"><label>Nama Toko *</label><input id="storeNama" placeholder="B_gadget"></div>
-              <div class="field"><label>Kode Toko</label><input id="storeKode" disabled style="background:#f3f4f6;color:#6b7280"></div>
+              <div class="field"><label>Kode Toko</label><input id="storeKode" placeholder="BGJ" style="text-transform:uppercase"><span style="font-size:10px;color:#8a8f98">2-5 huruf/angka — prefix nomor nota baru</span></div>
               <div class="field"><label>No. WA Pelayanan *</label><input id="storeWa" placeholder="08xxxxxxxxxx" inputmode="tel"></div>
               <div class="field"><label>Alamat Toko</label><input id="storeAlamat" placeholder="Jl. ..."></div>
             </div>
@@ -991,6 +991,8 @@
     const BOS_API = (window.BOSAuth ? window.BOSAuth.API : 'http://127.0.0.1:8000/api');
     const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const rp = n => 'Rp ' + (Number(n)||0).toLocaleString('id-ID');
+    // Mode data sungguhan: contoh/ilustrasi dimatikan — toko kosong tampil "belum ada data".
+    const REAL_ONLY = true;
     const TITLES = {
       ringkas: ['Monitor Toko', 'Keuangan + operasional hari ini'],
       keuangan: ['Keuangan', 'Kas Teknisi • Kecelakaan Kerja • Refund Dana'],
@@ -1354,7 +1356,7 @@
         const rows = await ownFetch('/services?limit=500');
         arr = Array.isArray(rows) ? rows : (rows.rows || rows.items || []);
       }catch(e){ arr = []; }
-      if(!arr.length){ arr = OWN_DUMMY_SERVICES(); demo = true; }
+      if(!arr.length && !REAL_ONLY){ arr = OWN_DUMMY_SERVICES(); demo = true; }
       window._ownDemo = demo;
       try{ document.getElementById('demoBar').style.display = demo ? '' : 'none'; }catch(e){}
       if(demo){
@@ -1485,7 +1487,7 @@
           const sp = await ownFetch('/inventory/spareparts');
           sArr = Array.isArray(sp) ? sp : (sp.rows || []);
         }catch(e){ sArr = []; }
-        if(!sArr.length) sArr = OWN_DUMMY_SPAREPART();
+        if(!sArr.length && !REAL_ONLY) sArr = OWN_DUMMY_SPAREPART();
         const top = [...sArr].sort((a, b) => (b.keluar || 0) - (a.keluar || 0)).slice(0, 5);
         const thin = sArr.filter(r => Number(r.stok || 0) <= 3 && !top.includes(r)).slice(0, 3);
         const rows = [...top, ...thin].slice(0, 5);
@@ -1515,10 +1517,13 @@
     async function ownSaveStore(){
       const id = window.BOSAuth ? window.BOSAuth.getActiveStoreId() : null;
       if (!id) return ownAlert('err', 'Tidak ada toko aktif');
+      const kode = (document.getElementById('storeKode').value.trim() || '').toUpperCase();
+      if(kode && !/^[A-Z0-9]{2,5}$/.test(kode)) return ownAlert('err', 'Kode 2-5 huruf/angka tanpa spasi');
       const body = {
         nama: document.getElementById('storeNama').value.trim(),
         wa: document.getElementById('storeWa').value.trim(),
         alamat: document.getElementById('storeAlamat').value.trim(),
+        kode: kode || undefined,
       };
       try{
         await ownFetch(`/stores/${id}`, {method: 'PATCH', body: JSON.stringify(body)});
@@ -1564,8 +1569,8 @@
       try{
         const rows = await ownFetch('/services?limit=500');
         const arr = Array.isArray(rows) ? rows : (rows.rows || rows.items || []);
-        window._ownServices = arr.length ? arr : OWN_DUMMY_SERVICES();
-      }catch(e){ window._ownServices = OWN_DUMMY_SERVICES(); }
+        window._ownServices = (arr.length || REAL_ONLY) ? arr : OWN_DUMMY_SERVICES();
+      }catch(e){ window._ownServices = REAL_ONLY ? [] : OWN_DUMMY_SERVICES(); }
       return window._ownServices;
     }
 
@@ -1599,7 +1604,7 @@
         return {...t, ...k, handle, sukses, rating};
       }));
       // Data ilustrasi HANYA kalau semua teknisi belum punya komisi/potongan sama sekali
-      const kosong = !kasList.length || kasList.every(t => !(t.komisi_bruto || t.komisi_cair) && !(t.potongan) && !(t.allowance));
+      const kosong = !REAL_ONLY && (!kasList.length || kasList.every(t => !(t.komisi_bruto || t.komisi_cair) && !(t.potongan) && !(t.allowance)));
       if(kosong){ kasList.length = 0; kasList.push(...OWN_DUMMY_KAS()); ownDemoOn('kasDemoNote'); }
       else ownDemoOff('kasDemoNote');
       kasList.sort((a, b) => (b.komisi_cair || 0) - (a.komisi_cair || 0));
@@ -1673,7 +1678,7 @@
         const d = await ownFetch('/engine/potongans' + (q.length ? '?' + q.join('&') : ''));
         let rows = Array.isArray(d) ? d : (d.rows || []);
         let ring = (d && d.ringkasan) || {total: 0, cicilan: 0, refund: 0, lainnya: 0, jumlah: 0, bulan_ini: 0, sisa_hutang: 0, per_teknisi: {}};        // data ilustrasi hanya kalau tabel benar-benar kosong
-        if(!rows.length){
+        if(!rows.length && !REAL_ONLY){
           const dum = OWN_DUMMY_POTONGAN();
           rows = dum.rows; ring = dum.ringkasan;
           if(!tipe || tipe === 'lainnya'){ /* biarkan semua jenis tampil */ }
@@ -1793,7 +1798,7 @@
         const rows = await ownFetch('/finance/accidents' + (st ? '?status=' + encodeURIComponent(st) : ''));
         let arr = Array.isArray(rows) ? rows : (rows.rows || []);
         let ring = await ownFetch('/finance/accidents/ringkasan');
-        if(!arr.length){
+        if(!arr.length && !REAL_ONLY){
           const dum = OWN_DUMMY_CELAKA();
           arr = dum.rows; ring = dum.ringkasan;
           if(st) arr = arr.filter(a => a.status === st);
@@ -1919,7 +1924,7 @@
         const rows = await ownFetch('/finance/refunds');
         let arr = Array.isArray(rows) ? rows : (rows.rows || []);
         let ring = await ownFetch('/finance/refunds/ringkasan');
-        if(!arr.length){
+        if(!arr.length && !REAL_ONLY){
           const dum = OWN_DUMMY_REFUND();
           arr = dum.rows; ring = dum.ringkasan;
           ownDemoOn('refundDemoNote');
@@ -3254,7 +3259,7 @@
       tb.innerHTML = '<tr><td colspan="10" style="text-align:center">Memuat...</td></tr>';
       try{
         let d = await ownFetch('/stores/jaringan/ringkasan');
-        if(!d || !d.cabang || !d.cabang.length){
+        if((!d || !d.cabang || !d.cabang.length) && !REAL_ONLY){
           d = OWN_DUMMY_CABANG();
           ownDemoOn('cabangDemoNote');
         } else ownDemoOff('cabangDemoNote');

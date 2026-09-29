@@ -152,6 +152,14 @@ def update_store(store_id: int, payload: schemas.StoreUpdate,
         if wa != s.wa:
             s.wa = wa
             changed.append("wa")
+    if payload.kode is not None:
+        kode = (payload.kode or "").strip().upper()
+        if kode != s.kode:
+            dup = db.query(models.Store).filter(models.Store.kode == kode, models.Store.id != s.id).first()
+            if dup:
+                raise HTTPException(status_code=400, detail=f"Kode {kode} sudah dipakai {dup.nama}")
+            s.kode = kode
+            changed.append(f"kode->{kode}")
     if not changed:
         return _store_to_out(db, s, role_saya=my_role)
     db.commit()

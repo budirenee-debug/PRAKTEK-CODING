@@ -1,6 +1,6 @@
 # HISTORI SESI — POS → Platform BOS SERVICE
 
-> Terakhir update: 29 Sep 2026 (Nota Modern).
+> Terakhir update: 30 Sep 2026 (Data Sungguhan — Dummy Dihapus).
 
 ## 1. Penanda Git (SUDAH push 23 Sep 2026, main sejajar origin/main)
 - `POS1` (4b8d28c, empty commit) — titik beku POS satu-toko sebelum platform.
@@ -150,6 +150,20 @@
 - `script.js?v=ambil18`. Uji: render masuk+ambil 7/7 (kop/badge/total/lacak/tanpa undefined) + `node --check` LULUS.
 - Revisi: baris **Teknisi dihapus dari nota pengambilan** (cetak + template WA default frontend & backend; nota masuk tetap ada). Template custom toko yang sudah tersimpan tidak ikut berubah — hapus manual di Pengaturan → Template WA bila perlu. `script.js?v=ambil19`.
 - Revisi font: nota + struk ikut font mockup TUSER — monospace (`Courier New`) dibuang, semua ukuran (58/80/A4) + struk kasir + preview pakai Inter/system sans. CSS `?v=black2` (4 halaman), `script.js?v=ambil20`.
+
+## 5k. FIX KAS TOKO STALE (29 Sep 2026, belum commit)
+- Laporan user: struk baru tidak masuk Kas Toko. Penyebab: `renderKasToko` pakai cache `dataset.filled` — sekali dibuka tidak hitung ulang. Fix: cache dihapus, Kas Toko selalu hitung ulang tiap dibuka (ikut pola view lain). `engine.js?v=eng7`.
+
+## 5l. DATA SUNGGUHAN — DUMMY DIHAPUS (30 Sep 2026, belum commit)
+- **DB** (`b_gadget.db`, backup `b_gadget.backup-pre-real-20260930-013952.db`): hapus 123 service (+engine), 112 customer, 42 sparepart, 18 alat, 1 struk test, 20 audit log, teknisi seed (Andi/Sinta/Budi/superadmin-nonaktif). **Pertahankan:** 6 user, 2 toko, 6 membership, 3 invite, settings. Teknisi tersisa: ANGDEDI + TOLE (asli).
+- **Kode:** `OWN_DUMMY_*` Owner dimatikan via flag `REAL_ONLY` (8 titik: ringkas/sparepart/services/kas/potongan/celaka/refund/cabang) → kosong tampil "belum ada data". `defaultData` toko = []. Fallback teknisi Andi/Sinta/Budi dihapus (backend `available-technicians` + `loadAvailableTechs` + penerima + laporan-teknisi). Estimasi dashboard hardcode Rp 2,85jt → real (pipeline aktif + id `stat-estimasi`).
+- **Kunci lokal baru** (`_v1`→`_v2`: data/inventory/pemakaian-sparepart/alat) agar sisa test di browser tidak muncul lagi.
+- Uji: DB nol + smoke API real 5/5 (login, services [], techs tanpa Andi, ringkasan nol) + `node --check` LULUS.
+- Siap terima CSV user (format dibahas berikutnya).
+
+## 5m. KODE TOKO BISA DIGANTI (30 Sep 2026, belum commit)
+- Kode toko (prefix nomor nota) dibuka: validasi 2-5 huruf/angka, unik antar toko. Nota lama tidak berubah (tersimpan), nota baru ikut kode baru. Berlaku di Pengaturan Toko + Profil Toko Owner. `script.js?v=ambil22`.
+- Uji: kode spasi ditolak, ganti TST → nota `TST-2026-0001` ✓, kembalikan BGJ ✓ + `node --check` LULUS.
 
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3→BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.

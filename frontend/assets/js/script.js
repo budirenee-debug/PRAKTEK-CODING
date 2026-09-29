@@ -1,5 +1,6 @@
 // B_gadget POS - Hybrid: FastAPI + SQLite, fallback localStorage
-const STORAGE_KEY = 'servicell_data_v1';
+// v2 (29 Sep 2026): data sungguhan — kunci lokal diganti agar sisa test lama tidak muncul lagi.
+const STORAGE_KEY = 'servicell_data_v2';
 const API_BASE = (() => {
   const stored = localStorage.getItem('API_BASE');
   if (stored) return stored;
@@ -12,18 +13,13 @@ const API_BASE = (() => {
 })();
 let USE_API = true; // coba API dulu, fallback ke localStorage jika gagal
 
-const defaultData = [
-  {id:'INV-2026-0118', invoice:'INV-2026-0118', nama:'Renee Budiman', wa:'081234567890', device:'iPhone 11 64GB', keluhan:'LCD pecah & baterai drop', teknisi:'Andi', penerima:'Admin', biaya:850000, status:'Dikerjakan', date:'2026-09-02', estimasi_selesai:'2026-09-05', deadline:'2026-09-05', deadline_type:'harian', kelengkapan:['HP Saja','+ Charger']},
-  {id:'INV-2026-0119', invoice:'INV-2026-0119', nama:'Dewi Lestari', wa:'082112345678', device:'Samsung A54', keluhan:'Mati total habis jatuh', teknisi:'Sinta', penerima:'Sinta', biaya:450000, status:'Antri', date:'2026-09-02', estimasi_selesai:'2026-09-06', deadline:'2026-09-06', deadline_type:'harian', kelengkapan:['HP Saja']},
-  {id:'INV-2026-0120', invoice:'INV-2026-0120', nama:'Budi Santoso', wa:'081345678901', device:'Xiaomi Redmi Note 12', keluhan:'Kamera belakang blur', teknisi:'Budi', penerima:'Budi', biaya:250000, status:'Menunggu Sparepart', date:'2026-09-01', estimasi_selesai:'2026-09-08', deadline:'2026-09-08', deadline_type:'mingguan', kelengkapan:['HP Saja','+ Dus']},
-  {id:'INV-2026-0121', invoice:'INV-2026-0121', nama:'Citra Amelia', wa:'085678901234', device:'Oppo Reno 8', keluhan:'Speaker sember', teknisi:'Andi', penerima:'Andi', biaya:180000, status:'Service Sukses', date:'2026-09-01', estimasi_selesai:'2026-09-04', deadline:'2026-09-04', deadline_type:'harian', kelengkapan:['HP Saja']},
-  {id:'INV-2026-0122', invoice:'INV-2026-0122', nama:'Fajar Pratama', wa:'081987654321', device:'iPhone XR', keluhan:'Face ID tidak berfungsi', teknisi:'Sinta', penerima:'Admin', biaya:650000, status:'Antri', date:'2026-09-02', estimasi_selesai:'2026-09-09', deadline:'2026-09-09', deadline_type:'mingguan', kelengkapan:['HP Saja','+ Charger']},
-];
+// Data sungguhan: default dikosongkan (dummy Renee Budiman dkk dihapus 29 Sep 2026).
+const defaultData = [];
 
 let data = [];
 
 // ---------- Inventory Sparepart ----------
-const INVENTORY_KEY = 'b_gadget_inventory_v1';
+const INVENTORY_KEY = 'b_gadget_inventory_v2';
 const MERK_HITS = ['IPHONE','SAMSUNG','XIAOMI','OPPO','VIVO','INFINIX'];
 // Merk asesories (bukan merk HP): dropdown merk ikut kategori barang.
 const MERK_ACC = ['ROBOT','OLIKE','BASEUS','ANKER','UNEED','KAKU','HIPPO','ORIGINAL','GENERIC','LAIN'];
@@ -190,7 +186,7 @@ function attachRupiahLive(){
 }
 
 // ---------- Sparepart Usage Log (Proses Service -> Stok) ----------
-const SPAREPART_USAGE_KEY='b_gadget_sparepart_usage_v1';
+const SPAREPART_USAGE_KEY='b_gadget_sparepart_usage_v2';
 let serviceSpareparts={}; // { invoice: [{sparepartId, nama, merk, qty, harga, teknisi, date}] }
 function loadSparepartUsage(){
   try{ const raw=localStorage.getItem(SPAREPART_USAGE_KEY); serviceSpareparts= raw? JSON.parse(raw) : {}; }catch{ serviceSpareparts={}; }
@@ -528,13 +524,15 @@ async function saveStoreProfile(){
   const nama = document.getElementById('storeNama')?.value.trim() || '';
   const wa = document.getElementById('storeWa')?.value.trim() || '';
   const alamat = document.getElementById('storeAlamat')?.value.trim() || '';
+  const kode = (document.getElementById('storeKode')?.value.trim() || '').toUpperCase();
   const msgEl = document.getElementById('storeProfileMsg');
   if(nama.length < 2) return showToast('Nama toko minimal 2 karakter');
   if(!wa) return showToast('No. WA pelayanan wajib diisi');
   const digits = wa.replace(/[\s\-\+]/g,'');
   if(!/^\d+$/.test(digits) || digits.length < 9) return showToast('No. WA harus angka minimal 9 digit');
+  if(kode && !/^[A-Z0-9]{2,5}$/.test(kode)) return showToast('Kode 2-5 huruf/angka tanpa spasi');
   try{
-    const updated = await apiFetch(`/stores/${sid}`, {method:'PATCH', body: JSON.stringify({nama, wa, alamat})});
+    const updated = await apiFetch(`/stores/${sid}`, {method:'PATCH', body: JSON.stringify({nama, wa, alamat, kode: kode || undefined})});
     showToast(`✅ Profil toko disimpan — WA: ${updated.wa || wa}`);
     if(msgEl){ msgEl.style.display='block'; msgEl.style.color='#059669'; msgEl.textContent=`✅ Tersimpan: ${updated.nama} • WA ${updated.wa || '-'} • ${new Date().toLocaleTimeString('id-ID')}`; }
     updateStoreBrand();
@@ -937,17 +935,7 @@ async function apiUpdateStatus(invoice, newStatus){
 }
 
 async function loadAvailableTechs(){
-  // ambil daftar akun terdaftar yang bisa di-assign dari backend
-  const fallback = [
-    {username: 'Andi', role: 'teknisi', source: 'fallback'},
-    {username: 'Sinta', role: 'teknisi', source: 'fallback'},
-    {username: 'Budi', role: 'teknisi', source: 'fallback'}
-  ];
-  // set fallback synchronously agar dropdown tidak stuck "Memuat anggota..."
-  if(!availableTechs.length){
-    availableTechs = [...fallback];
-    populateTeknisiSelect();
-  }
+  // ambil daftar akun terdaftar yang bisa di-assign dari backend (data sungguhan, tanpa nama contoh)
   if(!USE_API){
     populateTechFilters();
     try{ applyPreviewTeknisi(); }catch(e){}
@@ -961,21 +949,17 @@ async function loadAvailableTechs(){
     const res = await fetch(techUrl, {headers});
     if(!res.ok) throw new Error(await res.text());
     const rows = await res.json();
-    // rows = [{username, role, source}]
-    availableTechs = rows.length ? rows : [...fallback];
+    // rows = [{username, role, source}] — kosong berarti teknisi belum didaftarkan
+    availableTechs = Array.isArray(rows) ? rows : [];
   }catch(e){
-    console.warn('loadAvailableTechs gagal, fallback:', e.message);
+    console.warn('loadAvailableTechs gagal:', e.message);
     // coba fallback ke /technicians legacy
     try{
       const rows2 = await apiFetch('/technicians');
       if(Array.isArray(rows2) && rows2.length){
         availableTechs = rows2.map(r=>({username: r.nama || r.username, role:'teknisi', source:'technician'}));
-      } else {
-        availableTechs = [...fallback];
       }
-    }catch{
-      availableTechs = [...fallback];
-    }
+    }catch{}
   }
   populateTeknisiSelect();
   populateTechFilters();
@@ -1005,10 +989,8 @@ function populateTeknisiSelect(){
     const curP = selP.value || '';
     // penerima: semua anggota + opsi kosong
     const members = availableTechs.length ? availableTechs : [];
-    // fallback jika belum ada anggota (offline tanpa login) -> tampilkan Andi/Sinta/Budi + current user
-    const fallbackMembers = members.length ? members : [
-      {username:'Andi', role:'teknisi'}, {username:'Sinta', role:'teknisi'}, {username:'Budi', role:'teknisi'}
-    ];
+    // tanpa anggota terdaftar: hanya user saat ini (tanpa nama contoh)
+    const fallbackMembers = members.length ? members : [];
     const me = localStorage.getItem('username');
     let optsP = fallbackMembers.map(m=>m.username);
     if(me && !optsP.includes(me)) optsP.unshift(me);
@@ -2449,8 +2431,9 @@ function renderLaporanTeknisi(){
   // juga tambahkan dari availableTechs (yang role teknisi) agar laporan tetap tampil meski belum ada service
   availableTechs.filter(t=>t.role==='teknisi').forEach(t=>techNames.add(t.username));
   if(!techNames.size){
-    // fallback dummy agar tabel tidak kosong saat demo
-    ['Andi','Sinta','Budi'].forEach(n=>techNames.add(n));
+    // data sungguhan: tanpa nama contoh — tabel kosong berarti belum ada teknisi/service
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Belum ada data teknisi</td></tr>`;
+    return;
   }
   const rows=[...techNames].map(name=>{
     const handle=data.filter(d=>d.teknisi===name).length;
@@ -3054,7 +3037,7 @@ async function pakaiSparepart(invoice){
 }
 
 // ---------- Alat Inventory (multi-PC sync via API) ----------
-const ALAT_KEY='b_gadget_alat_v1';
+const ALAT_KEY='b_gadget_alat_v2';
 const defaultAlat = []; // kosong biar tes input baru 0 (sebelumnya dummy 4)
 let alatInventory=[];
 async function loadAlat(){
@@ -3349,6 +3332,14 @@ function resetAlatDummy(){
 }
 
 function renderDashboard(){
+  // Estimasi = nilai pipeline aktif (belum diambil/failed) — real, bukan angka contoh.
+  try{
+    const OPEN=['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart','Bisa Diambil','Service Sukses','Selesai'];
+    const pipe=data.filter(d=>OPEN.includes(d.status));
+    const tot=pipe.reduce((s,d)=>s+(Number(d.biaya)||0),0);
+    const el=document.getElementById('stat-estimasi'); if(el) el.textContent=formatRupiah(tot);
+    const sub=document.getElementById('stat-estimasi-sub'); if(sub) sub.textContent=`${pipe.length} service aktif • belum termasuk sparepart • klik →`;
+  }catch(e){}
   const tbody=document.querySelector('#tableDashboard tbody');
   if(tbody){
     tbody.innerHTML = data.slice(0,4).map(d=>`

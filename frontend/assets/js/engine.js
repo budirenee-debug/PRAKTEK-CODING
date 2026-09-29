@@ -118,7 +118,7 @@ async function renderKasToko(force){
     const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
       || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
     if(isTek){ setKasTab('saya'); return; }
-    if(tbody && !force && tbody.dataset.filled==='1' && _kasTab==='toko') return;
+    // Selalu hitung ulang tiap dibuka (jangan cache) — struk/pengeluaran/refund baru langsung masuk.
     if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Menghitung arus kas toko...</td></tr>';
     const SUKSES = ['Service Sukses','Sudah Diambil','Selesai'];
     const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0,10);
