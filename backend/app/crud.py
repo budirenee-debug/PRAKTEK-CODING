@@ -506,7 +506,7 @@ def create_sparepart(db: Session, payload: schemas.SparepartCreate, store_id=Non
     db.refresh(sp)
     return sp
 
-def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate):
+def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate, actor=None):
     sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
     if not sp:
         return None
@@ -514,7 +514,8 @@ def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate):
     # merk bebas — hanya rapikan huruf
     if "merk" in data and data["merk"]:
         data["merk"] = str(data["merk"]).upper().strip()[:40] or "LAIN"
-    for k,v in data.items():
+    stok_awal = int(sp.stok or 0)
+    for k, v in data.items():
         setattr(sp, k, v)
     # jika masuk/keluar berubah dan stok tidak di-set manual, auto
     if ("masuk" in data or "keluar" in data) and "stok" not in data:
@@ -522,6 +523,15 @@ def update_sparepart(db: Session, sp_id: int, payload: schemas.SparepartUpdate):
     # jika stok dikirim, pastikan konsisten
     if sp.stok is None:
         sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    # jejak: setiap ubah stok lewat edit manual dicatat sebagai penyesuaian
+    stok_akhir = int(sp.stok or 0)
+    if stok_akhir != stok_awal:
+        bagian = []
+        if "masuk" in data: bagian.append(f"masuk={data['masuk']}")
+        if "keluar" in data: bagian.append(f"keluar={data['keluar']}")
+        if "stok" in data: bagian.append(f"stok={data['stok']}")
+        catat_mutasi(db, sp, "penyesuaian", stok_akhir - stok_awal, stok_awal, stok_akhir,
+                     ref="edit: " + ",".join(bagian) if bagian else "edit", actor=actor)
     db.commit()
     db.refresh(sp)
     return sp
@@ -534,47 +544,185 @@ def delete_sparepart(db: Session, sp_id: int):
     db.commit()
     return True
 
-def pakai_sparepart(db: Session, sp_id: int, qty: int = 1):
-    # pakai SELECT ... FOR UPDATE + atomic update untuk cegah race (fix P0-4)
+# ----- Buku mutasi stok (jejak perubahan stok) -----
+def catat_mutasi(db: Session, sp, tipe: str, qty: int, stok_sebelum, stok_sesudah,
+                 ref=None, actor=None):
+    """Catat 1 baris stock_moves. Tidak pernah gagalkan operasi utama (best-effort)."""
     try:
-        # SQLite tidak support FOR UPDATE, tapi WAL + busy_timeout + transaksi sudah cukup;
-        # untuk DB lain (postgres) akan lock row
-        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).with_for_update().first()
+        db.add(models.StockMove(
+            store_id=getattr(sp, "store_id", None),
+            sparepart_id=sp.id,
+            nama_snapshot=sp.nama,
+            tipe=tipe,
+            qty=int(qty),
+            stok_sebelum=int(stok_sebelum or 0),
+            stok_sesudah=int(stok_sesudah or 0),
+            ref=(ref or None),
+            actor=(getattr(actor, "username", None) or (actor if isinstance(actor, str) else None)),
+        ))
     except Exception:
-        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
-    if not sp:
-        return None, "Sparepart tidak ditemukan"
-    if sp.stok is None:
-        sp.stok = max(0, (sp.masuk or 0) - (sp.keluar or 0))
-    if sp.stok < qty:
-        return None, f"Stok tidak cukup (sisa {sp.stok})"
-    # atomic: update via SQL where stok >= qty untuk safety concurrent
+        pass
+
+
+def catat_mutasi_plain(db: Session, sp_id: int, store_id, nama: str, tipe: str, qty: int,
+                       stok_sebelum, stok_sesudah, ref=None, actor=None):
+    """Varian kalau objek ORM sparepart sudah tidak tersedia (mis. setelah delete)."""
+    try:
+        db.add(models.StockMove(
+            store_id=store_id, sparepart_id=sp_id, nama_snapshot=nama, tipe=tipe,
+            qty=int(qty), stok_sebelum=int(stok_sebelum or 0), stok_sesudah=int(stok_sesudah or 0),
+            ref=(ref or None),
+            actor=(getattr(actor, "username", None) or (actor if isinstance(actor, str) else None)),
+        ))
+    except Exception:
+        pass
+
+
+def get_stock_moves(db: Session, store_id=None, sparepart_id=None, tipe=None, limit=100):
+    q = db.query(models.StockMove)
+    if store_id is not None:
+        q = q.filter(models.StockMove.store_id == store_id)
+    if sparepart_id is not None:
+        q = q.filter(models.StockMove.sparepart_id == sparepart_id)
+    if tipe:
+        q = q.filter(models.StockMove.tipe == tipe)
+    rows = q.order_by(models.StockMove.id.desc()).limit(int(limit or 100)).all()
+    return [schemas.StockMoveOut(
+        id=r.id, store_id=r.store_id, sparepart_id=r.sparepart_id, nama_snapshot=r.nama_snapshot,
+        tipe=r.tipe, tipe_label=schemas.LABEL_MUTASI.get(r.tipe, r.tipe),
+        qty=int(r.qty or 0), stok_sebelum=int(r.stok_sebelum or 0), stok_sesudah=int(r.stok_sesudah or 0),
+        ref=r.ref, actor=r.actor, created_at=r.created_at,
+    ) for r in rows]
+
+
+def pakai_part(db: Session, sp, svc, qty: int = 1, actor=None):
+    """Kurangi stok + catat pemakaian di service_parts dalam SATU transaksi.
+
+    Service yang sudah terminal dikunci di router (lihat schemas.BISA_PAKAI_PART).
+    Return (sparepart, service_part, error).
+    """
     from sqlalchemy import text
-    try:
-        # coba atomic decrement
-        result = db.execute(text("UPDATE spareparts SET keluar = keluar + :qty, stok = stok - :qty, tgl = :tgl WHERE id = :id AND stok >= :qty"), {"qty": qty, "tgl": date.today().isoformat(), "id": sp_id})
-        if result.rowcount == 0:
-            db.rollback()
-            sp2 = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
-            return None, f"Stok tidak cukup (sisa {sp2.stok if sp2 else 0}) atau race condition"
-        db.commit()
-        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
-        return sp, None
-    except Exception:
-        # fallback non-atomic (old path) jika SQL di atas gagal di SQLite syntax
-        try:
-            db.rollback()
-        except:
-            pass
-        sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp_id).first()
-        if sp.stok < qty:
-            return None, f"Stok tidak cukup (sisa {sp.stok})"
-        sp.keluar = (sp.keluar or 0) + qty
-        sp.stok = max(0, sp.stok - qty)
-        sp.tgl = date.today()
-        db.commit()
-        db.refresh(sp)
-        return sp, None
+    if sp is None:
+        return None, None, "Sparepart tidak ditemukan"
+    if svc is None:
+        return None, None, "Service tidak ditemukan"
+    stok = sp.stok if sp.stok is not None else max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    if stok < qty:
+        return None, None, f"Stok tidak cukup (sisa {stok})"
+    sid = getattr(sp, "store_id", None)
+    res = db.execute(
+        text(
+            "UPDATE spareparts SET keluar = COALESCE(keluar,0) + :qty, stok = COALESCE(stok,0) - :qty, tgl = :tgl "
+            "WHERE id = :id AND COALESCE(stok,0) >= :qty AND (:sid IS NULL OR store_id IS NULL OR store_id = :sid)"
+        ),
+        {"qty": qty, "tgl": date.today().isoformat(), "id": sp.id, "sid": sid},
+    )
+    if res.rowcount == 0:
+        db.rollback()
+        sp2 = db.query(models.Sparepart).filter(models.Sparepart.id == sp.id).first()
+        return None, None, f"Stok tidak cukup (sisa {sp2.stok if sp2 else 0}) — ada yang pakai barusan"
+    part = models.ServicePart(
+        store_id=getattr(svc, "store_id", None) or sid,
+        invoice=svc.invoice,
+        sparepart_id=sp.id,
+        nama_snapshot=sp.nama,
+        harga_up_snapshot=int(sp.harga or 0),
+        modal_asli_snapshot=int(sp.harga_beli or 0),
+        qty=qty,
+    )
+    db.add(part)
+    catat_mutasi(db, sp, "pakai", -qty, stok, stok - qty, ref=svc.invoice, actor=actor)
+    db.commit()
+    db.refresh(part)
+    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp.id).first()
+    return sp, part, None
+
+
+def kembalikan_part(db: Session, part, actor=None):
+    """Hapus catatan service_parts + kembalikan stok (keluar turun, stok naik)."""
+    from sqlalchemy import text
+    if part is None:
+        return False
+    nama, qty = part.nama_snapshot, int(part.qty or 1)
+    sp = None
+    if part.sparepart_id:
+        sp = db.query(models.Sparepart).filter(models.Sparepart.id == part.sparepart_id).first()
+        db.execute(
+            text(
+                "UPDATE spareparts SET keluar = MAX(0, COALESCE(keluar,0) - :qty), "
+                "stok = COALESCE(stok,0) + :qty, tgl = :tgl WHERE id = :id"
+            ),
+            {"qty": qty, "tgl": date.today().isoformat(), "id": part.sparepart_id},
+        )
+    db.delete(part)
+    catat_mutasi_plain(db, part.sparepart_id, part.store_id, nama, "batal", qty,
+                       (sp.stok if sp is not None else 0), (sp.stok + qty if sp is not None else qty),
+                       ref=part.invoice, actor=actor)
+    db.commit()
+    return True
+
+
+def masuk_part(db: Session, sp, qty: int = 1, actor=None, ref=None):
+    """Terima barang: masuk naik, stok naik. Proper-nya pakai ini, bukan edit kolom manual."""
+    from sqlalchemy import text
+    if sp is None:
+        return None, "Sparepart tidak ditemukan"
+    if qty <= 0:
+        return None, "Jumlah harus >= 1"
+    stok = sp.stok if sp.stok is not None else max(0, (sp.masuk or 0) - (sp.keluar or 0))
+    db.execute(
+        text("UPDATE spareparts SET masuk = COALESCE(masuk,0) + :qty, stok = COALESCE(stok,0) + :qty, tgl = :tgl WHERE id = :id"),
+        {"qty": qty, "tgl": date.today().isoformat(), "id": sp.id},
+    )
+    catat_mutasi(db, sp, "masuk", qty, stok, stok + qty, ref=ref, actor=actor)
+    db.commit()
+    sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp.id).first()
+    return sp, None
+
+
+def list_service_parts(db: Session, store_id=None, invoice=None, teknisi_scope=None):
+    """Semua pemakaian part di toko aktif. Label merk & teknisi di-join untuk tampilan."""
+    q = db.query(models.ServicePart)
+    if store_id is not None:
+        q = q.filter(models.ServicePart.store_id == store_id)
+    if invoice:
+        q = q.filter(models.ServicePart.invoice == invoice)
+    rows = q.order_by(models.ServicePart.id.desc()).all()
+    if not rows:
+        return []
+    sp_ids = {r.sparepart_id for r in rows if r.sparepart_id}
+    merks = {}
+    if sp_ids:
+        for p in db.query(models.Sparepart).filter(models.Sparepart.id.in_(sp_ids)).all():
+            merks[p.id] = p.merk
+    invs = {r.invoice for r in rows}
+    if teknisi_scope:
+        svc_q = db.query(models.Service).filter(models.Service.invoice.in_(invs))
+        svc_q = svc_q.filter(models.Service.teknisi.in_(list(teknisi_scope)) | models.Service.teknisi.in_(["Menunggu Teknisi", "-", ""]))
+        invs = {s.invoice for s in svc_q.all()}
+        rows = [r for r in rows if r.invoice in invs]
+    teknisis = {}
+    if rows:
+        for s in db.query(models.Service).filter(models.Service.invoice.in_({r.invoice for r in rows})).all():
+            teknisis[s.invoice] = s.teknisi
+    out = []
+    for r in rows:
+        out.append(
+            schemas.ServicePartOut(
+                id=r.id,
+                store_id=r.store_id,
+                invoice=r.invoice,
+                sparepart_id=r.sparepart_id,
+                nama_snapshot=r.nama_snapshot,
+                merk=merks.get(r.sparepart_id) or "LAIN",
+                harga_up_snapshot=int(r.harga_up_snapshot or 0),
+                modal_asli_snapshot=int(r.modal_asli_snapshot or 0),
+                qty=int(r.qty or 1),
+                teknisi=teknisis.get(r.invoice) or "-",
+                created_at=r.created_at,
+            )
+        )
+    return out
 
 # ----- Alat (multi-PC sync) -----
 def get_alats(db: Session, search: str = None, kondisi: str = None, store_id=None):

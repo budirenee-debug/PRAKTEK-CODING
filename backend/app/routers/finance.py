@@ -35,6 +35,23 @@ def _ctx(db, current, store_id, need_role=True):
     return store, role
 
 
+def _ctx_write(db, current, store_id):
+    """Tulis pengeluaran: owner/admin/kasir/superadmin.
+    Kasir boleh catat operasional harian (listrik/wifi/belanja) langsung dari Kas Toko.
+    Hapus tetap owner/admin (lihat delete_expense)."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    store = resolve_store(db, current, store_id)
+    if store is None:
+        store = default_store(db)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Toko tidak ditemukan")
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin", "kasir"]:
+        raise HTTPException(status_code=403, detail="Hanya tim toko yang boleh catat pengeluaran")
+    return store, role
+
+
 def _find_tech(db, store_id, payload):
     if payload.get("technician_id"):
         return db.query(models.Technician).filter(
@@ -411,8 +428,8 @@ def ringkasan_expenses(store_id: Optional[int] = Query(None),
 @router.post("/expenses")
 def create_expense(payload: dict = Body(...), store_id: Optional[int] = Query(None),
                    db: Session = Depends(get_db), current=Depends(get_current_user)):
-    """Catat pengeluaran operasional. Tulis: owner/admin/superadmin saja."""
-    store, _ = _ctx(db, current, store_id)
+    """Catat pengeluaran operasional. Tulis: owner/admin/kasir/superadmin (kasir dari Kas Toko). Hapus tetap owner/admin."""
+    store, _ = _ctx_write(db, current, store_id)
     keperluan = (payload.get("keperluan") or "").strip()
     if not keperluan:
         raise HTTPException(status_code=400, detail="keperluan wajib diisi")
@@ -454,6 +471,107 @@ def delete_expense(exp_id: int, store_id: Optional[int] = Query(None),
     log_action(db, "finance.expense_hapus", target=f"EXP-{exp_id}",
                detail=info, actor=current, store_id=store.id)
     return {"ok": True, "id": exp_id}
+
+
+# ================= PEMASUKAN MANUAL (modal awal / tambahan modal / lain) =================
+KAT_INCOME = ["Modal Awal", "Tambahan Modal", "Pemasukan Lain"]
+
+
+def _income_row(e: models.CashIncome):
+    return {"id": e.id, "tanggal": e.tanggal, "kategori": e.kategori,
+            "sumber": e.sumber, "nominal": e.nominal, "metode": e.metode,
+            "keterangan": e.keterangan, "dibuat_oleh": e.dibuat_oleh,
+            "created_at": e.created_at}
+
+
+@router.get("/incomes")
+def list_incomes(store_id: Optional[int] = Query(None), kategori: Optional[str] = Query(None),
+                 since: Optional[str] = Query(None),
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    q = db.query(models.CashIncome).filter(models.CashIncome.store_id == store.id)
+    if kategori:
+        q = q.filter(models.CashIncome.kategori == kategori)
+    if since:
+        try:
+            d0 = datetime.datetime.strptime(since[:10], "%Y-%m-%d").date()
+            q = q.filter(models.CashIncome.tanggal >= d0)
+        except Exception:
+            raise HTTPException(status_code=400, detail="since harus YYYY-MM-DD")
+    rows = q.order_by(models.CashIncome.tanggal.desc(), models.CashIncome.id.desc()).limit(300).all()
+    return [_income_row(e) for e in rows]
+
+
+@router.get("/incomes/ringkasan")
+def ringkasan_incomes(store_id: Optional[int] = Query(None),
+                      db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    rows = db.query(models.CashIncome).filter(models.CashIncome.store_id == store.id).all()
+    today = datetime.date.today()
+    iso, ym = today.isoformat(), today.strftime("%Y-%m")
+    hari = [e for e in rows if str(e.tanggal or "") == iso]
+    bln = [e for e in rows if str(e.tanggal or "")[:7] == ym]
+    per_kat = {}
+    for e in rows:
+        k = e.kategori or "Lainnya"
+        per_kat[k] = per_kat.get(k, 0) + int(e.nominal or 0)
+    return {
+        "total": len(rows),
+        "total_nominal": sum(int(e.nominal or 0) for e in rows),
+        "hari_ini": len(hari),
+        "nominal_hari_ini": sum(int(e.nominal or 0) for e in hari),
+        "bulan_ini": len(bln),
+        "nominal_bulan_ini": sum(int(e.nominal or 0) for e in bln),
+        "per_kategori": per_kat,
+    }
+
+
+@router.post("/incomes")
+def create_income(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                  db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Catat pemasukan manual (modal awal / tambahan modal / lain). Tulis: owner/admin/kasir/superadmin."""
+    store, _ = _ctx_write(db, current, store_id)
+    sumber = (payload.get("sumber") or "").strip()
+    if not sumber:
+        raise HTTPException(status_code=400, detail="sumber wajib diisi (mis. Modal awal laci kasir)")
+    nominal = int(payload.get("nominal") or 0)
+    if nominal <= 0:
+        raise HTTPException(status_code=400, detail="nominal harus > 0")
+    kategori = (payload.get("kategori") or "Modal Awal").strip()
+    if kategori not in KAT_INCOME:
+        raise HTTPException(status_code=400, detail="kategori harus: " + "/".join(KAT_INCOME))
+    metode = (payload.get("metode") or "Tunai").strip()
+    if metode not in METODE:
+        raise HTTPException(status_code=400, detail="metode harus Tunai/Transfer/QRIS")
+    e = models.CashIncome(store_id=store.id, tanggal=_parse_tgl(payload.get("tanggal")),
+                          kategori=kategori, sumber=sumber, nominal=nominal,
+                          metode=metode,
+                          keterangan=(payload.get("keterangan") or "").strip() or None,
+                          dibuat_oleh=getattr(current, "username", None))
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    log_action(db, "finance.income", target=f"IN-{e.id}",
+               detail=f"{kategori} {sumber} nominal={nominal} metode={metode}",
+               actor=current, store_id=store.id)
+    return _income_row(e)
+
+
+@router.delete("/incomes/{inc_id}")
+def delete_income(inc_id: int, store_id: Optional[int] = Query(None),
+                  db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Hapus salah input. Tulis: owner/admin/superadmin saja."""
+    store, _ = _ctx(db, current, store_id)
+    e = db.query(models.CashIncome).filter(models.CashIncome.id == inc_id,
+                                           models.CashIncome.store_id == store.id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Pemasukan tidak ditemukan di toko ini")
+    info = f"{e.kategori} {e.sumber} nominal={e.nominal}"
+    db.delete(e)
+    db.commit()
+    log_action(db, "finance.income_hapus", target=f"IN-{inc_id}",
+               detail=info, actor=current, store_id=store.id)
+    return {"ok": True, "id": inc_id}
 
 
 def _wa_quote(t: str) -> str:

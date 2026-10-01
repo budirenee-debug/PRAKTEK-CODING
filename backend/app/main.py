@@ -338,6 +338,29 @@ def _migrate_multistore():
     except Exception as e:
         print("migrate multistore fail:", e)
 _migrate_multistore()
+
+
+def _migrate_sparepart_index():
+    """Index spareparts.store_id — kolomnya ALTER-added setelah create_all, jadi indexnya
+    tidak pernah ikut dibuat. Tanpa ini setiap query stok per toko = full table scan."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            have = {row[0] for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='index'")).fetchall()}
+            for name, ddl in [
+                ("ix_spareparts_store_id", "CREATE INDEX ix_spareparts_store_id ON spareparts (store_id)"),
+                ("ix_spareparts_kategori", "CREATE INDEX ix_spareparts_kategori ON spareparts (kategori)"),
+            ]:
+                if name not in have:
+                    conn.execute(text(ddl))
+                    print(f"migrated: index {name}")
+            conn.commit()
+    except Exception as e:
+        print("migrate sparepart index fail:", e)
+_migrate_sparepart_index()
+
+
 def _migrate_engine():
     """Business Engine Fase 1: kolom level + tabel engine auto-create via create_all.
     Backfill: settings default per toko, level junior, service_engine untuk service lama."""

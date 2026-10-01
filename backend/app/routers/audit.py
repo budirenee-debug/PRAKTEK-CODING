@@ -14,8 +14,8 @@ router = APIRouter(prefix="/audit", tags=["Audit"])
 # (mis. "🛠 Service Service") di dropdown & chip filter.
 POLA = {
     "service":     ("Service",     "🛠", "Masuk, ubah, status, hapus, klaim garansi"),
-    "stok":        ("Stok",        "📦", "Tambah, ubah harga/stok, hapus sparepart"),
-    "alat":        ("Stok",        "📦", "Alat kerja: tambah, ubah, hapus"),
+    "stok":        ("Stok",        "📦", "Tambah, terima barang, ubah harga/stok, pakai part, hapus sparepart"),
+    "alat":        ("Stok",        "📦", "Alat kerja: tambah, pinjam, ubah, hapus"),
     "engine":      ("Engine",      "⚙️", "Aturan komisi, check-in, nombok, oper garansi, harga part"),
     "finance":     ("Keuangan",    "💸", "Kecelakaan kerja & refund dana"),
     "wa":          ("WA Template", "💬", "Ubah template pesan WhatsApp"),
@@ -34,7 +34,7 @@ SENSITIF = ("hapus", "delete", "update_harga", "refund", "nombok", "set_part",
 
 # action spesifik yang SENSITIF walau kata kuncinya tidak ada di atas
 # (mis. "stok.update" = ubah harga/stok part, "store.update" = ubah profil toko)
-SENSITIF_AKSI = {"stok.update", "store.update", "service.update", "invite.create",
+SENSITIF_AKSI = {"stok.update", "stok.pakai", "store.update", "service.update", "invite.create",
                  "auth.login_gagal", "user.update", "alat.update"}
 
 LABEL = {
@@ -46,9 +46,13 @@ LABEL = {
     "service.hapus": "Hapus service",
     "stok.create": "Tambah sparepart",
     "stok.update": "Ubah stok / harga part",
+    "stok.masuk": "Terima barang (stok naik)",
+    "stok.pakai": "Pakai part ke service",
+    "stok.pakai.batal": "Batal pakai part (stok kembali)",
     "stok.hapus": "Hapus sparepart",
     "alat.create": "Tambah alat",
     "alat.update": "Ubah alat",
+    "alat.pinjam": "Pinjam / kembalikan alat",
     "alat.hapus": "Hapus alat",
     "engine.settings": "Ubah aturan engine",
     "engine.checkin": "Absen teknisi",

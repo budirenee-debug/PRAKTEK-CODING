@@ -464,11 +464,11 @@
                         <div class="toolbar-right">
                             <div class="search-box small"><span>⌕</span><input id="searchSparepart" placeholder="Cari part, kategori, merk..."></div>
                             <select id="filterMerkSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>ROBOT</option><option>OLIKE</option><option>BASEUS</option><option>ANKER</option><option>UNEED</option><option>KAKU</option><option>HIPPO</option><option>ORIGINAL</option><option>GENERIC</option><option>LAIN</option></select>
-                            <select id="filterKategoriSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select>
+                            <select id="filterKategoriSp" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select>
                             <button class="btn btn-dark small" onclick="switchView('inventory-tambah')">+ Tambah Item</button>
                         </div>
                     </div>
-                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">✏️ <strong>Merk</strong> hits: IPHONE • SAMSUNG • XIAOMI • OPPO • VIVO • INFINIX • <span style="background:#f3f4f6;padding:2px 6px;border-radius:8px">LAIN</span> untuk merk jarang. Tabel bisa langsung diubah: <strong>Masuk</strong> / <strong>Keluar</strong> / <strong>Stok Akhir</strong> / <strong>Harga</strong> lalu <strong>Simpan</strong>.</p>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">🔒 <strong>Stok dikunci (auto = Masuk − Keluar)</strong> dari database. <strong>Masuk</strong> via tombol <strong>+ Masuk</strong> (tercatat), <strong>Keluar</strong> via <strong>Pakai</strong> di Proses Service / <strong>Jual</strong> di Kasir. 🎧 <strong>Aksesoris pindah ke tab Asesories</strong> — tidak tampil di sini. Klik <strong>📜 Riwayat</strong> untuk jejak masuk & keluar.</p>
                     <div class="table-wrap">
                         <table class="table compact" id="tableSparepart">
                             <thead><tr><th style="min-width:140px">Nama Part</th><th style="min-width:90px">Merk</th><th>Kategori</th><th style="text-align:center;min-width:80px">Masuk</th><th style="text-align:center;min-width:80px">Keluar</th><th style="text-align:center;min-width:90px">Stok</th><th style="min-width:90px">Tgl</th><th style="text-align:right;min-width:110px">Harga</th><th style="text-align:center;min-width:150px">Aksi</th></tr></thead>
@@ -490,12 +490,12 @@
                             <div class="field" style="margin-bottom:10px"><label>Nama Part *</label><input id="spEditNama" required placeholder="LCD iPhone 11"></div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
                                 <div class="field"><label>Merk * (bebas ketik)</label><input id="spEditMerk" required list="merkListEdit" placeholder="Contoh: Robot" autocomplete="off"><datalist id="merkListEdit"></datalist></div>
-                                <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="fillMerkOptions(document.getElementById('merkListEdit'), this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                                <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="fillMerkOptions(document.getElementById('merkListEdit'), this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select></div>
                             </div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                                <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
-                                <div class="field"><label>Keluar</label><input id="spEditKeluar" type="number" min="0"></div>
-                                <div class="field"><label>Stok Akhir</label><input id="spEditStok" type="number" min="0"></div>
+                                <div class="field"><label>Masuk (🔒 dikunci)</label><input id="spEditMasuk" type="number" min="0" disabled title="Pakai tombol +Masuk di tabel"><span style="font-size:10px;color:#8a8f98">via +Masuk</span></div>
+                                <div class="field"><label>Keluar (🔒 dikunci)</label><input id="spEditKeluar" type="number" min="0" disabled title="Keluar via Pakai/Jual"><span style="font-size:10px;color:#8a8f98">via Pakai/Jual</span></div>
+                                <div class="field"><label>Stok Akhir (🔒 auto)</label><input id="spEditStok" type="number" min="0" disabled title="Stok = Masuk − Keluar"><span style="font-size:10px;color:#059669">Masuk − Keluar</span></div>
                                 <div class="field"><label>Harga (Rp)</label><input id="spEditHarga" type="text" inputmode="numeric"><span id="spEditHarga-preview" style="font-size:11px;color:#059669;display:none">Rp 0</span></div>
                             </div>
                             <div style="display:flex;gap:10px;margin-top:14px">
@@ -589,7 +589,7 @@
                         <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"><span style="font-size:11px;color:#8a8f98">Terpakai / terjual — default 0</span></div>
                         <div class="field"><label>Stok Akhir (auto)</label><input id="sp-stok" type="number" min="0" placeholder="auto = Masuk - Keluar"><span style="font-size:11px;color:#059669">Kosongkan = otomatis Masuk - Keluar</span></div>
                     </div>
-                    <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="switchView('inventory-sparepart')">← Batal</button><button type="submit" class="btn btn-dark">Simpan Sparepart →</button></div>
+                    <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="batalTambahSparepart()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Sparepart →</button></div>
                 </form></div>
             </section>
 
@@ -733,7 +733,7 @@
                     <div class="card-head"><h3>🔧 Sparepart Dipakai (Sukses)</h3><span class="count-pill" id="sparepartPendapatanCount">0 item</span></div>
                     <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">List sparepart yang terpakai untuk service <strong>Service Sukses</strong> — dari fitur Pakai di Proses Service. Total sparepart = sum(harga×qty).</p>
                     <div class="table-wrap"><table class="table compact" id="tableSparepartPendapatan"><thead><tr><th>Invoice / Device</th><th>Sparepart</th><th style="text-align:center">Qty</th><th style="text-align:right">Harga Satuan</th><th style="text-align:right">Total</th><th>Teknisi</th></tr></thead><tbody id="tbodySparepartPendapatan"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Belum ada sparepart dipakai — pakai di Proses Service → Pakai</td></tr></tbody></table></div>
-                    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span id="sparepartPendapatanSummary" style="color:#8a8f98">0 item • Rp 0</span><span style="font-size:11px;color:#6b7280">Sumber: serviceSpareparts localStorage</span></div>
+                    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span id="sparepartPendapatanSummary" style="color:#8a8f98">0 item • Rp 0</span><span style="font-size:11px;color:#6b7280">Sumber: tabel <code>service_parts</code> (server, sync semua PC)</span></div>
                 </div>
                 </div>
                 <div id="pendapatan-tab-profit" style="display:none">
@@ -800,7 +800,7 @@
             </section>
             <!-- KAS TOKO: riwayat transaksi uang keseluruhan + sisa kas (sub-tab Saya = personal teknisi) -->
             <section class="view" id="view-kas-saya">
-                <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
+                <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-dark small" data-kas="toko" style="background:#059669;border-color:#059669" onclick="kasInOpen()">+ Catat Masuk</button> <button class="btn btn-dark small" data-kas="toko" onclick="kasOutOpen()">+ Catat Keluar</button> <button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
                 <div class="tabs" style="margin-bottom:10px">
                     <button class="tab active" data-kas="toko" onclick="setKasTab('toko')">🏪 Arus Toko</button>
                     <button class="tab" data-kas="saya" onclick="setKasTab('saya')">👤 Kas Saya</button>
@@ -811,8 +811,47 @@
                     <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Keluar</span></div><h3 id="kasTokoKeluar" style="color:#dc2626">Rp 0</h3><p class="trend" id="kasTokoKeluarSub">komisi + hadir + refund + beban toko</p></div>
                     <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Sisa Kas</span></div><h3 id="kasTokoSisa">Rp 0</h3><p class="trend">masuk − keluar</p></div>
                 </div>
-                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai). Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
+                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai) + penjualan kasir + <strong>pemasukan manual (modal/lain)</strong>. Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                </div>
+                <div class="modal" id="kasInModal">
+                    <div class="modal-box" style="max-width:480px">
+                        <button class="modal-close" onclick="kasInClose()">×</button>
+                        <h3 style="margin-bottom:4px">📥 Catat Pemasukan</h3>
+                        <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Modal awal laci, tambahan modal, atau pemasukan lain di luar service & penjualan — otomatis masuk Total Masuk Kas Toko.</p>
+                        <form id="kasInForm" onsubmit="kasInSave(event)">
+                            <div class="form-grid">
+                                <div class="field"><label>Sumber *</label><input id="kasin-sumber" required placeholder="Modal awal laci kasir"></div>
+                                <div class="field"><label>Nominal (Rp) *</label><input id="kasin-nominal" type="number" min="1" required placeholder="2000000" oninput="kasInPreview()"><span id="kasin-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                                <div class="field"><label>Kategori *</label><select id="kasin-kategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Modal Awal</option><option>Tambahan Modal</option><option>Pemasukan Lain</option></select></div>
+                                <div class="field"><label>Metode</label><select id="kasin-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
+                                <div class="field"><label>Tanggal</label><input id="kasin-tanggal" type="date"></div>
+                                <div class="field"><label>Keterangan</label><input id="kasin-ket" placeholder="Opsional"></div>
+                            </div>
+                            <div id="kasin-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                            <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="kasInClose()">← Batal</button><button type="submit" class="btn btn-dark" style="background:#059669;border-color:#059669">Simpan Pemasukan</button></div>
+                        </form>
+                    </div>
+                </div>
+                <div class="modal" id="kasOutModal">
+                    <div class="modal-box" style="max-width:480px">
+                        <button class="modal-close" onclick="kasOutClose()">×</button>
+                        <h3 style="margin-bottom:4px">🧾 Catat Pengeluaran</h3>
+                        <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Listrik, wifi/internet, sewa, belanja part — otomatis masuk Total Keluar Kas Toko.</p>
+                        <form id="kasOutForm" onsubmit="kasOutSave(event)">
+                            <div class="form-grid">
+                                <div class="field"><label>Keperluan *</label><input id="kasout-keperluan" required placeholder="Bayar listrik November"></div>
+                                <div class="field"><label>Nominal (Rp) *</label><input id="kasout-nominal" type="number" min="1" required placeholder="500000" oninput="kasOutPreview()"><span id="kasout-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                                <div class="field"><label>Kategori *</label><select id="kasout-kategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Listrik</option><option>Internet</option><option>Sewa</option><option>Gaji</option><option>Belanja Part</option><option>Operasional</option><option>Lainnya</option></select></div>
+                                <div class="field"><label>Metode</label><select id="kasout-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
+                                <div class="field"><label>Tanggal</label><input id="kasout-tanggal" type="date"></div>
+                                <div class="field"><label>Keterangan</label><input id="kasout-ket" placeholder="Opsional"></div>
+                            </div>
+                            <div id="kasout-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                            <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="kasOutClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Pengeluaran</button></div>
+                        </form>
+                    </div>
+                </div>
                 </div>
                 <div id="kasPanel-saya" style="display:none">
                 <div class="card-head" style="margin-bottom:10px"><h3 style="font-size:13px">👤 Kas Saya</h3><span class="muted" id="kasSayaSub">Komisi + uang hadir — transparan</span><span style="flex:1"></span><button class="btn btn-ghost small" onclick="renderKasSaya()">↻</button></div>
@@ -1224,7 +1263,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=role2"></script>
-    <script src="assets/js/script.js?v=ambil22"></script>
+    <script src="assets/js/script.js?v=partdb1"></script>
     <script src="assets/js/engine.js?v=eng7"></script>
 </body>
 </html>

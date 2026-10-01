@@ -123,6 +123,39 @@ Invoice auto: `INV-2026-0123`.
 - `POST /api/technicians` → `{"nama":"Joko","foto":"https://..."}` 
 - `GET /api/technicians/{id}/stats` → `{"total":5,"selesai":3,"persen":60}`
 
+### Inventory / Sparepart (`app/routers/inventory.py:line 1`)
+Semua endpoint wajib login. `store_id` opsional — tanpa itu anggota dapat toko primernya.
+Role: `teknisi` HANYA boleh pakai part ke service sendiri (lihat catatan scopes di bawah).
+
+| Method | Path | Params | Return |
+|---|---|---|---|
+| GET | `/api/inventory/spareparts` | `?search=&merk=&kategori=` | `List[SparepartOut]` |
+| POST | `/api/inventory/spareparts` | `SparepartCreate` JSON | `SparepartOut` 201 |
+| PUT | `/api/inventory/spareparts/{id}` | `SparepartUpdate` (partial) | `SparepartOut` |
+| DELETE | `/api/inventory/spareparts/{id}` | — | `{message}` (owner/admin/superadmin) |
+| POST | `/api/inventory/spareparts/{id}/pakai` | `?invoice=` **wajib**, `?qty=` | `PakaiPartOut` |
+| GET | `/api/inventory/service-parts` | `?invoice=` opsional | `List[ServicePartOut]` |
+| DELETE | `/api/inventory/service-parts/{id}` | — | `{message}` (batalkan + stok kembali) |
+
+**`/pakai` wajib `invoice`** — tanpa itu stok berkurang tanpa jejak service mana yang memakainya.
+Sekaligus potong stok (`keluar` naik, `stok` turun, atomic `WHERE stok >= qty`) **dan** tulis
+baris `service_parts` dengan snapshot harga (`harga_up_snapshot`, `modal_asli_snapshot`) supaya
+laporan lama tidak berubah ketika harga part di masterinventory diedit. Audit: `stok.pakai`.
+
+**Part terkunci total** begitu service masuk status terminal (`Service Sukses`, `Sudah Diambil`,
+`Service Failed`, `Garansi`, `Dibatalkan`) — harga sudah fix, jawaban `400`. Daftar status yang
+boleh pakai part: `Antri`, `Menunggu Konfirmasi`, `Dikerjakan`, `Menunggu Sparepart`,
+`Bisa Diambil` (`schemas.BISA_PAKAI_PART`).
+
+### Part terpakai per service (tabel `service_parts`)
+Sumber kebenaran laporan "Sparepart Dipakai" & "Profit Nett". Dulu hanya ada di localStorage
+browser (`b_gadget_sparepart_usage_v2`) sehingga hilang saat cache dibersihkan / ganti PC —
+sekarang diambil via `GET /api/inventory/service-parts` dan langsung dihapus dari localStorage.
+
+Kolom: `id, store_id, invoice (FK services), sparepart_id (FK), nama_snapshot,
+harga_up_snapshot, modal_asli_snapshot, qty, created_at`. `merk` & `teknisi` di-join saat baca
+untuk tampilan, bukan disimpan.
+
 ### Stats (`app/routers/stats.py:line 1`)
 - `GET /api/stats` → `StatsOut`: `total_masuk, dalam_proses, selesai_hari_ini, estimasi_pendapatan, antri, dikerjakan, menunggu_sparepart, selesai`
 - `GET /api/stats/dashboard` → gabungan `stats + recent[4] + technicians perf`

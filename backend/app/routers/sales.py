@@ -5,7 +5,7 @@ from typing import Optional
 import datetime
 
 from ..database import get_db
-from .. import models
+from .. import models, crud
 from ..audit import log_action
 from ..store_ctx import resolve_store, store_role, default_store
 from .auth import get_current_user
@@ -167,8 +167,11 @@ def create_sale(payload: dict = Body(...), store_id: Optional[int] = Query(None)
     s.kode = f"JL-{tanggal.strftime('%Y%m')}-{s.id:04d}"
     for b in built:
         if b["tipe"] == "barang":
-            b["sp"].stok = int(b["sp"].stok or 0) - b["qty"]
+            stok_lama = int(b["sp"].stok or 0)
+            b["sp"].stok = stok_lama - b["qty"]
             b["sp"].keluar = int(b["sp"].keluar or 0) + b["qty"]
+            crud.catat_mutasi(db, b["sp"], "jual", -b["qty"], stok_lama, b["sp"].stok,
+                              ref=s.kode, actor=current)
         db.add(models.SaleItem(sale_id=s.id, store_id=store.id, tipe=b["tipe"],
                                sparepart_id=b["sp"].id if b["sp"] else None,
                                nama_snapshot=b["nama"], qty=b["qty"],
@@ -193,10 +196,16 @@ def void_sale(sale_id: int, store_id: Optional[int] = Query(None),
     items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == s.id).all()
     for i in items:
         if i.tipe == "barang" and i.sparepart_id:
-            sp = db.query(models.Sparepart).filter(models.Sparepart.id == i.sparepart_id).first()
+            # scope toko: jangan hanya filter id (part bisa pindah toko /_no validasi)
+            sp = db.query(models.Sparepart).filter(
+                models.Sparepart.id == i.sparepart_id,
+                models.Sparepart.store_id == s.store_id).first()
             if sp:
-                sp.stok = int(sp.stok or 0) + int(i.qty or 0)
+                stok_lama = int(sp.stok or 0)
+                sp.stok = stok_lama + int(i.qty or 0)
                 sp.keluar = max(0, int(sp.keluar or 0) - int(i.qty or 0))
+                crud.catat_mutasi(db, sp, "batal", int(i.qty or 0), stok_lama, sp.stok,
+                                  ref=f"void {s.kode or s.id}", actor=current)
         db.delete(i)
     info = f"{s.kode} total={s.total} profit={s.profit}"
     db.flush()  # pastikan item terhapus dulu (FK sale_items.sale_id)

@@ -344,6 +344,59 @@ class SparepartOut(SparepartBase):
     class Config:
         from_attributes = True
 
+# ---------- Part terpakai per service (service_parts) ----------
+# Snapshot: harga & modal dikunci saat dipakai supaya laporan lama tidak berubah
+# walaupun harga part di masterinventory nanti diedit.
+BISA_PAKAI_PART = {"Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart", "Bisa Diambil"}
+
+class ServicePartOut(BaseModel):
+    id: int
+    store_id: Optional[int] = None
+    invoice: str
+    sparepart_id: Optional[int] = None
+    nama_snapshot: str
+    merk: Optional[str] = None          # join spareparts.merk (display)
+    harga_up_snapshot: int = 0          # harga jual saat dipakai
+    modal_asli_snapshot: int = 0        # harga beli saat dipakai
+    qty: int = 1
+    teknisi: Optional[str] = None       # join services.teknisi (display)
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
+class PakaiPartOut(BaseModel):
+    """Hasil POST /inventory/spareparts/{id}/pakai — part + catatan service_parts."""
+    sparepart: SparepartOut
+    part: ServicePartOut
+    class Config:
+        from_attributes = True
+
+# ---------- Buku mutasi stok (stock_moves) ----------
+TIPE_MUTASI = ("masuk", "pakai", "jual", "batal", "penyesuaian")
+LABEL_MUTASI = {
+    "masuk": "Terima barang",
+    "pakai": "Dipakai service",
+    "jual": "Terjual (kasir)",
+    "batal": "Pembatalan",
+    "penyesuaian": "Penyesuaian manual",
+}
+
+class StockMoveOut(BaseModel):
+    id: int
+    store_id: Optional[int] = None
+    sparepart_id: int
+    nama_snapshot: str
+    tipe: str
+    tipe_label: str = ""
+    qty: int = 0
+    stok_sebelum: int = 0
+    stok_sesudah: int = 0
+    ref: Optional[str] = None
+    actor: Optional[str] = None
+    created_at: Optional[dt] = None
+    class Config:
+        from_attributes = True
+
 # ---------- Alat (multi-PC sync) ----------
 class AlatBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=120)

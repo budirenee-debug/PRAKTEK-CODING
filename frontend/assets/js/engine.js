@@ -135,6 +135,15 @@ async function renderKasToko(force){
         rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kode||('#'+s.id), tipe: '🛒 Penjualan', masuk: n, keluar: 0, ket: `${(s.items||[]).length} item • ${s.metode||''}${s.pelanggan?' • '+s.pelanggan:''}`});
       });
     }catch(e){}
+    // Pemasukan manual (modal awal / tambahan modal / lain) = masuk
+    let inManual = 0;
+    try{
+      const inc = await apiFetch('/finance/incomes');
+      (Array.isArray(inc)?inc:[]).forEach(s=>{
+        const n = Number(s.nominal)||0; if(n<=0) return; inManual += n; masukTotal += n;
+        rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kategori||'Masuk', tipe: '📥 Pemasukan', masuk: n, keluar: 0, ket: `${s.sumber||''}${s.dibuat_oleh?' • '+s.dibuat_oleh:''}`});
+      });
+    }catch(e){}
     // Keluar ke teknisi: komisi + hadir (dari buku kas masing-masing)
     let techKeluar = 0;
     try{
@@ -182,7 +191,7 @@ async function renderKasToko(force){
       });
     }catch(e){}
     const keluarTotal = techKeluar + refundKeluar + celakaKeluar + outKeluar;
-    set('kasTokoMasuk', _rp(masukTotal)); set('kasTokoMasukSub', cair.length + ' service cair + omzet barang (bruto)');
+    set('kasTokoMasuk', _rp(masukTotal)); set('kasTokoMasukSub', cair.length + ' service cair + omzet barang + manual ' + _rp(inManual));
     set('kasTokoKeluar', _rp(keluarTotal)); set('kasTokoKeluarSub', `teknisi ${_rp(techKeluar)} • refund ${_rp(refundKeluar)} • toko ${_rp(celakaKeluar)} • keluar ${_rp(outKeluar)}`);
     set('kasTokoSisa', _rp(masukTotal - keluarTotal));
     rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
@@ -253,6 +262,110 @@ async function operGaransi(invoice){
     if(typeof loadData==='function') await loadData(true);
     if(typeof renderStatusView==='function'){ renderStatusView('kanbanGaransi','Garansi'); }
   }catch(e){ showToast('Gagal oper: '+e.message); }
+}
+// ---------- Catat pemasukan manual langsung dari Kas Toko (kasir/owner/admin) ----------
+function kasInOpen(){
+  try{
+    const m = document.getElementById('kasInModal');
+    if(!m) return;
+    const t = document.getElementById('kasin-tanggal');
+    if(t && !t.value){
+      const d = new Date();
+      t.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+    kasInPreview();
+    m.classList.add('show');
+    setTimeout(()=>document.getElementById('kasin-sumber')?.focus(), 100);
+  }catch(e){}
+}
+function kasInClose(){
+  try{ document.getElementById('kasInModal')?.classList.remove('show'); }catch(e){}
+}
+function kasInPreview(){
+  try{
+    const n = parseInt(document.getElementById('kasin-nominal')?.value)||0;
+    const k = document.getElementById('kasin-kategori')?.value||'Modal Awal';
+    const c = document.getElementById('kasin-sumber')?.value.trim()||'-';
+    const info = document.getElementById('kasin-nominalInfo');
+    if(info) info.textContent = _rp(n);
+    const p = document.getElementById('kasin-preview');
+    if(p) p.innerHTML = n>0 ? `Akan dicatat: <strong>${_esc(k)}</strong> — ${_esc(c)} sebesar <strong>${_rp(n)}</strong> → masuk Total Masuk Kas Toko.` : 'Isi sumber + nominal dulu.';
+  }catch(e){}
+}
+async function kasInSave(e){
+  if(e) e.preventDefault();
+  try{
+    const sumber = document.getElementById('kasin-sumber')?.value.trim()||'';
+    const nominal = parseInt(document.getElementById('kasin-nominal')?.value)||0;
+    const kategori = document.getElementById('kasin-kategori')?.value||'Modal Awal';
+    const metode = document.getElementById('kasin-metode')?.value||'Tunai';
+    const tanggal = document.getElementById('kasin-tanggal')?.value||'';
+    const keterangan = document.getElementById('kasin-ket')?.value.trim()||'';
+    if(!sumber){ (window.showToast||alert)('Sumber wajib diisi'); return; }
+    if(nominal<=0){ (window.showToast||alert)('Nominal harus > 0'); return; }
+    const body = {sumber, nominal, kategori, metode};
+    if(tanggal) body.tanggal = tanggal;
+    if(keterangan) body.keterangan = keterangan;
+    await apiFetch('/finance/incomes', {method:'POST', body: JSON.stringify(body)});
+    kasInClose();
+    try{ document.getElementById('kasInForm')?.reset(); }catch(_){}
+    (window.showToast||alert)(`✅ Pemasukan ${kategori} ${_rp(nominal)} tersimpan — masuk Kas Toko`);
+    await renderKasToko(true);
+  }catch(err){
+    (window.showToast||alert)('Gagal simpan: '+(err.message||err));
+  }
+}
+// ---------- Catat pengeluaran langsung dari Kas Toko (kasir/owner/admin) ----------
+function kasOutOpen(){
+  try{
+    const m = document.getElementById('kasOutModal');
+    if(!m) return;
+    const t = document.getElementById('kasout-tanggal');
+    if(t && !t.value){
+      const d = new Date();
+      t.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+    kasOutPreview();
+    m.classList.add('show');
+    setTimeout(()=>document.getElementById('kasout-keperluan')?.focus(), 100);
+  }catch(e){}
+}
+function kasOutClose(){
+  try{ document.getElementById('kasOutModal')?.classList.remove('show'); }catch(e){}
+}
+function kasOutPreview(){
+  try{
+    const n = parseInt(document.getElementById('kasout-nominal')?.value)||0;
+    const k = document.getElementById('kasout-kategori')?.value||'Operasional';
+    const c = document.getElementById('kasout-keperluan')?.value.trim()||'-';
+    const info = document.getElementById('kasout-nominalInfo');
+    if(info) info.textContent = _rp(n);
+    const p = document.getElementById('kasout-preview');
+    if(p) p.innerHTML = n>0 ? `Akan dicatat: <strong>${_esc(k)}</strong> — ${_esc(c)} sebesar <strong>${_rp(n)}</strong> → masuk Total Keluar Kas Toko.` : 'Isi keperluan + nominal dulu.';
+  }catch(e){}
+}
+async function kasOutSave(e){
+  if(e) e.preventDefault();
+  try{
+    const keperluan = document.getElementById('kasout-keperluan')?.value.trim()||'';
+    const nominal = parseInt(document.getElementById('kasout-nominal')?.value)||0;
+    const kategori = document.getElementById('kasout-kategori')?.value||'Operasional';
+    const metode = document.getElementById('kasout-metode')?.value||'Tunai';
+    const tanggal = document.getElementById('kasout-tanggal')?.value||'';
+    const keterangan = document.getElementById('kasout-ket')?.value.trim()||'';
+    if(!keperluan){ (window.showToast||alert)('Keperluan wajib diisi'); return; }
+    if(nominal<=0){ (window.showToast||alert)('Nominal harus > 0'); return; }
+    const body = {keperluan, nominal, kategori, metode};
+    if(tanggal) body.tanggal = tanggal;
+    if(keterangan) body.keterangan = keterangan;
+    await apiFetch('/finance/expenses', {method:'POST', body: JSON.stringify(body)});
+    kasOutClose();
+    try{ document.getElementById('kasOutForm')?.reset(); }catch(_){}
+    (window.showToast||alert)(`✅ Pengeluaran ${kategori} ${_rp(nominal)} tersimpan — masuk Kas Toko`);
+    await renderKasToko(true);
+  }catch(err){
+    (window.showToast||alert)('Gagal simpan: '+(err.message||err));
+  }
 }
 // hook ke switchView lama
 (function(){

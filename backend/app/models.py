@@ -114,6 +114,28 @@ class Sparepart(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
+class StockMove(Base):
+    """Buku mutasi stok sparepart — jejak setiap perubahan stok.
+
+    Sumbernya satu-satuan: masuk (terima barang), pakai (ke service), jual (kasir),
+    batal (pakai dibatalkan / struk void), penyesuaian (edit manual tabel).
+    Tanpa tabel ini `masuk`/`keluar` cuma angka mati yang tidak bisa diaudit.
+    """
+    __tablename__ = "stock_moves"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    sparepart_id = Column(Integer, ForeignKey("spareparts.id"), nullable=False, index=True)
+    nama_snapshot = Column(String(120), nullable=False)
+    tipe = Column(String(20), nullable=False, index=True)  # masuk/pakai/jual/batal/penyesuaian
+    qty = Column(Integer, default=0)              # + menambah stok, - mengurangi stok
+    stok_sebelum = Column(Integer, default=0)
+    stok_sesudah = Column(Integer, default=0)
+    ref = Column(String(40), nullable=True)       # invoice service / kode struk / "-"
+    actor = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=func.now(), index=True)
+
+
 class Alat(Base):
     __tablename__ = "alats"
 
@@ -348,6 +370,23 @@ class Expense(Base):
     tanggal = Column(Date, default=datetime.date.today, index=True)
     kategori = Column(String(40), default="Operasional", index=True)  # Sewa/Listrik/Internet/Gaji/Belanja Part/Operasional/Lainnya
     keperluan = Column(String(200), nullable=False)  # mis. "Sewa ruko Oktober"
+    nominal = Column(Integer, default=0)
+    metode = Column(String(20), default="Tunai")  # Tunai / Transfer / QRIS
+    keterangan = Column(String(255), nullable=True)
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class CashIncome(Base):
+    """Pemasukan manual di luar service & penjualan: modal awal, tambahan modal, pemasukan lain.
+    Masuk Total Masuk Kas Toko + Laba-Rugi owner."""
+    __tablename__ = "cash_incomes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    kategori = Column(String(40), default="Modal Awal", index=True)  # Modal Awal/Tambahan Modal/Pemasukan Lain
+    sumber = Column(String(200), nullable=False)  # mis. "Modal awal laci kasir"
     nominal = Column(Integer, default=0)
     metode = Column(String(20), default="Tunai")  # Tunai / Transfer / QRIS
     keterangan = Column(String(255), nullable=True)

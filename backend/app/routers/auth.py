@@ -78,7 +78,7 @@ def _stores_for_login(db: Session, user) -> tuple[list, Optional[int]]:
         mems = db.query(models.Membership).filter(
             models.Membership.user_id == user.id,
             models.Membership.is_active == True,
-        ).all()
+        ).order_by(models.Membership.store_id).all()
         for m in mems:
             s = db.query(models.Store).filter(models.Store.id == m.store_id).first()
             if s and s.is_active:

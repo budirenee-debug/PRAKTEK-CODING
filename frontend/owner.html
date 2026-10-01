@@ -533,7 +533,19 @@
               <div class="stat-card"><div class="stat-head"><span>Laba Bulan Ini</span></div><h3 id="labaBulan">-</h3><p class="trend" id="labaBulanSub">-</p></div>
             </div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Komponen</th><th style="text-align:right">Hari Ini</th><th style="text-align:right">Bulan Ini</th></tr></thead><tbody id="tbodyLaba"><tr><td colspan="3" style="text-align:center">Memuat...</td></tr></tbody></table></div>
-            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rumus: Omzet cair bruto + profit barang/jasa − komisi teknisi − uang hadir − refund nominal − beban toko kecelakaan − pengeluaran = <strong>Laba bersih</strong>.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rumus: Omzet cair bruto + profit barang/jasa + pemasukan lain/modal − komisi teknisi − uang hadir − refund nominal − beban toko kecelakaan − pengeluaran = <strong>Laba bersih</strong>.</p>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📥 Pemasukan Manual</h3><span class="muted">Modal + lain (dari Kas Toko)</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownInList()">↻</button></div>
+            </div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="inBulan" style="color:#059669">-</h3><p class="trend" id="inBulanSub">-</p></div>
+              <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Total Tercatat</span></div><h3 id="inTotal">-</h3><p class="trend" id="inTotalSub">-</p></div>
+            </div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Metode</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyMasuk"><tr><td colspan="7" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Input dari <strong>Dashboard Toko → Kas Toko → + Catat Masuk</strong>. Salah input bisa dihapus di sini.</p>
           </div>
           <div class="modal" id="outModal">
             <div class="modal-box" style="max-width:480px">
@@ -638,20 +650,19 @@
               <div class="toolbar-right">
                 <div class="search-box small"><span>⌕</span><input id="searchSparepart" placeholder="Cari part, kategori, merk..." oninput="ownInvRenderSp()" onkeydown="if(event.key==='Escape'){this.value='';ownInvRenderSp()}"></div>
                 <select id="filterMerkSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>ROBOT</option><option>OLIKE</option><option>BASEUS</option><option>ANKER</option><option>UNEED</option><option>KAKU</option><option>HIPPO</option><option>ORIGINAL</option><option>GENERIC</option><option>LAIN</option></select>
-                <select id="filterKategoriSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select>
-                <button class="btn btn-ghost small" onclick="ownAccPreset()" title="Tampilkan hanya Aksesoris">🎧 Asesories</button>
+                <select id="filterKategoriSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select>
                 <label title="Rumus harga jual otomatis = beli + margin%" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#4b5563;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:7px 10px;white-space:nowrap">⚡ Margin <input id="ownMargin" type="number" min="0" max="1000" value="8" onchange="oMarginSave()" style="width:48px;padding:3px 6px;border:1px solid #d9d9de;border-radius:7px;font-size:12px;text-align:center">%</label>
                 <button class="btn btn-dark small" onclick="ownInvToggleAdd()">+ Tambah Item</button>
               </div>
             </div>
-            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">✏️ Tabel bisa langsung diubah: <strong>Masuk</strong> / <strong>Keluar</strong> / <strong>Stok</strong> / <strong>Beli</strong> / <strong>Jual</strong> lalu <strong>💾 Simpan</strong> per baris. Tombol <strong>⚡</strong> = hitung Jual otomatis dari Beli + margin di atas.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">🔒 <strong>Stok dikunci (auto = Masuk − Keluar)</strong> dari database. <strong>Masuk</strong> via tombol <strong>+ Masuk</strong>, <strong>Keluar</strong> via Pakai/Jual. Yang bisa diedit langsung: <strong>Beli</strong> / <strong>Jual</strong> lalu <strong>💾 Simpan</strong>.</p>
             <div class="card form-card" id="ownSpAddCard" style="display:none;box-shadow:none;border:1px solid #ececec;margin-bottom:12px">
               <div class="card-head"><h3>Tambah Sparepart</h3></div>
               <form id="spAddForm" onsubmit="ownInvSpAdd(event)">
                 <div class="form-grid">
                   <div class="field"><label>Nama Part *</label><input id="sp-nama" required placeholder="LCD iPhone 11, Baterai Samsung..."></div>
                   <div class="field"><label>Merk * (bebas ketik)</label><input id="sp-merk" required list="ownMerkList" placeholder="Contoh: Samsung / Robot" autocomplete="off"><datalist id="ownMerkList"></datalist></div>
-                  <div class="field"><label>Kategori *</label><select id="sp-kategori" required onchange="oMerkFill('ownMerkList', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                  <div class="field"><label>Kategori *</label><select id="sp-kategori" required onchange="oMerkFill('ownMerkList', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="" disabled selected>Pilih kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select></div>
                   <div class="field"><label>Barang Masuk *</label><input id="sp-masuk" type="number" min="0" required placeholder="0"></div>
                   <div class="field"><label>Harga Beli (Rp)</label><input id="sp-beli" type="text" inputmode="numeric" placeholder="300.000" oninput="oRpLive('sp-beli');oAutoJual('sp-beli','sp-harga')"><span style="font-size:11px;color:#8a8f98">Modal dari supplier → Jual terisi otomatis</span></div>
                   <div class="field"><label>Harga Jual (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="550.000" oninput="oRpLive('sp-harga','sp-harga-preview');this.dataset.auto=''"><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
@@ -678,12 +689,12 @@
                 <div class="field" style="margin-bottom:10px"><label>Nama Part *</label><input id="spEditNama" required placeholder="LCD iPhone 11"></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
                   <div class="field"><label>Merk * (bebas ketik)</label><input id="spEditMerk" required list="ownMerkListEdit" placeholder="Contoh: Robot" autocomplete="off"><datalist id="ownMerkListEdit"></datalist></div>
-                  <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="oMerkFill('ownMerkListEdit', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option><option>Aksesoris</option></select></div>
+                  <div class="field"><label>Kategori</label><select id="spEditKategori" onchange="oMerkFill('ownMerkListEdit', this.value)" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select></div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                  <div class="field"><label>Masuk</label><input id="spEditMasuk" type="number" min="0"></div>
-                  <div class="field"><label>Keluar</label><input id="spEditKeluar" type="number" min="0"></div>
-                  <div class="field"><label>Stok Akhir</label><input id="spEditStok" type="number" min="0"></div>
+                  <div class="field"><label>Masuk (🔒 dikunci)</label><input id="spEditMasuk" type="number" min="0" disabled title="Pakai +Masuk di tabel"></div>
+                  <div class="field"><label>Keluar (🔒 dikunci)</label><input id="spEditKeluar" type="number" min="0" disabled title="Keluar via Pakai/Jual"></div>
+                  <div class="field"><label>Stok Akhir (🔒 auto)</label><input id="spEditStok" type="number" min="0" disabled title="Stok = Masuk − Keluar"></div>
                   <div class="field"><label>Harga Beli (Rp)</label><input id="spEditBeli" type="text" inputmode="numeric" oninput="oRpLive('spEditBeli');oAutoJual('spEditBeli','spEditHarga')"></div>
                   <div class="field"><label>Harga Jual (Rp)</label><input id="spEditHarga" type="text" inputmode="numeric" oninput="oRpLive('spEditHarga','spEditHarga-preview');this.dataset.auto=''"><span id="spEditHarga-preview" style="font-size:11px;color:#059669;display:none">Rp 0</span></div>
                 </div>
@@ -693,6 +704,18 @@
                 </div>
               </form>
             </div>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>🎧 Asesories</h3><span class="count-pill" id="asesorisOwnCount">0 item</span><span id="asesorisOwnWarning" style="display:none;background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Stok tipis</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownInvLoad()">↻</button></div>
+            </div>
+            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">🎧 Kategori <strong>Aksesoris</strong> (read-only di sini) — kelola lengkap di <strong>Dashboard Toko → Asesories</strong>.</p>
+            <div class="table-wrap">
+              <table class="table compact"><thead><tr><th>Nama</th><th>Merk</th><th style="text-align:center">Masuk</th><th style="text-align:center">Keluar</th><th style="text-align:center">Stok</th><th style="text-align:right">Harga Jual</th><th style="text-align:right">Nilai</th></tr></thead>
+              <tbody id="tbodyAsesorisOwn"><tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table>
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:#8a8f98"><span id="asesorisOwnSummary">0 item</span></div>
           </div>
           <div class="card">
             <div class="card-head toolbar">
@@ -2114,7 +2137,31 @@
     async function ownOutDel(id){
       if(!confirm('Hapus catatan pengeluaran ini? (salah input)')) return;
       try{ await ownFetch('/finance/expenses/' + id, {method: 'DELETE'}); await ownKeluar(); }
-      catch(e){ try{ ownAlert('err', 'Gagal hapus: ' + e.message); }catch(_){} }
+      catch(e){ ownAlert('err', 'Gagal hapus: ' + e.message); }
+    }
+    async function ownInList(){
+      const tb = document.getElementById('tbodyMasuk');
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const [rows, ring] = await Promise.all([
+          ownFetch('/finance/incomes'),
+          ownFetch('/finance/incomes/ringkasan'),
+        ]);
+        const arr = Array.isArray(rows) ? rows : [];
+        set('inBulan', rp(ring.nominal_bulan_ini || 0));
+        set('inBulanSub', (ring.bulan_ini || 0) + ' catatan bulan ini');
+        set('inTotal', rp(ring.total_nominal || 0));
+        set('inTotalSub', (ring.total || 0) + ' catatan semua');
+        if(tb) tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.sumber || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#059669">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownInDel(${r.id})">🗑</button></td></tr>`).join('')
+          || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pemasukan manual — catat di Dashboard Toko → Kas Toko → + Catat Masuk</td></tr>';
+      }catch(e){
+        if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`;
+      }
+    }
+    async function ownInDel(id){
+      if(!confirm('Hapus catatan pemasukan ini? (salah input)')) return;
+      try{ await ownFetch('/finance/incomes/' + id, {method: 'DELETE'}); await ownInList(); await ownKeluar(); }
+      catch(e){ ownAlert('err', 'Gagal hapus: ' + e.message); }
     }
     async function ownKeluar(){
       const tb = document.getElementById('tbodyKeluar');
@@ -2142,6 +2189,7 @@
         tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
           || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
         await ownLaba();
+        await ownInList();
       }catch(e){
         if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`;
       }
@@ -2176,7 +2224,7 @@
             }catch(e){}
           }
         }catch(e){}
-        let refH = 0, refB = 0, celH = 0, celB = 0, outH = 0, outB = 0, jualH = 0, jualB = 0;
+        let refH = 0, refB = 0, celH = 0, celB = 0, outH = 0, outB = 0, jualH = 0, jualB = 0, inH = 0, inB = 0;
         try{
           const rf = await ownFetch('/finance/refunds');
           (Array.isArray(rf) ? rf : []).forEach(r => {
@@ -2203,6 +2251,14 @@
           });
         }catch(e){}
         try{
+          const ic = await ownFetch('/finance/incomes');
+          (Array.isArray(ic) ? ic : []).forEach(r => {
+            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
+            if(tt === today) inH += n;
+            if(tt.slice(0, 7) === ym) inB += n;
+          });
+        }catch(e){}
+        try{
           const sl = await ownFetch('/sales?limit=300');
           (Array.isArray(sl) ? sl : []).forEach(s => {
             const n = Number(s.profit) || 0, tt = String(s.tanggal || '').slice(0, 10);
@@ -2210,12 +2266,13 @@
             if(tt.slice(0, 7) === ym) jualB += n;
           });
         }catch(e){}
-        const labaH = omH + jualH - komH - hadH - refH - celH - outH;
-        const labaB = omB + jualB - komB - hadB - refB - celB - outB;
+        const labaH = omH + jualH + inH - komH - hadH - refH - celH - outH;
+        const labaB = omB + jualB + inB - komB - hadB - refB - celB - outB;
         const row = (label, h, b) => `<tr><td>${label}</td><td style="text-align:right">${rp(h)}</td><td style="text-align:right">${rp(b)}</td></tr>`;
         document.getElementById('tbodyLaba').innerHTML =
           row('➕ Omzet cair bruto', omH, omB) +
           row('➕ Profit barang/jasa', jualH, jualB) +
+          row('➕ Pemasukan lain/modal', inH, inB) +
           row('➖ Komisi teknisi', -komH, -komB) +
           row('➖ Uang hadir', -hadH, -hadB) +
           row('➖ Refund nominal', -refH, -refB) +
@@ -2250,13 +2307,6 @@
           document.getElementById('tbodyJualTop').innerHTML = ((ring.terlaris || []).map(t => `<tr><td><strong>${esc(t.nama)}</strong></td><td style="text-align:center">${t.qty}</td><td style="text-align:right">${rp(t.omzet)}</td><td style="text-align:right;color:#059669">${rp(t.profit)}</td></tr>`).join('')) || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Belum ada data</td></tr>';
         }catch(e){}
       }catch(e){ tb.innerHTML = `<tr><td colspan="9" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
-    }
-    function ownAccPreset(){
-      try{
-        const s = document.getElementById('filterKategoriSp');
-        s.value = (s.value === 'Aksesoris') ? '' : 'Aksesoris';
-        ownInvRenderSp();
-      }catch(e){}
     }
     async function ownJualVoid(id, kode){
       if(!confirm(`Void struk ${kode}? Stok barang kembali, struk dihapus.`)) return;
@@ -2566,6 +2616,7 @@
       }catch(e){ ownInvSp = []; ownInvAlat = []; }
       ownInvRenderSp();
       ownInvRenderAlat();
+      try{ ownInvRenderAcc(); }catch(e){}
       // Jika gudang toko aktif kosong, cek toko lain → kasih tahu user (kasus: stok di BGJ, aktif di REN)
       try{
         const note = document.getElementById('invStoreNote');
@@ -2607,9 +2658,10 @@
       const q = (document.getElementById('searchSparepart')?.value || '').toLowerCase();
       const fCat = document.getElementById('filterKategoriSp')?.value || '';
       const fMerk = document.getElementById('filterMerkSp')?.value || '';
-      let filtered = [...ownInvSp];
+      let baseSp = ownInvSp.filter(i => (i.kategori || '') !== 'Aksesoris');
+      let filtered = [...baseSp];
       if(q) filtered = filtered.filter(i => (i.nama + (i.merk || '') + i.kategori).toLowerCase().includes(q));
-      if(fCat) filtered = filtered.filter(i => i.kategori === fCat);
+      if(fCat && fCat !== 'Aksesoris') filtered = filtered.filter(i => i.kategori === fCat);
       if(fMerk) filtered = filtered.filter(i => oNormMerk(i.merk) === fMerk);
       const ord = {IPHONE:0,SAMSUNG:1,XIAOMI:2,OPPO:3,VIVO:4,INFINIX:5,LAIN:6};
       filtered.sort((a, b) => (ord[oNormMerk(a.merk)] ?? 6) - (ord[oNormMerk(b.merk)] ?? 6) || a.stok - b.stok);
@@ -2625,9 +2677,9 @@
             <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${esc(it.nama)}</strong><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar} → akhir ${it.stok}</span></div></td>
             <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${oMerkBadge(merkNorm)}">${esc(merkNorm)}</span></td>
             <td><span class="badge-status" style="background:#f3f4f6;border:1px solid #ececec;font-size:11px">${esc(it.kategori)}</span></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="ownInvSpField(${it.id},'masuk',this.value)"></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" style="width:70px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="ownInvSpField(${it.id},'keluar',this.value)"></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.stok}" id="osp-stok-${it.id}" style="width:80px;padding:6px 8px;border:1px solid ${it.stok <= 2 ? '#fecaca' : '#ececec'};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${it.stok <= 2 ? '#dc2626' : it.stok <= 5 ? '#b45309' : '#059669'}" onchange="ownInvSpField(${it.id},'stok',this.value)"></td>
+            <td style="text-align:center"><div style="font-weight:700;font-size:13px">+${it.masuk}</div><div style="font-size:9px;color:#8a8f98">masuk</div><button class="btn btn-ghost small" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="ownInvSpMasuk(${it.id})" title="Terima barang — catat ke database">+ Masuk</button></td>
+            <td style="text-align:center"><div style="font-weight:700;font-size:13px">−${it.keluar}</div><div style="font-size:9px;color:#8a8f98">keluar</div><button class="btn btn-ghost small" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="ownInvSpRiwayat(${it.id})" title="Riwayat masuk & keluar dari database">📜 Riwayat</button></td>
+            <td style="text-align:center"><span title="Stok = Masuk − Keluar (otomatis, tidak bisa diedit)" style="display:inline-block;min-width:56px;padding:7px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid;background:${stokBg};${it.stok <= 2 ? 'color:#dc2626;border-color:#fecaca' : it.stok <= 5 ? 'color:#b45309;border-color:#fde68a' : 'color:#059669;border-color:#a7f3d0'}">🔒 ${it.stok}</span><div style="font-size:9px;color:#8a8f98;margin-top:3px">auto</div></td>
             <td style="font-size:11px;color:#4b5563;white-space:nowrap;text-align:center">${esc(oFmtTgl(it.tgl))}</td>
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga_beli ? Number(it.harga_beli).toLocaleString('id-ID') : ''}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvSpField(${it.id},'harga_beli',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga_beli)}</div></td>
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvSpField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga)}</div></td>
@@ -2636,37 +2688,77 @@
         }).join('');
       }
       if(countEl) countEl.textContent = filtered.length + ' item';
-      const lowCount = ownInvSp.filter(i => i.stok <= 2).length;
+      const lowCount = baseSp.filter(i => i.stok <= 2).length;
       if(warnEl){ warnEl.style.display = lowCount ? 'inline-block' : 'none'; warnEl.textContent = lowCount ? `⚠ ${lowCount} stok tipis` : ''; }
-      if(sumEl) sumEl.textContent = `${ownInvSp.length} item • Total nilai stok (jual): ${rp(ownInvSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Menampilkan ${filtered.length}`;
+      if(sumEl) sumEl.textContent = `${baseSp.length} item • Total nilai stok (jual): ${rp(baseSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Menampilkan ${filtered.length} (tanpa Aksesoris)`;
     }
     async function ownInvSpField(id, field, val){
+      // Stok / Masuk / Keluar dikunci: stok = Masuk − Keluar (otomatis dari database).
+      if(field === 'masuk' || field === 'keluar' || field === 'stok'){
+        ownAlert('err', '🔒 Stok otomatis = Masuk − Keluar. Pakai +Masuk untuk terima barang.');
+        try{ ownInvRenderSp(); }catch(e){}
+        return;
+      }
       const it = ownInvSp.find(x => x.id === id);
       if(!it) return;
       const n = (field === 'harga' || field === 'harga_beli') ? oParseRp(val) : (parseInt(val) || 0);
-      if(field === 'masuk') it.masuk = n;
-      else if(field === 'keluar') it.keluar = n;
-      else if(field === 'stok') it.stok = n;
-      else if(field === 'harga') it.harga = n;
+      if(field === 'harga') it.harga = n;
       else if(field === 'harga_beli') it.harga_beli = n;
-      if(field === 'masuk' || field === 'keluar'){
-        it.stok = Math.max(0, (parseInt(it.masuk) || 0) - (parseInt(it.keluar) || 0));
-        const stokInput = document.getElementById(`osp-stok-${id}`);
-        if(stokInput) stokInput.value = it.stok;
-      }
       it.tgl = oToday();
-      try{ await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga, harga_beli: it.harga_beli, tgl: it.tgl})}); }
+      try{ await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({harga: it.harga, harga_beli: it.harga_beli})}); }
       catch(e){ ownAlert('err', 'Gagal simpan: ' + e.message); await ownInvLoad(); return; }
       const sumEl = document.getElementById('sparepartSummary');
       if(sumEl) sumEl.textContent = `${ownInvSp.length} item • Total nilai stok (jual): ${rp(ownInvSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Tersimpan ✅`;
+    }
+    // ----- Asesories owner: read-only (kelola di Dashboard Toko) -----
+    function ownInvRenderAcc(){
+      const tbody = document.getElementById('tbodyAsesorisOwn');
+      if(!tbody) return;
+      const countEl = document.getElementById('asesorisOwnCount');
+      const warnEl = document.getElementById('asesorisOwnWarning');
+      const sumEl = document.getElementById('asesorisOwnSummary');
+      const list = (ownInvSp || []).filter(i => (i.kategori || '') === 'Aksesoris').sort((a, b) => a.stok - b.stok);
+      const stokStyle = (v) => v <= 2 ? 'background:#fef2f2;color:#dc2626;border-color:#fecaca' : v <= 5 ? 'background:#fffbeb;color:#b45309;border-color:#fde68a' : 'background:#ecfdf5;color:#059669;border-color:#a7f3d0';
+      tbody.innerHTML = list.map(it => `<tr><td><strong style="font-size:12px">${esc(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id}</span></td><td>${esc(oNormMerk(it.merk))}</td><td style="text-align:center">+${it.masuk}</td><td style="text-align:center">−${it.keluar}</td><td style="text-align:center"><span style="display:inline-block;min-width:48px;padding:5px 10px;border-radius:10px;font-size:12px;font-weight:800;border:1px solid;${stokStyle(it.stok)}">🔒 ${it.stok}</span></td><td style="text-align:right;font-weight:700">${rp(it.harga)}</td><td style="text-align:right;color:#4b5563">${rp((it.stok || 0) * (it.harga || 0))}</td></tr>`).join('')
+        || '<tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Belum ada asesories — tambah di Dashboard Toko → Asesories</td></tr>';
+      if(countEl) countEl.textContent = list.length + ' item';
+      const low = list.filter(i => i.stok <= 2).length;
+      if(warnEl){ warnEl.style.display = low ? 'inline-block' : 'none'; warnEl.textContent = low ? `⚠ ${low} stok tipis` : ''; }
+      if(sumEl) sumEl.textContent = `${list.length} item • Total nilai stok: ${rp(list.reduce((s, i) => s + (i.stok || 0) * (i.harga || 0), 0))}`;
+    }
+    async function ownInvSpMasuk(id){
+      const it = ownInvSp.find(x => x.id === id);
+      if(!it) return;
+      const qtyRaw = prompt(`Terima barang untuk "${it.nama}"\nStok sekarang: ${it.stok} (Masuk ${it.masuk} − Keluar ${it.keluar})\n\nJumlah masuk:`, '1');
+      if(qtyRaw === null) return;
+      const qty = parseInt(qtyRaw) || 0;
+      if(qty <= 0) return ownAlert('err', 'Jumlah harus >= 1');
+      const ref = prompt('No. nota supplier / PO (opsional):', '') || '';
+      try{
+        const q = `?qty=${encodeURIComponent(qty)}` + (ref.trim() ? `&ref=${encodeURIComponent(ref.trim())}` : '');
+        const updated = await ownFetch(`/inventory/spareparts/${id}/masuk${q}`, {method: 'POST'});
+        await ownInvLoad();
+        ownAlert('ok', `✅ Masuk +${qty} — "${updated.nama || it.nama}" stok ${updated.stok} (DB)`);
+      }catch(e){ ownAlert('err', 'Gagal catat masuk: ' + e.message); }
+    }
+    async function ownInvSpRiwayat(id){
+      const it = ownInvSp.find(x => x.id === id);
+      const nama = it ? it.nama : ('#' + id);
+      ownAlert('ok', 'Memuat riwayat ' + nama + '...');
+      try{
+        const rows = await ownFetch(`/inventory/spareparts/${id}/riwayat?limit=50`);
+        if(!rows || !rows.length) return ownAlert('ok', nama + ': belum ada mutasi — terima via +Masuk dulu');
+        const txt = rows.slice(0, 10).map(r => `${String(r.created_at||'').slice(0,16).replace('T',' ')} • ${r.tipe_label||r.tipe} ${r.qty>0?'+':''}${r.qty} (${r.stok_sebelum}→${r.stok_sesudah}) ${r.ref||''}`).join('\n');
+        alert(`📜 ${nama}\nMasuk +${it.masuk} • Keluar −${it.keluar} • Stok 🔒${it.stok}\n\n${txt}${rows.length>10?`\n... +${rows.length-10} lagi`:''}`);
+      }catch(e){ ownAlert('err', 'Gagal muat riwayat: ' + e.message); }
     }
     async function ownInvSpSave(id){
       const it = ownInvSp.find(x => x.id === id);
       if(!it) return;
       try{
-        await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({masuk: it.masuk, keluar: it.keluar, stok: it.stok, harga: it.harga, harga_beli: it.harga_beli, tgl: oToday()})});
+        await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({harga: it.harga, harga_beli: it.harga_beli})});
         await ownInvLoad();
-        ownAlert('ok', `✅ ${it.nama} disimpan — Masuk ${it.masuk}, Keluar ${it.keluar}, Stok ${it.stok}, Beli ${rp(it.harga_beli)}, Jual ${rp(it.harga)}`);
+        ownAlert('ok', `✅ ${it.nama} disimpan — Masuk ${it.masuk}, Keluar ${it.keluar}, Stok 🔒${it.stok}, Beli ${rp(it.harga_beli)}, Jual ${rp(it.harga)}`);
       }catch(e){ ownAlert('err', 'Gagal simpan: ' + e.message); }
     }
     async function ownInvSpDel(id){
@@ -2737,15 +2829,13 @@
       const nama = document.getElementById('spEditNama').value.trim();
       const merk = oNormMerk(document.getElementById('spEditMerk')?.value || 'LAIN');
       const kategori = document.getElementById('spEditKategori').value;
-      const masuk = parseInt(document.getElementById('spEditMasuk').value) || 0;
-      const keluar = parseInt(document.getElementById('spEditKeluar').value) || 0;
-      const stok = parseInt(document.getElementById('spEditStok').value) || 0;
+      if(kategori === 'Aksesoris') return ownAlert('err', '🎧 Aksesoris pindah ke tab Asesories kasir — edit dari sana');
       const harga_beli = oParseRp(document.getElementById('spEditBeli').value);
       const harga = oParseRp(document.getElementById('spEditHarga').value);
       if(!nama) return ownAlert('err', 'Nama wajib');
       if(ownInvSp.some(x => x.id !== id && x.nama.toLowerCase() === nama.toLowerCase())) return ownAlert('err', 'Nama sudah dipakai item lain');
       try{
-        await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli, tgl: oToday()})});
+        await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({nama, merk, kategori, harga, harga_beli})});
         ownInvSpClose();
         await ownInvLoad();
         ownAlert('ok', `✎ ${nama} diperbarui`);
