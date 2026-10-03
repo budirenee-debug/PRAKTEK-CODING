@@ -30,6 +30,7 @@
       window.__dashGuardReplace = guardReplace;
     })();
     </script>
+    <script src="assets/js/embed.js?v=uni1"></script>
 </head>
 <body>
     <div class="app">
@@ -842,7 +843,14 @@
                             <div class="form-grid">
                                 <div class="field"><label>Keperluan *</label><input id="kasout-keperluan" required placeholder="Bayar listrik November"></div>
                                 <div class="field"><label>Nominal (Rp) *</label><input id="kasout-nominal" type="number" min="1" required placeholder="500000" oninput="kasOutPreview()"><span id="kasout-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
-                                <div class="field"><label>Kategori *</label><select id="kasout-kategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Listrik</option><option>Internet</option><option>Sewa</option><option>Gaji</option><option>Belanja Part</option><option>Operasional</option><option>Lainnya</option></select></div>
+                                <div class="field"><label>Kategori (mentor) *</label><select id="kasout-kategori" onchange="kasOutPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="C4">Operasional Harian</option><option value="C1">Gaji & Upah</option><option value="C2">Tempat (sewa/listrik/air)</option><option value="C3">Internet & Sistem</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="B1">Belanja Sparepart (HPP)</option><option value="B2">Belanja Accessories (HPP)</option><option value="D">Aset / Investasi</option></select></div>
+                                <div class="field" id="kasout-subWrap" style="display:none"><label>Jenis D *</label><select id="kasout-sub" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Aset</option><option>Investasi</option></select></div>
+                                <div id="kasout-stokWrap" style="display:none;grid-column:1/-1;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px">
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                        <div class="field" style="flex:2;min-width:150px;margin:0"><label>➕ Tambah ke stok (opsional)</label><select id="kasout-sp" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="">— tidak tambah stok —</option></select></div>
+                                        <div class="field" style="flex:1;min-width:80px;margin:0"><label>Qty</label><input id="kasout-spqty" type="number" min="1" placeholder="5"></div>
+                                    </div>
+                                </div>
                                 <div class="field"><label>Metode</label><select id="kasout-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
                                 <div class="field"><label>Tanggal</label><input id="kasout-tanggal" type="date"></div>
                                 <div class="field"><label>Keterangan</label><input id="kasout-ket" placeholder="Opsional"></div>

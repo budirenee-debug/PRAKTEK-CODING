@@ -86,16 +86,12 @@
     } catch (e) {}
   }
 
-  // Target landing per role (flow 3 lapis):
-  // 1. landing.html publik (beranda pengenalan produk)
-  // 2. owner.html — owner/admin/superadmin (pengaturan toko + laporan keuangan)
-  // 3. index.html — dashboard toko (admin/owner full, kasir/teknisi terbatas di dalamnya)
+  // Target landing per role (1 dashboard):
+  // app.html = SATU pintu (sidebar unified, view beda per role).
+  // index.html / owner.html tetap jalan sebagai konten di dalam iframe app.html.
   // Kembalikan URL agar mudah di-test.
   function landingFor(role) {
-    const r = (role || '').trim().toLowerCase();
-    if (r === 'superadmin' || r === 'owner' || r === 'admin') return 'owner.html';
-    if (r === 'kasir' || r === 'teknisi') return 'index.html';
-    return 'index.html';
+    return 'app.html';
   }
 
   function redirectAfterLogin(data) {

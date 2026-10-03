@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOS SERVICE — 1 Dashboard</title>
+  <meta name="description" content="Satu dashboard BOS SERVICE: toko + keuangan + owner. View menyesuaikan peran.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css?v=black2">
+  <style>
+    html.guard-lock body{visibility:hidden}
+    .app-shell{display:flex;min-height:100vh}
+    .app-frame{flex:1;border:0;width:100%;min-height:100vh;background:#f6f6f7}
+    .menu-item.locked{opacity:.45}
+    .role-pill{font-size:10.5px;font-weight:700;background:#04074a;color:#fff;border-radius:20px;padding:2px 9px;margin-left:6px}
+    .uni-note{margin:10px 12px 0;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:8px 11px;font-size:11.5px;line-height:1.5}
+    @media(max-width:860px){
+      .sidebar{position:fixed;z-index:60;transform:translateX(-105%);transition:transform .25s}
+      .sidebar.open{transform:none}
+      .sidebar-overlay.show{display:block}
+      .app-frame{min-height:100vh;min-height:100dvh}
+      #uniFab{display:block !important}
+    }
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:55}
+  </style>
+  <script>
+  (function(){
+    try{ document.documentElement.classList.add('guard-lock'); }catch(e){}
+    function needLogin(){ try{ return !localStorage.getItem('access_token'); }catch(e){ return true; } }
+    if(needLogin()){ try{ location.replace('login.html'); }catch(e){ location.href='login.html'; } }
+    window.addEventListener('pageshow', function(){
+      try{ if(!localStorage.getItem('access_token')) location.replace('login.html'); }catch(e){}
+    });
+  })();
+  </script>
+</head>
+<body>
+  <div class="app app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="brand-icon">◈</div>
+          <div>
+            <h2>BOS SERVICE</h2>
+            <p>1 Dashboard<span id="rolePill" class="role-pill">-</span></p>
+          </div>
+        </div>
+        <div class="store-switch" style="padding:8px 12px 0">
+          <label for="uniStoreSel" style="font-size:10.5px;color:#9aa0a6;display:block;margin-bottom:4px">🏪 Toko aktif</label>
+          <select id="uniStoreSel" onchange="uniSwitchStore(this.value)" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid #2a2c2f;background:#1b1d1f;color:#e5e7eb;font-size:12px;outline:0"></select>
+        </div>
+        <nav class="menu" id="uniMenu">
+          <div class="menu-category">TOKO</div>
+          <button class="menu-item active" data-src="index.html" onclick="uniGo(this,'index.html','Dashboard Toko','Service • kasir • stok')">
+            <span class="mi">🏬</span> Dashboard Toko
+          </button>
+          <button class="menu-item" data-src="lacak.html" onclick="uniGo(this,'lacak.html','Lacak Service','Cek posisi HP pelanggan')">
+            <span class="mi">🔍</span> Lacak Service
+          </button>
+          <div class="menu-category" data-need="finance">KEUANGAN</div>
+          <button class="menu-item" data-need="finance" data-src="owner.html" onclick="uniGo(this,'owner.html','Keuangan','Kas teknisi • celaka • refund • pengeluaran')">
+            <span class="mi">💰</span> Keuangan
+          </button>
+          <div class="menu-category" data-need="manage">OWNER</div>
+          <button class="menu-item" data-need="manage" data-src="owner.html" onclick="uniGo(this,'owner.html','Owner Space','Ringkasan • laporan • kontrol')">
+            <span class="mi">▦</span> Owner Space
+          </button>
+          <button class="menu-item" data-need="manage" data-src="dev.html" onclick="uniGo(this,'dev.html','Dev','Superadmin only')">
+            <span class="mi">🛠</span> Dev
+          </button>
+          <div class="menu-category">NAVIGASI</div>
+          <a class="menu-item" href="landing.html" style="text-decoration:none">
+            <span class="mi">⌂</span> Beranda
+          </a>
+        </nav>
+        <div class="uni-note" id="uniNote">Memeriksa sesi...</div>
+      </div>
+      <div class="sidebar-bottom">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button class="btn btn-ghost small" style="flex:1" onclick="uniReload()" title="Muat ulang isi">↻ Reload isi</button>
+          <button class="btn btn-ghost small" style="flex:1" onclick="uniFullscreen()" title="Layar penuh">⛶ Full</button>
+        </div>
+        <div class="user-card">
+          <img src="https://i.pravatar.cc/100?img=33" alt="user" id="uni-avatar">
+          <div>
+            <strong id="uni-username">-</strong>
+            <span id="uni-role">-</span>
+          </div>
+          <button class="icon-btn" onclick="uniLogout()" title="Keluar">⎋</button>
+        </div>
+        <button class="btn-logout" onclick="uniLogout()" title="Keluar dari akun">
+          <span class="logout-icon">⎋</span> Logout
+        </button>
+        <div class="store-info">
+          <span>● 1 Dashboard</span>
+          <span id="app-ver">vUNI-1</span>
+        </div>
+      </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <main class="main" style="flex:1;min-width:0">
+      <button id="uniFab" onclick="toggleSidebar()" title="Menu" style="display:none;position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:70;width:46px;height:46px;border-radius:50%;border:1px solid #26262b;background:#0c0c0e;color:#fafafa;font-size:19px;box-shadow:0 6px 20px rgba(0,0,0,.4)">☰</button>
+      <iframe id="appFrame" class="app-frame" src="index.html" title="BOS content"></iframe>
+    </main>
+  </div>
+
+  <script src="assets/js/auth.js?v=role2"></script>
+  <script>
+    function toggleSidebar(){
+      try{
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebarOverlay').classList.toggle('show');
+      }catch(e){}
+    }
+    function closeSidebar(){
+      try{
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('show');
+      }catch(e){}
+    }
+    function uniGo(btn, src){
+      try{
+        document.querySelectorAll('#uniMenu .menu-item').forEach(function(b){ b.classList.remove('active'); });
+        if(btn) btn.classList.add('active');
+        document.getElementById('appFrame').src = src;
+        try{ localStorage.setItem('uni_last', src); }catch(e){}
+      }catch(e){}
+      closeSidebar();
+    }
+    function uniReload(){
+      try{ document.getElementById('appFrame').contentWindow.location.reload(); }catch(e){
+        try{ document.getElementById('appFrame').src = document.getElementById('appFrame').src; }catch(_){}
+      }
+    }
+    function uniFullscreen(){
+      try{
+        var f = document.getElementById('appFrame');
+        if(f.requestFullscreen) f.requestFullscreen();
+        else window.open(f.src, '_blank');
+      }catch(e){}
+    }
+    function uniLogout(){ try{ window.BOSAuth.logout(); }catch(e){ location.href='login.html'; } }
+    function uniSwitchStore(id){
+      try{ localStorage.setItem('active_store_id', String(id)); }catch(e){}
+      uniReload();
+    }
+    function fillStores(){
+      var sel = document.getElementById('uniStoreSel');
+      if(!sel) return;
+      var stores = [], active = null;
+      try{
+        stores = window.BOSAuth ? window.BOSAuth.getStores() : JSON.parse(localStorage.getItem('bos_stores')||'[]');
+        active = window.BOSAuth ? window.BOSAuth.getActiveStoreId() : parseInt(localStorage.getItem('active_store_id')||'',10);
+      }catch(e){}
+      sel.innerHTML = '';
+      (stores||[]).forEach(function(s){
+        var o = document.createElement('option');
+        o.value = s.id; o.textContent = (s.kode? s.kode+' • ':'') + (s.nama||('Toko '+s.id));
+        if(s.id === active) o.selected = true;
+        sel.appendChild(o);
+      });
+      if(!(stores||[]).length){
+        var o = document.createElement('option');
+        o.textContent = 'Belum ada toko'; sel.appendChild(o);
+      }
+    }
+    async function uniBoot(){
+      try{ document.documentElement.classList.remove('guard-lock'); }catch(e){}
+      if(!window.BOSAuth){ document.getElementById('uniNote').textContent = 'auth.js gagal load — refresh halaman.'; return; }
+      if(!window.BOSAuth.requireTokenOrRedirect()) return;
+      var v = await window.BOSAuth.validateSession();
+      if(!v.ok){
+        if(v.reason === 'expired') return; // sudah ditendang ke login
+        document.getElementById('uniNote').textContent = 'Offline / sesi tidak bisa divalidasi ('+v.reason+') — menu toko tetap bisa dibuka, data dari cache.';
+      } else {
+        document.getElementById('uniNote').textContent = 'SATU pintu: Toko + Keuangan + Owner. Kategori A–G mentor tahap berikutnya — tab lama tetap jalan.';
+      }
+      var role = window.BOSAuth.myActiveRole() || window.BOSAuth.getGlobalRole() || '-';
+      var uname = ''; try{ uname = localStorage.getItem('username') || ''; }catch(e){}
+      document.getElementById('rolePill').textContent = role;
+      document.getElementById('uni-username').textContent = uname || 'Pengguna';
+      document.getElementById('uni-role').textContent = role;
+      var canFin = window.BOSAuth.canSeeFinance();
+      var canManage = window.BOSAuth.canManage();
+      document.querySelectorAll('[data-need="finance"]').forEach(function(el){ el.style.display = canFin ? '' : 'none'; });
+      document.querySelectorAll('[data-need="manage"]').forEach(function(el){ el.style.display = canManage ? '' : 'none'; });
+      if(!canFin && !canManage){
+        document.getElementById('uniNote').textContent = 'Mode kasir/teknisi: hanya Dashboard Toko + Lacak. Keuangan disembunyikan.';
+      }
+      fillStores();
+      // default frame: owner roles -> owner.html, lainnya index.html (samakan landingFor lama)
+      var last = null; try{ last = localStorage.getItem('uni_last'); }catch(e){}
+      var def = (role==='superadmin'||role==='owner'||role==='admin') ? 'owner.html' : 'index.html';
+      var src = last || def;
+      var btn = document.querySelector('#uniMenu .menu-item[data-src="'+src+'"]');
+      // teknisi/kasir jangan default ke owner/dev
+      if((!canFin && src==='owner.html') || (!canManage && src==='dev.html')){ src='index.html'; btn=document.querySelector('#uniMenu .menu-item[data-src="index.html"]'); }
+      document.querySelectorAll('#uniMenu .menu-item').forEach(function(b){ b.classList.remove('active'); });
+      if(btn) btn.classList.add('active');
+      document.getElementById('appFrame').src = src;
+    }
+    window.addEventListener('pageshow', function(ev){ if(ev.persisted){ try{ document.documentElement.classList.remove('guard-lock'); }catch(e){} } });
+    uniBoot();
+  </script>
+</body>
+</html>

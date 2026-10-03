@@ -72,7 +72,7 @@
       alert.className = 'alert ' + kind; alert.textContent = msg; alert.style.display = 'block';
     }
 
-    // Sudah login owner tapi pencet Back → langsung ke owner.html.
+    // Sudah login owner tapi pencet Back → langsung ke app.html (1 dashboard).
     async function bounceIfOwner(){
       let token = null;
       try{ token = window.BOSAuth ? window.BOSAuth.getToken() : localStorage.getItem('access_token'); }catch(e){}
@@ -83,7 +83,7 @@
           const me = await res.json().catch(()=>null);
           try{ if(me && me.role) localStorage.setItem('role', String(me.role).toLowerCase()); }catch(e){}
           const role = window.BOSAuth ? window.BOSAuth.myActiveRole() : String((me && me.role) || '').toLowerCase();
-          if(['superadmin','owner','admin'].includes(role)) location.replace('owner.html');
+          if(['superadmin','owner','admin'].includes(role)) location.replace('app.html');
           // teknisi/kasir: biarkan di halaman ini agar dapat pesan penolakan jelas saat login ulang
         }
         else if(res.status === 401){
@@ -121,8 +121,8 @@
           try{ if(window.BOSAuth) window.BOSAuth.logout(true); else localStorage.removeItem('access_token'); }catch(e){}
           throw new Error('⛔ Akun "' + u + '" (' + (role || 'tanpa peran') + ') bukan owner/admin. Pakai login toko untuk kasir/teknisi.');
         }
-        showMsg('ok', 'Berhasil! Membuka Owner Space...');
-        setTimeout(()=> location.replace('owner.html'), 600);
+        showMsg('ok', 'Berhasil! Membuka 1 Dashboard...');
+        setTimeout(()=> location.replace('app.html'), 600);
       }catch(err){
         showMsg('err', String(err.message || 'Gagal login'));
       }
