@@ -82,6 +82,35 @@ def _migrate_deadline():
         print("migrate deadline fail:", e)
 _migrate_deadline()
 
+def _migrate_ledger():
+    """Pondasi mentor: tambah subkategori (Aset/Investasi) di ledger_entries untuk DB lama."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(ledger_entries)")).fetchall()]
+            if "subkategori" not in cols:
+                conn.execute(text("ALTER TABLE ledger_entries ADD COLUMN subkategori VARCHAR(40)"))
+                print("migrated: ledger subkategori")
+            if "masuk_laba" not in cols:
+                conn.execute(text("ALTER TABLE ledger_entries ADD COLUMN masuk_laba BOOLEAN DEFAULT 1"))
+                print("migrated: ledger masuk_laba")
+            if "pengaruh_kas" not in cols:
+                conn.execute(text("ALTER TABLE ledger_entries ADD COLUMN pengaruh_kas BOOLEAN DEFAULT 1"))
+                print("migrated: ledger pengaruh_kas")
+            conn.commit()
+            # Prinsip mentor: belanja barang (expense B1/B2) = PERSEDIAAN, bukan HPP.
+            # HPP terbentuk saat terjual/terpakai (auto-post sales/service).
+            try:
+                conn.execute(text(
+                    "UPDATE ledger_entries SET masuk_laba = 0 "
+                    "WHERE ref_type = 'expense' AND kategori IN ('B1', 'B2')"))
+                conn.commit()
+            except Exception as e2:
+                print("backfill persediaan skip:", e2)
+    except Exception as e:
+        print("migrate ledger fail:", e)
+_migrate_ledger()
+
 def _migrate_garansi():
     """Klaim garansi tanpa input baru: tambah garansi_hari/garansi_sampai/garansi_dari untuk DB lama."""
     try:

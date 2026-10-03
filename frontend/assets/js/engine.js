@@ -187,7 +187,8 @@ async function renderKasToko(force){
       const xlist = Array.isArray(ex)?ex:(ex.rows||[]);
       xlist.forEach(r=>{
         const n = Number(r.nominal)||0; if(n<=0) return; outKeluar += n;
-        rows.push({t: String(r.tanggal||'').slice(0,10), ref: r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`});
+        const KL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
+        rows.push({t: String(r.tanggal||'').slice(0,10), ref: KL[r.kategori]||r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`});
       });
     }catch(e){}
     const keluarTotal = techKeluar + refundKeluar + celakaKeluar + outKeluar;
@@ -336,26 +337,52 @@ function kasOutClose(){
 function kasOutPreview(){
   try{
     const n = parseInt(document.getElementById('kasout-nominal')?.value)||0;
-    const k = document.getElementById('kasout-kategori')?.value||'Operasional';
+    const k = document.getElementById('kasout-kategori')?.value||'C4';
     const c = document.getElementById('kasout-keperluan')?.value.trim()||'-';
+    const LBL = {B1:'Belanja Sparepart (HPP)',B2:'Belanja Accessories (HPP)',C1:'Gaji & Upah',C2:'Tempat',C3:'Internet & Sistem',C4:'Operasional Harian',C5:'Marketing',C6:'Maintenance',D:'Aset/Investasi'};
+    try{ document.getElementById('kasout-subWrap').style.display = k==='D' ? '' : 'none'; }catch(e){}
+    try{
+      document.getElementById('kasout-stokWrap').style.display = (k==='B1'||k==='B2') ? '' : 'none';
+      if(k==='B1'||k==='B2') kasOutSpFill();
+    }catch(e){}
     const info = document.getElementById('kasout-nominalInfo');
     if(info) info.textContent = _rp(n);
+    const dest = (k==='B1'||k==='B2') ? 'HPP' : k==='D' ? 'Aset (bukan biaya bulan ini)' : 'Operasional';
     const p = document.getElementById('kasout-preview');
-    if(p) p.innerHTML = n>0 ? `Akan dicatat: <strong>${_esc(k)}</strong> — ${_esc(c)} sebesar <strong>${_rp(n)}</strong> → masuk Total Keluar Kas Toko.` : 'Isi keperluan + nominal dulu.';
+    if(p) p.innerHTML = n>0 ? `Akan dicatat: <strong>${_esc(LBL[k]||k)}</strong> — ${_esc(c)} sebesar <strong>${_rp(n)}</strong> → masuk <strong>${dest}</strong> + buku besar.` : 'Isi keperluan + nominal dulu.';
   }catch(e){}
+}
+let _kasOutSpFilled = false;
+async function kasOutSpFill(){
+  if(_kasOutSpFilled) return; _kasOutSpFilled = true;
+  try{
+    const sp = await apiFetch('/inventory/spareparts');
+    const sel = document.getElementById('kasout-sp');
+    (Array.isArray(sp)?sp:[]).slice(0,300).forEach(s=>{
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = `${s.nama||'-'} (stok ${s.stok ?? '?'})`;
+      sel.appendChild(o);
+    });
+  }catch(e){ _kasOutSpFilled = false; }
 }
 async function kasOutSave(e){
   if(e) e.preventDefault();
   try{
     const keperluan = document.getElementById('kasout-keperluan')?.value.trim()||'';
     const nominal = parseInt(document.getElementById('kasout-nominal')?.value)||0;
-    const kategori = document.getElementById('kasout-kategori')?.value||'Operasional';
+    const kategori = document.getElementById('kasout-kategori')?.value||'C4';
     const metode = document.getElementById('kasout-metode')?.value||'Tunai';
     const tanggal = document.getElementById('kasout-tanggal')?.value||'';
     const keterangan = document.getElementById('kasout-ket')?.value.trim()||'';
     if(!keperluan){ (window.showToast||alert)('Keperluan wajib diisi'); return; }
     if(nominal<=0){ (window.showToast||alert)('Nominal harus > 0'); return; }
     const body = {keperluan, nominal, kategori, metode};
+    if(kategori==='D') body.subkategori = document.getElementById('kasout-sub')?.value||'Aset';
+    try{
+      const spId = parseInt(document.getElementById('kasout-sp')?.value)||0;
+      const spQty = parseInt(document.getElementById('kasout-spqty')?.value)||0;
+      if((kategori==='B1'||kategori==='B2')&&spId&&spQty>0) body.tambah_stok = {sparepart_id: spId, qty: spQty};
+    }catch(e){}
     if(tanggal) body.tanggal = tanggal;
     if(keterangan) body.keterangan = keterangan;
     await apiFetch('/finance/expenses', {method:'POST', body: JSON.stringify(body)});

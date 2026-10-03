@@ -165,6 +165,38 @@
 - Kode toko (prefix nomor nota) dibuka: validasi 2-5 huruf/angka, unik antar toko. Nota lama tidak berubah (tersimpan), nota baru ikut kode baru. Berlaku di Pengaturan Toko + Profil Toko Owner. `script.js?v=ambil22`.
 - Uji: kode spasi ditolak, ganti TST → nota `TST-2026-0001` ✓, kembalikan BGJ ✓ + `node --check` LULUS.
 
+## 5n. PONDASI PEMBUKUAN MENTOR — KATEGORI A-G + BUKU BESAR + TUTUP KAS (4 Okt 2026, belum commit)
+- **Sumber:** `konsep pembukuan toko.docx` (SATU pembukuan, aliran dibedakan fungsi; Omzet ≠ uang tersedia ≠ laba; 5 angka; tutup kas harian; kas kecil).
+- **Backend** (`ledger_meta.py` baru = single source kategori): A1-A4 omzet, B1-B3 HPP, C1-C6 operasional, D aset, E1 modal/E2 prive, F1 transfer/F2 hutang/F3 DP, G media (kas_utama/kas_kecil/bank/qris). Validasi: F1 wajib transfer + beda media (bukan omzet), E1 masuk, E2 keluar, DP bukan omzet.
+- **Model** (`models.py`): `LedgerEntry` (tanggal/jenis/kategori/nominal/media + ref dual-write), `CashClose` (sistem vs fisik per media + selisih), `CashConfig` (limit kas kecil, default Rp500rb). Auto-create via `create_all`, tanpa migrasi.
+- **Endpoint** (`routers/finance.py`): `GET /finance/kategori` (dropdown frontend), `GET/POST/DELETE /finance/ledger` (manual; hapus auto ditolak), `GET /finance/ledger/ringkasan` (omzet−HPP=laba kotor−operasional=laba bersih + per-media), `GET/PUT /finance/cash/config`, `GET/POST /finance/cash/close` (selisih target Rp0, kasir boleh tutup).
+- **Dual-write:** expense → B1/C1-C4 + income → E1/A4 otomatis masuk ledger (media dari metode bayar); hapus sumber ikut hapus baris ledger. Data lama tidak diubah.
+- **Uji:** TestClient DB temp 26/26 LULUS (validasi, dual-write, hapus guard, ringkasan, config, tutup kas).
+- **Berikutnya:** UI Transaksi Pusat + Tutup Kas (baca `/finance/kategori`), auto-posting service/sales ke ledger, limit kas kecil final owner.
+
+## 5o. HUB KEUANGAN SATU ALUR MENTOR (4 Okt 2026, belum commit)
+- Menu mencar (Pendapatan Sukses/Pembayaran/Pengeluaran/Buku Besar/Tutup Kas) disembunyikan → lebur ke **Keuangan** 6 sub-tab: 📊 Arus (5 angka via `ownArus` cache) • 💰 Pendapatan (service cair + refund) • 🧾 HPP & Komisi (kas teknisi + celaka) • 🏪 Operasional (pengeluaran + laba) • 💳 Kas (metode + tutup kas) • 📒 Buku Besar.
+- Teknik: panel lama **dipindah DOM** (`ownHubMove`, class `view` dilepas) — tanpa duplikat kode/fungsi, loader lama dipakai ulang. `ownKeuTab` lama dihapus. `ownLoadAll` + `ownBuku/ownClose`.
+- Uji: ID hub lengkap + inline `node --check` LULUS.
+
+## 5p. HUB 7 TAB MENTOR + EXPENSE KODE MENTOR (4 Okt 2026, belum commit)
+- Keuangan → 8 sub-tab: 💰 Pendapatan (union service cair + kasir barang/jasa + lain + refund, filter A1-A4) • 🧾 HPP & Komisi (panel kas teknisi + B1/B2/B3 buku besar + insiden) • 🏪 Operasional (C1-C6 + panel pengeluaran) • 🏗 Aset (sub Aset/Investasi) • 👑 Owner (E1/E2) • 🔁 Non-Biaya (F1/F2/F3) • 💳 Kas & Media (saldo per media + bayar + tutup kas) • 📒 Buku Besar. Tab Arus dihapus (indikator sehat jadi tab lain nanti).
+- Backend: `ledger.subkategori` + migrasi ALTER, expense terima kode mentor (B1/B2/C1-C6/D, nama lama kompatibel), filter kategori ikut memetakan lama→kode, `POST /ledger` + expense D wajib subkategori, `GET /ledger?subkategori=`.
+- Form Pengeluaran (owner + toko Kas Toko) ganti dropdown ke kode mentor + Jenis D; preview tulis tujuan HPP/Operasional/Aset; Kas Toko ikut nampil kode.
+- Uji: backend 35/35 + inline `node --check` LULUS. Unit (A3/B3) + aset masih kosong jujur (modul menyusul, bisa Catat Manual).
+
+## 5q. GRUP MENTOR JADI MENU UTAMA (4 Okt 2026, belum commit)
+- Protes user benar: grup (HPP/operasional/aset/...) jangan jadi sub-tab. Sidebar KEUANGAN kini 8 menu utama: Pendapatan, HPP & Komisi, Operasional, Aset, Owner, Non-Biaya, Kas & Media, Buku Besar — via `ownShowKeu()` + judul per grup + highlight tepat. Baris sub-tab hub dihapus; sub-tab dalam grup (A1-A4, C1-C6, dll) tetap sebagai filter.
+- Uji: 8 menu + 8 panel + nav OK, inline `node --check` LULUS.
+
+## 5r. PRINSIP MENTOR DIKUNCI: BELI=PERSEDIAAN, JUAL/PAKAI=HPP (4 Okt 2026, belum commit)
+- Audit menemukan 5 lubang: belanja langsung HPP + tanpa stok; jual tanpa posting buku; pakai part tanpa HPP di mana pun; sukses tanpa omzet/HPP jasa; refund hanya koreksi layar.
+- Ledger +2 flag: `masuk_laba` (belanja B = persediaan, HPP saat terjual/terpakai) + `pengaruh_kas` (HPP tanpa gerak kas, media `stok`). Migrasi ALTER + backfill expense-B lama → persediaan.
+- Auto-post (idempoten, anti-gagal): jual → omzet + HPP barang; Sukses → omzet jasa + komisi (HPP); pakai part → HPP modal; refund → pengurang omzet; void/batal hapus barisnya.
+- Belanja B1/B2 opsional ➕ tambah stok (mutasi `beli`) — form owner + toko.
+- UI: badge 📦 Persediaan di tab HPP + kartu HPP-only (persediaan di sub), Buku Besar tampil subkategori.
+- Uji: TestClient 50/50 (stok 8−1+5=12, HPP=komisi+part+sale, kas tidak ganda).
+
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3→BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.
 - Nanti: laporan gabungan owner, paket/billing, root `/` → landing (butuh edit `main.py`).

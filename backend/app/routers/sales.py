@@ -6,6 +6,7 @@ import datetime
 
 from ..database import get_db
 from .. import models, crud
+from .. import ledger_meta as lm
 from ..audit import log_action
 from ..store_ctx import resolve_store, store_role, default_store
 from .auth import get_current_user
@@ -178,6 +179,35 @@ def create_sale(payload: dict = Body(...), store_id: Optional[int] = Query(None)
                                harga_jual=b["jual"], harga_beli=b["beli"], profit=b["profit"]))
     db.commit()
     db.refresh(s)
+    # Buku besar (prinsip mentor): TERJUAL = omzet terbentuk + HPP terbentuk.
+    # HPP tanpa gerak kas (kas sudah keluar saat beli). Void menghapus baris ini.
+    try:
+        from .finance import _ledger_add
+        media = lm.METODE_KE_MEDIA.get(metode, "kas_utama")
+        oleh = getattr(current, "username", None)
+        om_barang = sum(b["jual"] * b["qty"] for b in built if b["tipe"] == "barang")
+        om_jasa = sum(b["jual"] * b["qty"] for b in built if b["tipe"] == "jasa")
+        hpp_barang = sum((b["jual"] - b["beli"]) * b["qty"] for b in built if b["tipe"] == "barang")
+        if om_barang > 0:
+            _ledger_add(db, store.id, tanggal, "masuk", "A2",
+                        f"Kasir {s.kode}: accessories/barang", om_barang, media,
+                        ref_type="sale", ref_id=s.id, oleh=oleh)
+        if om_jasa > 0:
+            _ledger_add(db, store.id, tanggal, "masuk", "A4",
+                        f"Kasir {s.kode}: jasa", om_jasa, media,
+                        ref_type="sale_jasa", ref_id=s.id, oleh=oleh)
+        if hpp_barang > 0:
+            _ledger_add(db, store.id, tanggal, "keluar", "B2",
+                        f"HPP {s.kode}: modal barang terjual", hpp_barang, "stok",
+                        ref_type="sale_hpp", ref_id=s.id, oleh=oleh,
+                        masuk_laba=True, pengaruh_kas=False)
+        db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("ledger sale skip:", e)
     log_action(db, "sale.create", target=s.kode,
                detail=f"{len(built)} item total={total} profit={profit} metode={metode}",
                actor=current, store_id=store.id)
@@ -209,6 +239,11 @@ def void_sale(sale_id: int, store_id: Optional[int] = Query(None),
         db.delete(i)
     info = f"{s.kode} total={s.total} profit={s.profit}"
     db.flush()  # pastikan item terhapus dulu (FK sale_items.sale_id)
+    # void = omzet & HPP yang terbentuk ikut batal
+    db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == s.store_id,
+        models.LedgerEntry.ref_type.in_(["sale", "sale_jasa", "sale_hpp"]),
+        models.LedgerEntry.ref_id == s.id).delete(synchronize_session=False)
     db.delete(s)
     db.commit()
     log_action(db, "sale.void", target=s.kode or f"JL-{sale_id}",

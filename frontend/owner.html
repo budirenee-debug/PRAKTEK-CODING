@@ -25,15 +25,33 @@
     .own-grid21{margin-bottom:12px;display:grid;grid-template-columns:2fr 1fr;gap:12px}
     .own-grid21 .card{margin-bottom:0}
     /* mode padat: rapatkan kartu, tabel & stat khusus owner */
-    #ownWrap .stats{gap:8px;margin-bottom:10px}
-    #ownWrap .stat-card{padding:10px 12px}
-    #ownWrap .stat-card h3{font-size:19px;margin:2px 0}
-    #ownWrap .stat-card .trend{font-size:10.5px;margin-top:2px}
-    #ownWrap .card{padding:14px;margin-bottom:12px}
-    #ownWrap .card .card-head{margin-bottom:8px}
-    #ownWrap .card h3{font-size:14px}
-    #ownWrap .table{font-size:12px}
-    #ownWrap .table th, #ownWrap .table td{padding:6px 8px}
+    #ownWrap{font-size:12.5px}
+    #ownWrap .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
+    #ownWrap .stat-card{padding:8px 10px;border-radius:10px}
+    #ownWrap .stat-card h3{font-size:17px;margin:1px 0}
+    #ownWrap .stat-card .stat-head{font-size:11px;margin-bottom:2px}
+    #ownWrap .stat-card .trend{font-size:10px;margin-top:1px}
+    #ownWrap .stat-card .stat-icon{width:20px;height:20px;font-size:11px;border-radius:6px}
+    #ownWrap .card{padding:10px 12px;margin-bottom:8px;border-radius:12px}
+    #ownWrap .card .card-head{margin-bottom:6px}
+    #ownWrap .card h3{font-size:13px}
+    #ownWrap .card .muted{font-size:11px}
+    #ownWrap .table{font-size:11.5px}
+    #ownWrap .table th{padding:5px 6px;font-size:10px}
+    #ownWrap .table td{padding:5px 6px}
+    #ownWrap .tabs{gap:6px;margin-bottom:8px}
+    #ownWrap .tabs .tab{padding:6px 10px;font-size:11.5px}
+    #ownWrap .own-grid2,#ownWrap .own-grid21{gap:8px;margin-bottom:8px}
+    #ownWrap .toolbar-right .btn.small{padding:5px 8px;font-size:11px}
+    @media(max-width:1100px){
+      #ownWrap .stats{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(max-width:860px){
+      #ownWrap .stats{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:420px){
+      #ownWrap .stats{grid-template-columns:1fr}
+    }
     .bayar-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #f3f4f6;font-size:12.5px}
     .bayar-row:last-child{border-bottom:0}
     @media(max-width:860px){
@@ -92,6 +110,7 @@
     });
   })();
   </script>
+  <script src="assets/js/embed.js?v=uni1"></script>
 </head>
 <body>
   <div class="app">
@@ -114,17 +133,44 @@
             <span class="mi">▦</span> Ringkasan
           </button>
           <div class="menu-category">KEUANGAN</div>
-          <button class="menu-item" data-own="keuangan" onclick="ownShow('keuangan')">
-            <span class="mi">💰</span> Keuangan
+          <button class="menu-item" data-own="keuangan" data-hubmenu="pendapatan" onclick="ownShowKeu('pendapatan', this)">
+            <span class="mi">💰</span> Pendapatan
           </button>
-          <button class="menu-item" data-own="finsukses" onclick="ownShow('finsukses')">
+          <button class="menu-item" data-own="keuangan" data-hubmenu="hpp" onclick="ownShowKeu('hpp', this)">
+            <span class="mi">🧾</span> HPP / Modal
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="operasional" onclick="ownShowKeu('operasional', this)">
+            <span class="mi">🏪</span> Operasional
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="aset" onclick="ownShowKeu('aset', this)">
+            <span class="mi">🏗</span> Aset
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="owner" onclick="ownShowKeu('owner', this)">
+            <span class="mi">👑</span> Owner
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="non" onclick="ownShowKeu('non', this)">
+            <span class="mi">🔁</span> Non-Biaya
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="kas" onclick="ownShowKeu('kas', this)">
+            <span class="mi">💳</span> Kas & Media
+          </button>
+          <button class="menu-item" data-own="keuangan" data-hubmenu="buku" onclick="ownShowKeu('buku', this)">
+            <span class="mi">📒</span> Buku Besar
+          </button>
+          <button class="menu-item" data-own="finsukses" onclick="ownShow('finsukses')" style="display:none">
             <span class="mi">✅</span> Pendapatan Sukses
           </button>
-          <button class="menu-item" data-own="bayar" onclick="ownShow('bayar')">
+          <button class="menu-item" data-own="bayar" onclick="ownShow('bayar')" style="display:none">
             <span class="mi">💳</span> Pembayaran
           </button>
-          <button class="menu-item" data-own="keluar" onclick="ownShow('keluar')">
+          <button class="menu-item" data-own="keluar" onclick="ownShow('keluar')" style="display:none">
             <span class="mi">🧾</span> Pengeluaran
+          </button>
+          <button class="menu-item" data-own="bukubesar" onclick="ownShow('bukubesar')" style="display:none">
+            <span class="mi">📒</span> Buku Besar
+          </button>
+          <button class="menu-item" data-own="tutupkas" onclick="ownShow('tutupkas')" style="display:none">
+            <span class="mi">🌙</span> Tutup Kas
           </button>
           <div class="menu-category">USAHA</div>
           <button class="menu-item" data-own="penjualan" onclick="ownShow('penjualan')">
@@ -208,33 +254,37 @@
         <section class="view active" id="view-own-ringkas">
           <div id="demoBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px">🧪 <strong>DATA CONTOH (demo)</strong> — toko belum ada service, angka di bawah hanya ilustrasi. Otomatis terganti data asli setelah ada service masuk.</div>
           <div class="stats">
-            <div class="stat-card" onclick="ownShow('keuangan')" style="cursor:pointer;border-left:4px solid #059669">
-              <div class="stat-head"><span>💰 Pendapatan Hari Ini</span><span class="stat-icon">💰</span></div>
-              <h3 id="finHari">-</h3><p class="trend" id="finHariSub">cair hari ini</p>
+            <div class="stat-card" onclick="ownShow('penjualan')" style="cursor:pointer;border-left:4px solid #059669">
+              <div class="stat-head"><span>① Omzet Hari Ini</span><span class="stat-icon">💰</span></div>
+              <h3 id="mOmzet">-</h3><p class="trend" id="mOmzetSub">service + penjualan − refund</p>
             </div>
             <div class="stat-card" style="border-left:4px solid #2563eb">
-              <div class="stat-head"><span>7 Hari Terakhir</span><span class="stat-icon blue">📊</span></div>
-              <h3 id="fin7">-</h3><p class="trend" id="fin7Sub">-</p>
-            </div>
-            <div class="stat-card" style="border-left:4px solid #7c3aed">
-              <div class="stat-head"><span>Bulan Ini</span><span class="stat-icon">🗓</span></div>
-              <h3 id="finBulan">-</h3><p class="trend" id="finBulanSub">-</p>
-            </div>
-            <div class="stat-card" style="border-left:4px solid #0891b2">
-              <div class="stat-head"><span>Rata-rata / Service</span><span class="stat-icon">🧮</span></div>
-              <h3 id="finAvg">-</h3><p class="trend" id="finAvgSub">bulan ini</p>
-            </div>
-            <div class="stat-card" style="border-left:4px solid #dc2626">
-              <div class="stat-head"><span>Pengeluaran Hari Ini</span><span class="stat-icon">🧾</span></div>
-              <h3 id="outHari" style="color:#dc2626">-</h3><p class="trend" id="outHariSub">pengeluaran hari ini</p>
-            </div>
-            <div class="stat-card" onclick="ownShow('keuangan')" style="cursor:pointer;border-left:4px solid #ef4444">
-              <div class="stat-head"><span>Hutang Teknisi</span><span class="stat-icon">⚠</span></div>
-              <h3 id="stHutang" style="color:#ef4444">-</h3><p class="trend">aktif • klik → keuangan</p>
+              <div class="stat-head"><span>② Laba Kotor</span><span class="stat-icon blue">📊</span></div>
+              <h3 id="mKotor">-</h3><p class="trend" id="mKotorSub">omzet − HPP hari ini</p>
             </div>
             <div class="stat-card" style="border-left:4px solid #f59e0b">
-              <div class="stat-head"><span>Belum Bayar</span><span class="stat-icon">⏳</span></div>
-              <h3 id="finBelum">-</h3><p class="trend" id="finBelumSub">sukses tanpa metode bayar</p>
+              <div class="stat-head"><span>③ Biaya Operasional</span><span class="stat-icon">🧾</span></div>
+              <h3 id="mOps">-</h3><p class="trend" id="mOpsSub">pengeluaran + uang hadir</p>
+            </div>
+            <div class="stat-card" style="border-left:4px solid #7c3aed">
+              <div class="stat-head"><span>④ Laba Bersih</span><span class="stat-icon">✅</span></div>
+              <h3 id="mLaba">-</h3><p class="trend" id="mLabaSub">laba kotor − operasional</p>
+            </div>
+            <div class="stat-card" style="border-left:4px solid #04074a">
+              <div class="stat-head"><span>⑤ Saldo Kas (estimasi)</span><span class="stat-icon">🏦</span></div>
+              <h3 id="mSaldo">-</h3><p class="trend" id="mSaldoSub">tanpa saldo awal • cocokkan via Tutup Kas</p>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#8a8f98;margin:0 0 12px">Rumus mentor: <strong>Omzet − HPP = Laba Kotor</strong> → Laba Kotor − Operasional = <strong>Laba Bersih</strong>. HPP = komisi teknisi + modal barang terjual + beban toko kecelakaan. Komisi teknisi masuk HPP (biaya langsung service), bukan operasional.</p>
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📋 Laporan Harian</h3><span class="muted" id="lapDate">-</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownAnalytics()">↻</button></div>
+            </div>
+            <div class="table-wrap"><table class="table compact"><tbody id="tbodyLapHarian"><tr><td style="text-align:center;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+            <div class="own-grid2" style="margin-top:10px;margin-bottom:0">
+              <div style="font-size:12px;color:#4b5563;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px"><strong>💵 Uang per media (masuk hari ini)</strong><br><span id="lapMedia">-</span></div>
+              <div style="font-size:12px;color:#4b5563;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px"><strong>🧮 Selisih kas</strong><br><span id="lapSelisih">-</span></div>
             </div>
           </div>
           <div class="stats">
@@ -253,6 +303,14 @@
             <div class="stat-card" style="border-left:4px solid #059669">
               <div class="stat-head"><span>Sukses</span><span class="stat-icon">✓</span></div>
               <h3 id="stSukses">-</h3><p class="trend">siap/dihitung pendapatan</p>
+            </div>
+            <div class="stat-card" onclick="ownShow('keuangan')" style="cursor:pointer;border-left:4px solid #ef4444">
+              <div class="stat-head"><span>Hutang Teknisi</span><span class="stat-icon">⚠</span></div>
+              <h3 id="stHutang" style="color:#ef4444">-</h3><p class="trend">aktif • klik → keuangan</p>
+            </div>
+            <div class="stat-card" style="border-left:4px solid #f59e0b">
+              <div class="stat-head"><span>Belum Bayar</span><span class="stat-icon">⏳</span></div>
+              <h3 id="finBelum">-</h3><p class="trend" id="finBelumSub">sukses tanpa metode bayar</p>
             </div>
             <div class="stat-card" style="display:none">
               <div class="stat-head"><span>Estimasi</span></div>
@@ -303,13 +361,110 @@
           </div>
         </section>
 
-        <!-- KEUANGAN: sub-tab Kas Teknisi / Kecelakaan Kerja / Refund Dana -->
+        <!-- KEUANGAN: 7 grup mentor sebagai menu utama (navigasi via sidebar) -->
         <section class="view" id="view-own-keuangan">
-          <div class="tabs" style="margin-bottom:12px">
-            <button class="tab active" data-ownkeu="kas" onclick="ownKeuTab('kas')">💰 Kas Teknisi</button>
-            <button class="tab" data-ownkeu="celaka" onclick="ownKeuTab('celaka')">🛠 Kecelakaan Kerja</button>
-            <button class="tab" data-ownkeu="refund" onclick="ownKeuTab('refund')">💸 Refund Dana</button>
+          <div id="hubPanel-pendapatan">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="pend" data-subk="all" onclick="ownPendSub('all')">Semua</button>
+              <button class="tab" data-subg="pend" data-subk="A1" onclick="ownPendSub('A1')">🛠 Jasa Service</button>
+              <button class="tab" data-subg="pend" data-subk="A2" onclick="ownPendSub('A2')">🎧 Accessories</button>
+              <button class="tab" data-subg="pend" data-subk="A3" onclick="ownPendSub('A3')">📱 Unit</button>
+              <button class="tab" data-subg="pend" data-subk="A4" onclick="ownPendSub('A4')">➕ Lain</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>💰 Pendapatan</h3><span class="muted" id="pendSub">service + kasir + lain − refund</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownRefundOpen()">− Refund</button><button class="btn btn-ghost small" onclick="ownPendapatan(true)">↻</button></div></div>
+              <div class="stats" id="pendCards" style="margin-bottom:10px">
+                <div class="stat-card" onclick="ownPendSub('A1')" style="cursor:pointer;border-left:4px solid #059669"><div class="stat-head"><span>🛠 Jasa Service</span></div><h3 id="pendTotA1">-</h3><p class="trend" id="pendCntA1">-</p></div>
+                <div class="stat-card" onclick="ownPendSub('A2')" style="cursor:pointer;border-left:4px solid #2563eb"><div class="stat-head"><span>🎧 Accessories</span></div><h3 id="pendTotA2">-</h3><p class="trend" id="pendCntA2">-</p></div>
+                <div class="stat-card" onclick="ownPendSub('A3')" style="cursor:pointer;border-left:4px solid #7c3aed"><div class="stat-head"><span>📱 Unit</span></div><h3 id="pendTotA3">-</h3><p class="trend" id="pendCntA3">-</p></div>
+                <div class="stat-card" onclick="ownPendSub('A4')" style="cursor:pointer;border-left:4px solid #f59e0b"><div class="stat-head"><span>➕ Lain</span></div><h3 id="pendTotA4">-</h3><p class="trend" id="pendCntA4">-</p></div>
+              </div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyPend"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+            <div id="hubPendapatan"></div>
           </div>
+          <div id="hubPanel-hpp" style="display:none">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="hpp" data-subk="all" onclick="ownHppSub('all')">Semua</button>
+              <button class="tab" data-subg="hpp" data-subk="komisi" onclick="ownHppSub('komisi')">👷 Komisi Teknisi</button>
+              <button class="tab" data-subg="hpp" data-subk="B1" onclick="ownHppSub('B1')">🔩 Sparepart</button>
+              <button class="tab" data-subg="hpp" data-subk="B2" onclick="ownHppSub('B2')">🎧 Accessories</button>
+              <button class="tab" data-subg="hpp" data-subk="B3" onclick="ownHppSub('B3')">📱 Unit</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>🧾 HPP / Modal</h3><span class="muted" id="hppSub">komisi + modal barang − langsung terkait penjualan</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownHpp(true)">↻</button></div></div>
+              <div class="stats" id="hppCards" style="margin-bottom:10px">
+                <div class="stat-card" onclick="ownHppSub('komisi')" style="cursor:pointer;border-left:4px solid #059669"><div class="stat-head"><span>👷 Komisi Teknisi</span></div><h3 id="hppTotKomisi">-</h3><p class="trend" id="hppCntKomisi">-</p></div>
+                <div class="stat-card" onclick="ownHppSub('B1')" style="cursor:pointer;border-left:4px solid #2563eb"><div class="stat-head"><span>🔩 Sparepart</span></div><h3 id="hppTotB1">-</h3><p class="trend" id="hppCntB1">-</p></div>
+                <div class="stat-card" onclick="ownHppSub('B2')" style="cursor:pointer;border-left:4px solid #7c3aed"><div class="stat-head"><span>🎧 Accessories</span></div><h3 id="hppTotB2">-</h3><p class="trend" id="hppCntB2">-</p></div>
+                <div class="stat-card" onclick="ownHppSub('B3')" style="cursor:pointer;border-left:4px solid #f59e0b"><div class="stat-head"><span>📱 Unit</span></div><h3 id="hppTotB3">-</h3><p class="trend" id="hppCntB3">-</p></div>
+              </div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyHpp"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+            <div id="hubHppKomisi"></div>
+            <div class="card" style="margin-top:12px"><div class="card-head"><h3>🛠 Insiden Kerja (beban)</h3><span class="muted">beban toko = HPP • beban teknisi = hutang</span></div><div id="hubHppCelaka"></div></div>
+          </div>
+          <div id="hubPanel-operasional" style="display:none">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="ops" data-subk="all" onclick="ownOpsSub('all')">Semua</button>
+              <button class="tab" data-subg="ops" data-subk="C1" onclick="ownOpsSub('C1')">C1 Gaji</button>
+              <button class="tab" data-subg="ops" data-subk="C2" onclick="ownOpsSub('C2')">C2 Tempat</button>
+              <button class="tab" data-subg="ops" data-subk="C3" onclick="ownOpsSub('C3')">C3 Internet</button>
+              <button class="tab" data-subg="ops" data-subk="C4" onclick="ownOpsSub('C4')">C4 Harian</button>
+              <button class="tab" data-subg="ops" data-subk="C5" onclick="ownOpsSub('C5')">C5 Marketing</button>
+              <button class="tab" data-subg="ops" data-subk="C6" onclick="ownOpsSub('C6')">C6 Maintenance</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>🏪 Biaya Operasional</h3><span class="muted" id="opsSub">buku besar C1–C6 + uang hadir</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOperasional(true)">↻</button></div></div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyOps"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+            <div id="hubOperasional"></div>
+          </div>
+          <div id="hubPanel-aset" style="display:none">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="aset" data-subk="all" onclick="ownAsetSub('all')">Semua</button>
+              <button class="tab" data-subg="aset" data-subk="Aset" onclick="ownAsetSub('Aset')">🏗 Aset</button>
+              <button class="tab" data-subg="aset" data-subk="Investasi" onclick="ownAsetSub('Investasi')">📈 Investasi</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>🏗 Aset / Investasi (D)</h3><span class="muted">tidak langsung mengecilkan laba • isi via Buku Besar → Catat Manual</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownAset(true)">↻</button></div></div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyAset"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+          </div>
+          <div id="hubPanel-owner" style="display:none">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="own" data-subk="all" onclick="ownOwnerSub('all')">Semua</button>
+              <button class="tab" data-subg="own" data-subk="E1" onclick="ownOwnerSub('E1')">💵 Modal Owner</button>
+              <button class="tab" data-subg="own" data-subk="E2" onclick="ownOwnerSub('E2')">💸 Prive</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>👑 Transaksi Owner</h3><span class="muted">modal/prive BUKAN omzet & bukan biaya • isi via Buku Besar → Catat Manual</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOwnerTab(true)">↻</button></div></div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyOwner"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+          </div>
+          <div id="hubPanel-non" style="display:none">
+            <div class="tabs" style="margin-bottom:12px">
+              <button class="tab active" data-subg="non" data-subk="all" onclick="ownNonSub('all')">Semua</button>
+              <button class="tab" data-subg="non" data-subk="F1" onclick="ownNonSub('F1')">🔁 Transfer Media</button>
+              <button class="tab" data-subg="non" data-subk="F2" onclick="ownNonSub('F2')">🤝 Hutang</button>
+              <button class="tab" data-subg="non" data-subk="F3" onclick="ownNonSub('F3')">🧾 DP Customer</button>
+            </div>
+            <div class="card">
+              <div class="card-head toolbar">              <div class="toolbar-left"><h3>🔁 Non-Pendapatan / Non-Biaya</h3><span class="muted" id="nonHint">bergerak tapi bukan omzet & bukan biaya</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownNonTab(true)">↻</button></div></div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyNon"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
+          </div>
+          <div id="hubPanel-kas" style="display:none">
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Kas Utama</span></div><h3 id="mdU">-</h3><p class="trend">laci kasir</p></div>
+              <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Kas Kecil</span></div><h3 id="mdK">-</h3><p class="trend" id="mdKSub">operasional harian</p></div>
+              <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="stat-head"><span>Bank</span></div><h3 id="mdB">-</h3><p class="trend">rekening</p></div>
+              <div class="stat-card" style="border-left:4px solid #0891b2"><div class="stat-head"><span>QRIS / E-Wallet</span></div><h3 id="mdQ">-</h3><p class="trend">dompet digital</p></div>
+            </div>
+            <p style="font-size:11px;color:#8a8f98;margin:0 0 10px" id="mdNote">Saldo sistem per media (buku besar).</p>
+            <div id="hubKas"></div>
+          </div>
+          <div id="hubPanel-buku" style="display:none"><div id="hubBuku"></div></div>
 
           <div id="ownKeuPanel-kas">
           <div class="tabs" style="margin-bottom:12px">
@@ -510,7 +665,7 @@
             <div class="card-head toolbar">
               <div class="toolbar-left"><h3>🧾 Pengeluaran</h3><span class="muted">Belanja + operasional toko</span></div>
               <div class="toolbar-right">
-                <select id="outFilterKat" onchange="ownKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option>Sewa</option><option>Listrik</option><option>Internet</option><option>Gaji</option><option>Belanja Part</option><option>Operasional</option><option>Lainnya</option></select>
+                <select id="outFilterKat" onchange="ownKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option value="B1">Sparepart</option><option value="B2">Accessories</option><option value="C1">Gaji</option><option value="C2">Tempat</option><option value="C3">Internet</option><option value="C4">Harian</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="D">Aset</option></select>
                 <button class="btn btn-ghost small" onclick="ownKeluar()">↻</button>
                 <button class="btn btn-dark small" onclick="ownOutOpen()">+ Catat Keluar</button>
               </div>
@@ -533,7 +688,7 @@
               <div class="stat-card"><div class="stat-head"><span>Laba Bulan Ini</span></div><h3 id="labaBulan">-</h3><p class="trend" id="labaBulanSub">-</p></div>
             </div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Komponen</th><th style="text-align:right">Hari Ini</th><th style="text-align:right">Bulan Ini</th></tr></thead><tbody id="tbodyLaba"><tr><td colspan="3" style="text-align:center">Memuat...</td></tr></tbody></table></div>
-            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rumus: Omzet cair bruto + profit barang/jasa + pemasukan lain/modal − komisi teknisi − uang hadir − refund nominal − beban toko kecelakaan − pengeluaran = <strong>Laba bersih</strong>.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Rumus mentor: (Service cair + Penjualan kasir − Refund) − (Komisi teknisi + Modal barang terjual + Beban toko kecelakaan) − (Pengeluaran + Uang hadir) = <strong>Laba bersih</strong>. Pemasukan lain/modal masuk kas tapi <strong>bukan omzet</strong>.</p>
           </div>
           <div class="card" style="margin-top:12px">
             <div class="card-head toolbar">
@@ -556,7 +711,15 @@
                 <div class="form-grid">
                   <div class="field"><label>Keperluan *</label><input id="out-keperluan" required placeholder="Sewa ruko Oktober"></div>
                   <div class="field"><label>Nominal (Rp) *</label><input id="out-nominal" type="number" min="1" required placeholder="2500000" oninput="ownOutPreview()"><span id="out-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
-                  <div class="field"><label>Kategori *</label><select id="out-kategori" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Operasional</option><option>Sewa</option><option>Listrik</option><option>Internet</option><option>Gaji</option><option>Belanja Part</option><option>Lainnya</option></select></div>
+                  <div class="field"><label>Kategori (mentor) *</label><select id="out-kategori" onchange="ownOutKat()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="C4">Operasional Harian</option><option value="C1">Gaji & Upah</option><option value="C2">Tempat (sewa/listrik/air)</option><option value="C3">Internet & Sistem</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="B1">Belanja Sparepart (HPP)</option><option value="B2">Belanja Accessories (HPP)</option><option value="D">Aset / Investasi</option></select></div>
+                  <div class="field" id="out-subWrap" style="display:none"><label>Jenis D *</label><select id="out-sub" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Aset</option><option>Investasi</option></select></div>
+                  <div id="out-stokWrap" style="display:none;grid-column:1/-1;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                      <div class="field" style="flex:2;min-width:160px;margin:0"><label>➕ Tambah ke stok (opsional)</label><select id="out-sp" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="">— tidak tambah stok —</option></select></div>
+                      <div class="field" style="flex:1;min-width:90px;margin:0"><label>Qty</label><input id="out-spqty" type="number" min="1" placeholder="5"></div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin:6px 0 0">Belanja = uang berkurang + stok bertambah (persediaan, belum HPP).</p>
+                  </div>
                   <div class="field"><label>Metode</label><select id="out-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
                   <div class="field"><label>Tanggal</label><input id="out-tanggal" type="date"></div>
                   <div class="field"><label>Keterangan</label><input id="out-ket" placeholder="Opsional"></div>
@@ -565,6 +728,76 @@
                 <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownOutClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Pengeluaran</button></div>
               </form>
             </div>
+          </div>
+        </section>
+
+        <!-- BUKU BESAR: transaksi pusat SATU pembukuan (kode mentor A-G + media G) -->
+        <section class="view" id="view-own-bukubesar">
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📒 Buku Besar</h3><span class="muted">Semua uang toko • satu pembukuan • kode A–G</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownBuku()">↻</button><button class="btn btn-dark small" onclick="ownLedOpen()">+ Catat Manual</button></div>
+            </div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Omzet (A)</span></div><h3 id="bbOmzet">-</h3><p class="trend">pendapatan buku besar</p></div>
+              <div class="stat-card" style="border-left:4px solid #b45309"><div class="stat-head"><span>HPP (B)</span></div><h3 id="bbHpp">-</h3><p class="trend">modal barang + komisi (nanti)</p></div>
+              <div class="stat-card" style="border-left:4px solid #f59e0b"><div class="stat-head"><span>Operasional (C)</span></div><h3 id="bbOps">-</h3><p class="trend">biaya jalan toko</p></div>
+              <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="stat-head"><span>Laba Kotor</span></div><h3 id="bbKotor">-</h3><p class="trend">omzet − HPP</p></div>
+              <div class="stat-card" style="border-left:4px solid #04074a"><div class="stat-head"><span>Laba Bersih</span></div><h3 id="bbBersih">-</h3><p class="trend">kotor − operasional</p></div>
+            </div>
+            <p style="font-size:11px;color:#8a8f98;margin:0 0 10px" id="bbNote">Memuat...</p>
+            <div class="toolbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+              <select id="bbJenis" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Jenis</option><option value="masuk">Masuk</option><option value="keluar">Keluar</option><option value="transfer">Transfer</option></select>
+              <select id="bbKat" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option></select>
+              <select id="bbMedia" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Media</option></select>
+              <input id="bbSince" type="date" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+            </div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th><th>Sumber</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyLedger"><tr><td colspan="8" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+          </div>
+          <div class="modal" id="ledModal">
+            <div class="modal-box" style="max-width:520px">
+              <button class="modal-close" onclick="ownLedClose()">×</button>
+              <h3 style="margin-bottom:4px">📒 Catat Manual</h3>
+              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Wajib: jenis + kategori A–G + media uang. Transfer (F1) hanya pindah media, bukan omzet.</p>
+              <form id="ledForm" onsubmit="ownLedSave(event)">
+                <div class="form-grid">
+                  <div class="field"><label>Jenis *</label><select id="led-jenis" onchange="ownLedJenis()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="masuk">Uang Masuk</option><option value="keluar">Uang Keluar</option><option value="transfer">Transfer Antar Kas</option></select></div>
+                  <div class="field"><label>Kategori (A–G) *</label><select id="led-kategori" onchange="ownLedJenis()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"></select></div>
+                  <div class="field" id="led-subWrap" style="display:none"><label>Jenis D *</label><select id="led-sub" onchange="ownLedPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Aset</option><option>Investasi</option></select></div>
+                  <div class="field"><label>Nominal (Rp) *</label><input id="led-nominal" type="number" min="1" required placeholder="500000" oninput="ownLedPreview()"><span id="led-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                  <div class="field"><label>Media Uang *</label><select id="led-media" onchange="ownLedPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"></select></div>
+                  <div class="field" id="led-tujuanWrap" style="display:none"><label>Ke Media *</label><select id="led-tujuan" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"></select></div>
+                  <div class="field"><label>Tanggal</label><input id="led-tanggal" type="date"></div>
+                  <div class="field" style="grid-column:1/-1"><label>Keterangan</label><input id="led-ket" placeholder="Contoh: Setor modal owner / Beli mikroskop"></div>
+                </div>
+                <div id="led-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownLedClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan ke Buku Besar</button></div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- TUTUP KAS: ritual malam — sistem vs fisik per media, selisih target Rp0 -->
+        <section class="view" id="view-own-tutupkas">
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>🌙 Tutup Kas</h3><span class="muted" id="clsDate">-</span></div>
+              <div class="toolbar-right"><input id="clsTanggal" type="date" onchange="ownClose()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><button class="btn btn-ghost small" onclick="ownClose()">↻</button></div>
+            </div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Kas Utama</span></div><h3 id="clsSU">-</h3><p class="trend" id="clsSUSub">sistem</p></div>
+              <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Kas Kecil</span></div><h3 id="clsSK">-</h3><p class="trend" id="clsSKSub">sistem</p></div>
+              <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="stat-head"><span>Bank</span></div><h3 id="clsSB">-</h3><p class="trend">sistem</p></div>
+              <div class="stat-card" style="border-left:4px solid #0891b2"><div class="stat-head"><span>QRIS / E-Wallet</span></div><h3 id="clsSQ">-</h3><p class="trend">sistem</p></div>
+              <div class="stat-card" id="clsSelisihCard" style="border-left:4px solid #f59e0b"><div class="stat-head"><span>Selisih</span></div><h3 id="clsSelisih">-</h3><p class="trend" id="clsSelisihSub">fisik − sistem • target Rp0</p></div>
+            </div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Media</th><th style="text-align:right">Sistem</th><th style="text-align:right">Fisik (hitung manual) *</th><th style="text-align:right">Selisih</th></tr></thead><tbody id="tbodyClose"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div class="form-grid" style="margin-top:10px">
+              <div class="field"><label>Catatan</label><input id="clsCatatan" placeholder="Opsional — mis. kurang 50rb, cari besok"></div>
+              <div class="field"><label>Limit Kas Kecil (Rp)</label><div style="display:flex;gap:6px"><input id="clsLimit" type="number" min="1" style="flex:1;padding:11px 12px;border-radius:12px;border:1px solid #ececec"><button type="button" class="btn btn-ghost small" onclick="ownKasLimit()" title="Simpan limit (owner/admin)">Set</button></div><span id="clsLimitInfo" style="font-size:11px;color:#8a8f98">-</span></div>
+            </div>
+            <div class="form-actions" style="margin-top:10px"><button class="btn btn-dark" onclick="ownCloseSave()">🌙 Simpan Tutup Kas</button></div>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px" id="clsInfo">Hitung uang fisik + cek mutasi bank/QRIS, isi kolom fisik, simpan malam ini juga.</p>
           </div>
         </section>
 
@@ -1018,10 +1251,12 @@
     const REAL_ONLY = true;
     const TITLES = {
       ringkas: ['Monitor Toko', 'Keuangan + operasional hari ini'],
-      keuangan: ['Keuangan', 'Kas Teknisi • Kecelakaan Kerja • Refund Dana'],
+      keuangan: ['Keuangan', 'Pendapatan • HPP • Operasional • Aset • Owner • Non • Kas • Buku'],
       finsukses: ['Pendapatan Sukses', 'Service cair: Sukses + Sudah Diambil + Selesai'],
       bayar: ['Pembayaran', 'Tunai • Transfer • QRIS • Belum bayar'],
       keluar: ['Pengeluaran', 'Belanja + operasional toko'],
+      bukubesar: ['Buku Besar', 'SATU pembukuan • kode A–G • media uang'],
+      tutupkas: ['Tutup Kas', 'Ritual malam • sistem vs fisik • selisih Rp0'],
       penjualan: ['Penjualan', 'Pergerakan barang & jasa'],
       laporan: ['Laporan', 'Service • Teknisi • Penjualan (pindahan dashboard toko)'],
       inventori: ['Inventori', 'Sparepart + alat'],
@@ -1038,6 +1273,7 @@
       if(sec) sec.classList.add('active');
       const t = TITLES[v];
       if(t){ document.getElementById('page-title').textContent = t[0]; document.getElementById('page-subtitle').textContent = t[1]; }
+      if(v === 'keuangan'){ try{ fixHubMenu(window._hubTab || 'pendapatan'); }catch(e){} }
       try{ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarOverlay').classList.remove('show'); }catch(e){}
       try{ window.scrollTo({top: 0}); }catch(e){}
       // Persis dashboard toko: tiap buka tab, datanya di-refresh
@@ -1049,10 +1285,12 @@
               document.getElementById('stSukses').textContent = window._ownDemoStats.sukses;
             }
           }),
-          keuangan: () => ownKeuTab(window._ownKeuTab || 'kas'),
+          keuangan: () => ownHubTab(window._hubTab || 'pendapatan'),
           finsukses: () => ownFinSukses(),
           bayar: () => ownBayar(),
           keluar: () => ownKeluar(),
+          bukubesar: () => ownBuku(),
+          tutupkas: () => ownClose(),
           penjualan: () => ownPenjualan(),
           laporan: () => ownLaporan(),
           inventori: () => { ownInvResetFilters(); return ownInvLoad(); },
@@ -1141,7 +1379,7 @@
       // Tombol ↻ pojok kanan atas: bersihkan juga search/filter inventori → kembali ke semua
       try{ ownInvResetFilters(); }catch(e){}
       try{ const s = document.getElementById('potTeknisi'); if(s) delete s.dataset.filled; }catch(e){}
-      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownPenjualan(), ownLaporan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan(), ownApproval()]);
+      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownBuku(), ownClose(), ownPenjualan(), ownLaporan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan(), ownApproval()]);
       // Jika mode demo (toko kosong), pastikan kartu operasional ikut angka contoh
       // (ownStats dari /stats backend tetap 0 untuk toko kosong).
       try{
@@ -1367,6 +1605,109 @@
         + `<span style="font-size:12px;font-weight:700;min-width:52px;text-align:right">${cnt} ${unit}</span>`
         + `<span style="font-size:11px;color:#8a8f98;min-width:34px;text-align:right">${pct}%</span></div>`;
     }
+    // ---------- Arus mentor (SATU rumus dipakai Ringkasan + Laba-Rugi) ----------
+    // Omzet = service cair + penjualan total − refund (refund diambil dari omzet).
+    // HPP = komisi teknisi (biaya langsung service) + modal barang terjual + beban toko kecelakaan.
+    // Operasional = pengeluaran + uang hadir. Pemasukan lain/modal = arus kas, BUKAN omzet.
+    let _arusPromise = null, _arusAt = 0;
+    async function ownArus(){
+      const now = Date.now();
+      if(_arusPromise && (now - _arusAt) < 90000) return _arusPromise;
+      _arusAt = now;
+      _arusPromise = (async () => {
+        const _d = new Date();
+        const today = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
+        const ym = today.slice(0, 7);
+        const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
+        const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0, 10);
+        const arr = await ownServices();
+        const ok = arr.filter(d => SUKSES.includes(d.status));
+        const sum = l => l.reduce((s, d) => s + (Number(d.biaya) || 0), 0);
+        const omSvcH = sum(ok.filter(d => actDate(d) === today));
+        const omSvcB = sum(ok.filter(d => actDate(d).slice(0, 7) === ym));
+        const omSvcT = sum(ok);
+        const mediaSvcH = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
+        ok.filter(d => actDate(d) === today).forEach(d => {
+          const m = d.metode_bayar || '';
+          const k = mediaSvcH[m] !== undefined ? m : 'Lain';
+          mediaSvcH[k] += Number(d.biaya) || 0;
+        });
+        const mediaSvcT = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
+        ok.forEach(d => {
+          const m = d.metode_bayar || '';
+          const k = mediaSvcT[m] !== undefined ? m : 'Lain';
+          mediaSvcT[k] += Number(d.biaya) || 0;
+        });
+        let komH = 0, komB = 0, komT = 0, hadH = 0, hadB = 0, hadT = 0;
+        try{
+          const techs = await ownFetch('/technicians');
+          const list = Array.isArray(techs) ? techs : [];
+          await Promise.all(list.map(async t => {
+            try{
+              const j = await ownFetch(`/engine/kas/teknisi/${t.id}`);
+              (j.riwayat || []).forEach(l => {
+                const m = Number(l.masuk) || 0; if(!m) return;
+                const tt = String(l.tanggal || '').slice(0, 10);
+                if(l.tipe === 'allowance'){ hadT += m; if(tt === today) hadH += m; if(tt.slice(0, 7) === ym) hadB += m; }
+                else if(l.tipe !== 'hutang_baru'){ komT += m; if(tt === today) komH += m; if(tt.slice(0, 7) === ym) komB += m; }
+              });
+            }catch(e){}
+          }));
+        }catch(e){}
+        const sumByDay = (rows, key) => {
+          let h = 0, b = 0, t = 0;
+          (Array.isArray(rows) ? rows : []).forEach(r => {
+            const n = Number(r[key]) || 0; if(!n) return;
+            const tt = String(r.tanggal || '').slice(0, 10);
+            t += n; if(tt === today) h += n; if(tt.slice(0, 7) === ym) b += n;
+          });
+          return {h, b, t};
+        };
+        let ref = {h: 0, b: 0, t: 0}, cel = {h: 0, b: 0, t: 0}, out = {h: 0, b: 0, t: 0}, inc = {h: 0, b: 0, t: 0};
+        try{ ref = sumByDay(await ownFetch('/finance/refunds'), 'nominal'); }catch(e){}
+        try{
+          let ac = [];
+          try{ ac = await ownFetch('/finance/accidents'); }catch(e){}
+          ac = Array.isArray(ac) ? ac : [];
+          let h = 0, b = 0, t = 0;
+          ac.forEach(a => {
+            const n = Number(a.beban_toko) || 0; if(!n) return;
+            const tt = String(a.tanggal || '').slice(0, 10);
+            t += n; if(tt === today) h += n; if(tt.slice(0, 7) === ym) b += n;
+          });
+          cel = {h, b, t};
+        }catch(e){}
+        try{ out = sumByDay(await ownFetch('/finance/expenses'), 'nominal'); }catch(e){}
+        try{ inc = sumByDay(await ownFetch('/finance/incomes'), 'nominal'); }catch(e){}
+        let jualH = 0, jualB = 0, jualT = 0, hppJualH = 0, hppJualB = 0, hppJualT = 0;
+        const mediaJualH = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
+        try{
+          const sl = await ownFetch('/sales?limit=300');
+          (Array.isArray(sl) ? sl : []).forEach(s => {
+            const total = Number(s.total) || 0, profit = Number(s.profit) || 0;
+            const hpp = Math.max(0, total - profit);
+            const tt = String(s.tanggal || '').slice(0, 10);
+            jualT += total; hppJualT += hpp;
+            if(tt === today){ jualH += total; hppJualH += hpp; const k = mediaJualH[s.metode] !== undefined ? s.metode : 'Lain'; mediaJualH[k] += total; }
+            if(tt.slice(0, 7) === ym){ jualB += total; hppJualB += hpp; }
+          });
+        }catch(e){}
+        const omH = omSvcH + jualH - ref.h, omB = omSvcB + jualB - ref.b, omT = omSvcT + jualT - ref.t;
+        const hppH = komH + hppJualH + cel.h, hppB = komB + hppJualB + cel.b, hppT = komT + hppJualT + cel.t;
+        const opsH = out.h + hadH, opsB = out.b + hadB, opsT = out.t + hadT;
+        return {
+          today, ym, omSvcH, omSvcB, omSvcT, jualH, jualB, jualT, hppJualH, hppJualB, hppJualT,
+          ref, cel, out, inc, komH, komB, komT, hadH, hadB, hadT, mediaSvcH, mediaSvcT, mediaJualH,
+          omH, omB, omT, hppH, hppB, hppT, opsH, opsB, opsT,
+          kotorH: omH - hppH, kotorB: omB - hppB,
+          labaH: omH - hppH - opsH, labaB: omB - hppB - opsB,
+          arusH: omH + inc.h - hppH - opsH, arusB: omB + inc.b - hppB - opsB,
+          saldoT: omT + inc.t - hppT - opsT,
+        };
+      })();
+      return _arusPromise;
+    }
+
     async function ownAnalytics(){
       const tbTek = document.getElementById('tbodyOwnTeknisi');
       const brandEl = document.getElementById('ownBrandList');
@@ -1430,21 +1771,47 @@
           const sumM = m => ok.filter(d => (d.metode_bayar || '') === m).reduce((s, d) => s + (Number(d.biaya) || 0), 0);
           const cntM = m => ok.filter(d => (d.metode_bayar || '') === m).length;
           const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
-          set('finHari', rp(finHari)); set('finHariSub', `${finHariRows.length} service cair hari ini`);
-          set('fin7', rp(fin7)); set('fin7Sub', `${cnt7} service • 7 hari`);
-          set('finBulan', rp(finBulan)); set('finBulanSub', `${blnRows.length} service • bulan ini`);
-          set('finAvg', rp(finAvg)); set('finAvgSub', `${blnRows.length} service bulan ini`);
           set('finBelum', rp(belumTotal)); set('finBelumSub', `${belumRows.length} service tanpa metode bayar`);
           const tT = sumM('Tunai'), tTr = sumM('Transfer'), tQ = sumM('QRIS');
           set('finTunai', rp(tT)); set('finTunaiSub', `${cntM('Tunai')} service`);
           set('finTransfer', rp(tTr)); set('finTransferSub', `${cntM('Transfer')} service`);
           set('finQris', rp(tQ)); set('finQrisSub', `${cntM('QRIS')} service`);
-          // Pengeluaran Hari Ini — real dari /finance/expenses/ringkasan.
+          // ---- 5 ANGKA MENTOR (SATU rumus via ownArus, dipakai juga Laba-Rugi) ----
           try{
-            const xr = await ownFetch('/finance/expenses/ringkasan');
-            set('outHari', rp(xr.nominal_hari_ini || 0));
-            set('outHariSub', (xr.hari_ini || 0) + ' catatan hari ini');
-          }catch(e){ set('outHari', 'Rp 0'); set('outHariSub', 'belum ada data'); }
+            const A = await ownArus();
+            const col = v => v < 0 ? '#dc2626' : '#059669';
+            set('mOmzet', rp(A.omH)); set('mOmzetSub', `service ${rp(A.omSvcH)} + jual ${rp(A.jualH)} − refund ${rp(A.ref.h)}`);
+            set('mKotor', rp(A.kotorH)); set('mKotorSub', `omzet ${rp(A.omH)} − HPP ${rp(A.hppH)}`);
+            try{ document.getElementById('mKotor').style.color = col(A.kotorH); }catch(e){}
+            set('mOps', rp(A.opsH)); set('mOpsSub', `keluar ${rp(A.out.h)} + hadir ${rp(A.hadH)}`);
+            set('mLaba', rp(A.labaH)); set('mLabaSub', `kotor ${rp(A.kotorH)} − operasional ${rp(A.opsH)}`);
+            try{ document.getElementById('mLaba').style.color = col(A.labaH); }catch(e){}
+            set('mSaldo', rp(A.saldoT)); set('mSaldoSub', 'tanpa saldo awal • wajib Tutup Kas');
+            const neg = v => v ? `<span style="color:#dc2626">−${rp(v)}</span>` : rp(0);
+            const r2 = (label, val, bold) => `<tr${bold ? ' style="background:#f9fafb;font-weight:800"' : ''}><td>${label}</td><td style="text-align:right">${val}</td></tr>`;
+            try{
+              document.getElementById('tbodyLapHarian').innerHTML =
+                r2('🛠 Service cair', rp(A.omSvcH)) +
+                r2('🛒 Penjualan kasir', rp(A.jualH)) +
+                r2('💸 Refund (diambil dari omzet)', neg(A.ref.h)) +
+                r2('＝ Total omzet', rp(A.omH), true) +
+                r2('💰 Komisi teknisi (HPP)', neg(A.komH)) +
+                r2('📦 Modal barang terjual (HPP)', neg(A.hppJualH)) +
+                r2('🛠 Beban toko kecelakaan (HPP)', neg(A.cel.h)) +
+                r2('🧾 Pengeluaran operasional', neg(A.out.h)) +
+                r2('🕘 Uang hadir', neg(A.hadH)) +
+                r2('📥 Pemasukan lain/modal (masuk kas, bukan omzet)', rp(A.inc.h)) +
+                `<tr style="background:#ecfdf5;font-weight:800"><td>＝ Arus kas bersih hari ini</td><td style="text-align:right;color:${col(A.arusH)}">${rp(A.arusH)}</td></tr>`;
+            }catch(e){}
+            try{
+              const p = A.today.split('-');
+              document.getElementById('lapDate').textContent = `${p[2]}/${p[1]}/${p[0]} • tutup kas malam ini`;
+            }catch(e){}
+            set('lapMedia', `Tunai ${rp(A.mediaSvcH.Tunai + A.mediaJualH.Tunai)} • Transfer ${rp(A.mediaSvcH.Transfer + A.mediaJualH.Transfer)} • QRIS ${rp(A.mediaSvcH.QRIS + A.mediaJualH.QRIS)} • Kas Kecil Rp0 (limit menyusul)`);
+            set('lapSelisih', 'Belum ada Tutup Kas — hitung uang fisik + cek QRIS/bank malam ini, selisih target Rp0 (modul Tutup Kas tahap berikutnya).');
+          }catch(e){
+            try{ document.getElementById('tbodyLapHarian').innerHTML = `<tr><td style="text-align:center;color:#dc2626">Gagal hitung: ${esc(e.message).slice(0, 120)}</td></tr>`; }catch(_){}
+          }
           // range + chart + tabel 7 hari
           const fmtTgl = iso => { try{ const [y, m, d] = iso.split('-'); return `${d}/${m}`; }catch(e){ return iso; } };
           try{ document.getElementById('finRange').textContent = `${fmtTgl(last7[0])} — ${fmtTgl(last7[6])}`; }catch(e){}
@@ -1757,22 +2124,352 @@
       }
     }
 
-    // ---------- Sub-tab Keuangan: Kas / Kecelakaan Kerja / Refund ----------
+    // ---------- Hub Keuangan: SATU alur mentor (panel lama dipindah ke sini) ----------
     function ownSet(id, v){ try{ document.getElementById(id).textContent = v; }catch(e){} }
-    function ownKeuTab(k){
-      window._ownKeuTab = k || 'kas';
-      document.querySelectorAll('[data-ownkeu]').forEach(b => b.classList.toggle('active', b.dataset.ownkeu === window._ownKeuTab));
-      ['kas','celaka','refund'].forEach(x => {
-        const el = document.getElementById('ownKeuPanel-' + x);
-        if(el) el.style.display = (x === window._ownKeuTab) ? '' : 'none';
-      });
-      ownKeuLoad();
+    let _hubMoved = false;
+    function ownHubMove(){
+      if(_hubMoved) return; _hubMoved = true;
+      const mv = (id, target) => {
+        try{
+          const el = document.getElementById(id), t = document.getElementById(target);
+          if(el && t){ el.classList.remove('view'); el.style.display = ''; t.appendChild(el); }
+        }catch(e){}
+      };
+      // Pendapatan: panel refund DILEPAS dari tab (input refund via tombol modal saja)
+      try{
+        const rf = document.getElementById('ownKeuPanel-refund');
+        if(rf) rf.style.display = 'none';
+      }catch(e){}
+      // HPP: komisi teknisi + insiden (beban toko = HPP)
+      mv('ownKeuPanel-kas', 'hubHppKomisi');
+      mv('ownKeuPanel-celaka', 'hubHppCelaka');
+      // Operasional / Kas & Media / Buku = pindahan utuh
+      mv('view-own-keluar', 'hubOperasional');
+      mv('view-own-bayar', 'hubKas');
+      mv('view-own-tutupkas', 'hubKas');
+      mv('view-own-bukubesar', 'hubBuku');
     }
-    function ownKeuLoad(){
-      const k = window._ownKeuTab || 'kas';
-      if(k === 'celaka') return ownAccidents();
-      if(k === 'refund') return ownRefunds();
-      return ownPotonganTab(window._ownPotTab || 'all');
+    const HUB_TABS = ['pendapatan', 'hpp', 'operasional', 'aset', 'owner', 'non', 'kas', 'buku'];
+    const HUB_TITLES = {
+      pendapatan: ['Pendapatan', 'Jasa • Accessories • Unit • Lain − refund'],
+      hpp: ['HPP / Modal', 'Komisi teknisi + modal barang + insiden'],
+      operasional: ['Operasional', 'C1–C6 + uang hadir'],
+      aset: ['Aset / Investasi', 'D • tidak langsung mengecilkan laba'],
+      owner: ['Transaksi Owner', 'Modal & prive — bukan omzet'],
+      non: ['Non-Pendapatan / Non-Biaya', 'Transfer • hutang • DP'],
+      kas: ['Kas & Media', 'Saldo per media + tutup kas'],
+      buku: ['Buku Besar', 'Satu pembukuan • kode A–G'],
+    };
+    // Grup mentor = menu utama sidebar. Masuk via sini agar judul + highlight tepat.
+    function ownShowKeu(h){
+      ownShow('keuangan');
+      ownHubTab(h);
+    }
+    function fixHubMenu(h){
+      document.querySelectorAll('[data-hubmenu]').forEach(b => b.classList.toggle('active', b.dataset.hubmenu === h));
+      const t = HUB_TITLES[h];
+      if(t){
+        try{ document.getElementById('page-title').textContent = t[0]; }catch(e){}
+        try{ document.getElementById('page-subtitle').textContent = t[1]; }catch(e){}
+      }
+    }
+    function ownHubTab(k){
+      window._hubTab = (k && HUB_TABS.includes(k)) ? k : (HUB_TABS.includes(window._hubTab) ? window._hubTab : 'pendapatan');
+      ownHubMove();
+      fixHubMenu(window._hubTab);
+      HUB_TABS.forEach(x => {
+        try{ document.getElementById('hubPanel-' + x).style.display = (x === window._hubTab) ? '' : 'none'; }catch(e){}
+      });
+      const L = {
+        pendapatan: () => ownPendapatan(),
+        hpp: () => ownHpp(),
+        operasional: () => ownOperasional(),
+        aset: () => ownAset(),
+        owner: () => ownOwnerTab(),
+        non: () => ownNonTab(),
+        kas: () => ownKasTab(),
+        buku: () => ownBuku(),
+      };
+      try{ const r = (L[window._hubTab] || (() => {}))(); if(r && r.catch) r.catch(() => {}); }catch(e){}
+    }
+    // Sub-tab generik: tombol data-subg/subk + panel data-pang/pank (jika ada) + render ulang
+    function ownSubGet(g){
+      try{
+        const b = document.querySelector('[data-subg="' + g + '"].active');
+        return b ? b.dataset.subk : 'all';
+      }catch(e){ return 'all'; }
+    }
+    function ownSubSet(g, k, render){
+      document.querySelectorAll('[data-subg="' + g + '"]').forEach(b => b.classList.toggle('active', b.dataset.subk === k));
+      document.querySelectorAll('[data-pang="' + g + '"]').forEach(p => { try{ p.style.display = p.dataset.pank === k ? '' : 'none'; }catch(e){} });
+      if(render) try{ render(); }catch(e){}
+    }
+    // Label kode mentor untuk baris lama (nama) & baru (kode)
+    const EXP_LBL = {B1: 'Sparepart (HPP)', B2: 'Accessories (HPP)', C1: 'Gaji & Upah', C2: 'Tempat', C3: 'Internet & Sistem', C4: 'Operasional Harian', C5: 'Marketing', C6: 'Maintenance', D: 'Aset/Investasi'};
+    const expLbl = k => EXP_LBL[k] || k || '-';
+    // Cache buku besar (90 detik) untuk tabel-tabel hub
+    let _ledCache = null, _ledAt = 0;
+    async function ownLedCached(force){
+      if(!force && _ledCache && (Date.now() - _ledAt) < 90000) return _ledCache;
+      _ledCache = await ownFetch('/finance/ledger?limit=500');
+      if(!Array.isArray(_ledCache)) _ledCache = [];
+      _ledAt = Date.now();
+      return _ledCache;
+    }
+    function ownLedInvalidate(){ _ledCache = null; _ledAt = 0; try{ _pendCache = null; _pendAt = 0; }catch(e){} try{ _hppCache = null; _hppAt = 0; }catch(e){} }
+    function ownLedRow4(r){
+      // baris ringkas 4 kolom: tanggal | keterangan | nominal | media
+      return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
+        + `<td><strong>${esc(r.keterangan || (r.kategori_nama || '-'))}</strong>${r.subkategori ? `<br><span style="font-size:10.5px;color:#8a8f98">${esc(r.subkategori)}</span>` : ''}</td>`
+        + `<td style="text-align:right;font-weight:700;color:${r.jenis === 'masuk' ? '#059669' : '#dc2626'}">${r.jenis === 'masuk' ? '+' : '−'}${rp(r.nominal || 0)}</td>`
+        + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td></tr>`;
+    }
+    function ownLedRow5(r, katCol){
+      // baris 5 kolom: tanggal | keterangan | kategori | nominal | media (nama saja, tanpa kode)
+      return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
+        + `<td><strong>${esc(r.keterangan || '-')}</strong>${r.subkategori ? `<br><span style="font-size:10.5px;color:#8a8f98">${esc(r.subkategori)}</span>` : ''}<br><span style="font-size:10.5px;color:#8a8f98">${esc(r.dibuat_oleh || '')}</span></td>`
+        + `<td style="font-size:11.5px;font-weight:600">${esc(katCol || r.kategori_nama || r.kategori || '')}</td>`
+        + `<td style="text-align:right;font-weight:700;color:${r.jenis === 'masuk' ? '#059669' : '#dc2626'}">${r.jenis === 'masuk' ? '+' : '−'}${rp(r.nominal || 0)}</td>`
+        + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td></tr>`;
+    }
+    // ---------- 1. PENDAPATAN: union service cair + kasir + lain + refund ----------
+    let _pendCache = null, _pendAt = 0;
+    async function ownPendUnion(force){
+      if(!force && _pendCache && (Date.now() - _pendAt) < 90000) return _pendCache;
+      const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
+      const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0, 10);
+      const mediaLbl = m => m === 'Tunai' ? 'Tunai' : m === 'Transfer' ? 'Bank' : m === 'QRIS' ? 'QRIS' : (m || '-');
+      const rows = [];
+      try{
+        const arr = await ownServices();
+        arr.filter(d => SUKSES.includes(d.status)).forEach(d => rows.push({
+          tanggal: actDate(d), kat: 'A1', katLbl: 'A1 · Jasa Service',
+          ket: `${d.device || '-'} • ${d.invoice || ''} • ${d.teknisi || ''}`,
+          nominal: Number(d.biaya) || 0, media: mediaLbl(d.metode_bayar), jenis: 'masuk', src: 'Service'}));
+      }catch(e){}
+      try{
+        const sl = await ownFetch('/sales?limit=300');
+        (Array.isArray(sl) ? sl : []).forEach(s => {
+          (s.items || []).forEach(it => {
+            const isJasa = (it.tipe || 'barang') === 'jasa';
+            rows.push({tanggal: String(s.tanggal || '').slice(0, 10), kat: isJasa ? 'A4' : 'A2',
+              katLbl: isJasa ? 'A4 · Pendapatan Lain' : 'A2 · Accessories',
+              ket: `${it.nama_snapshot || it.nama || '-'} x${it.qty || 1} (${s.kode || ''})`,
+              nominal: (Number(it.harga_jual) || 0) * (Number(it.qty) || 1),
+              media: mediaLbl(s.metode), jenis: 'masuk', src: 'Kasir'});
+          });
+        });
+      }catch(e){}
+      try{
+        const inc = await ownFetch('/finance/incomes');
+        (Array.isArray(inc) ? inc : []).forEach(r => {
+          if((r.kategori || '') !== 'Pemasukan Lain') return; // E1 modal = tab Owner
+          rows.push({tanggal: String(r.tanggal || '').slice(0, 10), kat: 'A4', katLbl: 'A4 · Pendapatan Lain',
+            ket: r.sumber || '-', nominal: Number(r.nominal) || 0, media: mediaLbl(r.metode), jenis: 'masuk', src: 'Lain'});
+        });
+      }catch(e){}
+      try{
+        const led = await ownLedCached();
+        led.filter(r => (r.kelompok === 'omzet') && (r.ref_type === 'manual' || !r.ref_type)).forEach(r => rows.push({
+          tanggal: String(r.tanggal || '').slice(0, 10), kat: r.kategori, katLbl: `${r.kategori} · ${r.kategori_nama || ''}`,
+          ket: r.keterangan || '-', nominal: Number(r.nominal) || 0, media: r.media_nama || r.media, jenis: r.jenis, src: 'Manual'}));
+      }catch(e){}
+      try{
+        const rf = await ownFetch('/finance/refunds');
+        (Array.isArray(rf) ? rf : []).forEach(r => rows.push({
+          tanggal: String(r.tanggal || '').slice(0, 10), kat: 'RF', katLbl: 'Refund (pengurang omzet)',
+          ket: `Refund ${r.kode || ''} ${r.invoice || ''}`, nominal: -(Number(r.nominal) || 0),
+          media: r.metode || '-', jenis: 'keluar', src: 'Refund'}));
+      }catch(e){}
+      rows.sort((a, b) => String(b.tanggal || '').localeCompare(String(a.tanggal || '')));
+      _pendCache = rows; _pendAt = Date.now();
+      return rows;
+    }
+    function ownPendSub(k){ ownSubSet('pend', k, () => ownPendapatan()); }
+    async function ownPendapatan(force){
+      const tb = document.getElementById('tbodyPend');
+      const sub = ownSubGet('pend');
+      const lbl = {all: 'service + kasir + lain − refund', A1: 'jasa service (service cair)', A2: 'penjualan accessories (kasir)', A3: 'penjualan unit (modul menyusul)', A4: 'pendapatan lain (jasa kasir + manual)'};
+      try{ document.getElementById('pendSub').textContent = lbl[sub] || lbl.all; }catch(e){}
+      try{ document.getElementById('pendCards').style.display = sub === 'all' ? '' : 'none'; }catch(e){}
+      try{
+        const rows = await ownPendUnion(force);
+        // kartu per kategori (hanya di Semua): total + jumlah baris, klik → filter
+        try{
+          for(const k of ['A1', 'A2', 'A3', 'A4']){
+            const rk = rows.filter(r => r.kat === k);
+            const tk = rk.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+            document.getElementById('pendTot' + k).textContent = rp(tk);
+            document.getElementById('pendCnt' + k).textContent = rk.length ? rk.length + ' transaksi • klik → rincian' : (k === 'A3' ? 'modul menyusul' : 'belum ada data');
+          }
+        }catch(e){}
+        const fr = rows.filter(r => sub === 'all' || r.kat === sub);
+        const tot = fr.filter(r => r.kat === 'komisi' || r.laba !== false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        const totPers = fr.filter(r => r.kat !== 'komisi' && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        tb.innerHTML = fr.slice(0, 200).map(r =>
+          `<tr><td style="white-space:nowrap">${esc(r.tanggal || '')}</td><td><strong>${esc(r.ket || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.src || '')}</span></td>`
+          + `<td style="font-size:11.5px;font-weight:600">${esc((r.katLbl || r.kat || '').replace(/^[A-Z]\d*\s*·\s*/, ''))}</td>`
+          + `<td style="text-align:right;font-weight:700;color:${r.nominal < 0 ? '#dc2626' : '#059669'}">${rp(r.nominal || 0)}</td>`
+          + `<td style="font-size:11px">${esc(r.media || '-')}</td></tr>`).join('')
+          + (fr.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${fr.length} baris)</td><td style="text-align:right;color:${tot < 0 ? '#dc2626' : '#059669'}">${rp(tot)}</td><td></td></tr>` : '')
+          || `<tr><td colspan="5" style="text-align:center;color:#8a8f98">${sub === 'A3' ? 'Belum ada penjualan unit — modul menyusul, bisa Catat Manual A3 di Buku Besar' : 'Belum ada data'}</td></tr>`;
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    // ---------- 2. HPP / MODAL: union komisi + B1/B2/B3 + kartu per kategori ----------
+    let _hppCache = null, _hppAt = 0;
+    async function ownHppUnion(force){
+      if(!force && _hppCache && (Date.now() - _hppAt) < 90000) return _hppCache;
+      const rows = [];
+      let techCount = 0;
+      try{
+        const techs = await ownFetch('/technicians');
+        const list = Array.isArray(techs) ? techs : [];
+        techCount = list.length;
+        await Promise.all(list.map(async t => {
+          try{
+            const j = await ownFetch(`/engine/kas/teknisi/${t.id}`);
+            (j.riwayat || []).forEach(l => {
+              const m = Number(l.masuk) || 0;
+              if(!m || l.tipe === 'allowance' || l.tipe === 'hutang_baru') return;
+              rows.push({tanggal: String(l.tanggal || '').slice(0, 10), kat: 'komisi', katLbl: 'Komisi Teknisi',
+                ket: `${j.nama || t.nama || ''} • ${l.invoice || ''}`, nominal: m, media: '—', jenis: 'keluar', src: 'Komisi'});
+            });
+          }catch(e){}
+        }));
+      }catch(e){}
+      try{
+        const led = await ownLedCached();
+        const names = {B1: 'Sparepart', B2: 'Accessories', B3: 'Unit'};
+        // Komisi teknisi (sub 'Komisi') tampil di sub Komisi (data engine), bukan di tab barang.
+        // masuk_laba=false = PERSEDIAAN (belum jadi HPP, prinsip mentor).
+        led.filter(r => ['B1', 'B2', 'B3'].includes(r.kategori) && r.subkategori !== 'Komisi').forEach(r => rows.push({
+          tanggal: String(r.tanggal || '').slice(0, 10), kat: r.kategori, katLbl: names[r.kategori] || r.kategori,
+          ket: r.keterangan || '-', nominal: Number(r.nominal) || 0,
+          media: r.media_nama || r.media, jenis: 'keluar', laba: r.masuk_laba !== false,
+          src: !r.ref_type || r.ref_type === 'manual' ? 'Manual' : 'Belanja'}));
+      }catch(e){}
+      rows.sort((a, b) => String(b.tanggal || '').localeCompare(String(a.tanggal || '')));
+      _hppCache = {rows, techCount}; _hppAt = Date.now();
+      return _hppCache;
+    }
+    function ownHppSub(k){
+      document.querySelectorAll('[data-subg="hpp"]').forEach(b => b.classList.toggle('active', b.dataset.subk === k));
+      try{ ownHpp(); }catch(e){}
+    }
+    async function ownHpp(force){
+      const tb = document.getElementById('tbodyHpp');
+      let sub = 'all';
+      try{
+        const b = document.querySelector('[data-subg="hpp"].active');
+        sub = b ? b.dataset.subk : 'all';
+      }catch(e){}
+      const lbl = {all: 'komisi + modal barang − langsung terkait penjualan', komisi: 'biaya langsung jasa teknisi', B1: 'belanja + part terpakai', B2: 'modal accessories terjual', B3: 'modul unit menyusul'};
+      try{ document.getElementById('hppSub').textContent = lbl[sub] || lbl.all; }catch(e){}
+      try{ document.getElementById('hppCards').style.display = sub === 'all' ? '' : 'none'; }catch(e){}
+      try{
+        const {rows, techCount} = await ownHppUnion(force);
+        try{
+          const defs = [['komisi', 'Komisi Teknisi'], ['B1', 'Sparepart'], ['B2', 'Accessories'], ['B3', 'Unit']];
+          for(const [k, nm] of defs){
+            const rk = rows.filter(r => r.kat === k && (k === 'komisi' || r.laba !== false));
+            const tk = rk.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+            const pers = k === 'komisi' ? 0 : rows.filter(r => r.kat === k && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+            const id = k === 'komisi' ? 'Komisi' : k;
+            document.getElementById('hppTot' + id).textContent = rp(tk);
+            document.getElementById('hppCnt' + id).textContent = k === 'komisi'
+              ? (techCount ? techCount + ' teknisi • klik → rincian' : 'belum ada teknisi')
+              : ((rk.length ? rk.length + ' HPP' : (k === 'B3' ? 'modul menyusul' : 'belum ada HPP')) + (pers ? ` • persediaan ${rp(pers)}` : '') + ' • klik → rincian');
+          }
+        }catch(e){}
+        const fr = rows.filter(r => sub === 'all' || r.kat === sub);
+        const tot = fr.filter(r => r.kat === 'komisi' || r.laba !== false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        const totPers = fr.filter(r => r.kat !== 'komisi' && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        const emptyB3 = sub === 'B3' && !fr.length;
+        tb.innerHTML = fr.slice(0, 200).map(r =>
+          `<tr><td style="white-space:nowrap">${esc(r.tanggal || '')}</td><td><strong>${esc(r.ket || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.src || '')}${r.kat !== 'komisi' && r.laba === false ? ' • 📦 <strong>Persediaan (belum HPP)</strong>' : ''}</span></td>`
+          + `<td style="font-size:11.5px;font-weight:600">${esc(r.katLbl || r.kat || '')}</td>`
+          + `<td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td>`
+          + `<td style="font-size:11px">${esc(r.media || '-')}</td></tr>`).join('')
+          + (fr.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">HPP terbentuk (${fr.filter(r => r.kat === 'komisi' || r.laba !== false).length} baris)${totPers ? ` • 📦 Persediaan ${rp(totPers)}` : ''}</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>` : '')
+          || `<tr><td colspan="5" style="text-align:center;color:#8a8f98">${emptyB3 ? 'Belum ada HPP unit — modul menyusul, bisa Catat Manual di Buku Besar' : 'Belum ada data HPP'}</td></tr>`;
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+      try{ await Promise.allSettled([ownKasAll(), ownPotongan(), ownAccidents()]); }catch(e){}
+    }
+    // ---------- 3. OPERASIONAL: C1-C6 buku besar + panel pengeluaran ----------
+    function ownOpsSub(k){ ownSubSet('ops', k, () => ownOperasional()); }
+    async function ownOperasional(force){
+      const tb = document.getElementById('tbodyOps');
+      const sub = ownSubGet('ops');
+      const names = {all: 'buku besar C1–C6 + uang hadir', C1: 'gaji & upah', C2: 'tempat', C3: 'internet & sistem', C4: 'operasional harian', C5: 'marketing', C6: 'maintenance'};
+      try{ document.getElementById('opsSub').textContent = names[sub] || names.all; }catch(e){}
+      try{
+        const led = (await ownLedCached(force)).filter(r => r.kelompok === 'operasional' && (sub === 'all' || r.kategori === sub));
+        const tot = led.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori_nama)).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris, belum termasuk uang hadir)</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>` : '')
+          || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data operasional</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+      try{ await ownKeluar(); }catch(e){}
+    }
+    // ---------- 4. ASET ----------
+    function ownAsetSub(k){ ownSubSet('aset', k, () => ownAset()); }
+    async function ownAset(force){
+      const tb = document.getElementById('tbodyAset');
+      const sub = ownSubGet('aset');
+      try{
+        const led = (await ownLedCached(force)).filter(r => r.kategori === 'D' && (sub === 'all' || r.subkategori === sub));
+        const tot = led.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.subkategori || 'D')).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris)</td><td style="text-align:right">${rp(tot)}</td><td></td></tr>` : '')
+          || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada aset — catat via Buku Besar → + Catat Manual → D</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    // ---------- 5. OWNER ----------
+    function ownOwnerSub(k){ ownSubSet('own', k, () => ownOwnerTab()); }
+    async function ownOwnerTab(force){
+      const tb = document.getElementById('tbodyOwner');
+      const sub = ownSubGet('own');
+      try{
+        const led = (await ownLedCached(force)).filter(r => r.kelompok === 'owner' && (sub === 'all' || r.kategori === sub));
+        const tin = led.filter(r => r.kategori === 'E1').reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        const tout = led.filter(r => r.kategori === 'E2').reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori === 'E1' ? 'Modal Owner' : 'Prive Owner')).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Modal ${rp(tin)} − Prive ${rp(tout)}</td><td style="text-align:right;color:${(tin - tout) < 0 ? '#dc2626' : '#059669'}">${rp(tin - tout)}</td><td></td></tr>` : '')
+          || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada transaksi owner — catat via Buku Besar → + Catat Manual</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    // ---------- 6. NON-BIAYA ----------
+    function ownNonSub(k){ ownSubSet('non', k, () => ownNonTab()); }
+    async function ownNonTab(force){
+      const tb = document.getElementById('tbodyNon');
+      const sub = ownSubGet('non');
+      const hint = {all: 'bergerak tapi bukan omzet & bukan biaya', F1: 'pindah media — bukan omzet', F2: 'pinjaman & cicilan pokok', F3: 'uang muka — belum omzet penuh'};
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      set('nonHint', hint[sub] || hint.all);
+      try{
+        const led = (await ownLedCached(force)).filter(r => r.kelompok === 'non' && (sub === 'all' || r.kategori === sub));
+        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori_nama)).join('')
+          || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data — catat via Buku Besar → + Catat Manual (transfer/hutang/DP)</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    // ---------- 7. KAS & MEDIA ----------
+    async function ownKasTab(){
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const [g, cfg] = await Promise.all([
+          ownFetch('/finance/ledger/ringkasan').catch(() => null),
+          ownFetch('/finance/cash/config').catch(() => null),
+        ]);
+        const pm = (g && g.per_media) || {};
+        set('mdU', rp(pm.kas_utama || 0));
+        set('mdK', rp(pm.kas_kecil || 0));
+        set('mdB', rp(pm.bank || 0));
+        set('mdQ', rp(pm.qris || 0));
+        const lim = (cfg && cfg.kas_kecil_limit) || 500000;
+        set('mdKSub', `sistem • limit ${rp(lim)}`);
+        set('mdNote', `Saldo sistem per media (buku besar, ${g ? g.count + ' baris' : 'belum termuat'}) • cocokkan fisik di Tutup Kas bawah.`);
+      }catch(e){ set('mdNote', 'Gagal muat saldo: ' + e.message); }
+      try{ await Promise.allSettled([ownBayar(), ownClose()]); }catch(e){}
     }
     function ownToday(){
       const d = new Date();
@@ -2047,6 +2744,7 @@
           + (r.jadi_pengeluaran ? ', jadi pengeluaran ' + rp(r.jadi_pengeluaran) : '')
           + (r.komisi_dibalik ? ', komisi teknisi dibalik ' + rp(r.komisi_dibalik) : '') + '.';
         ownAlert('ok', msg);
+        try{ ownLedInvalidate(); }catch(_){}
         await ownRefunds();
         try{ await ownFinSukses(); }catch(x){}
       }catch(err){
@@ -2103,18 +2801,42 @@
     function ownOutOpen(){
       try{
         document.getElementById('out-tanggal').value = new Date().toISOString().slice(0, 10);
-        ownOutPreview();
+        try{ document.getElementById('out-spqty').value = ''; }catch(e){}
+        ownOutKat();
         document.getElementById('outModal').classList.add('show');
       }catch(e){}
     }
     function ownOutClose(){ try{ document.getElementById('outModal').classList.remove('show'); }catch(e){} }
+    function ownOutKat(){
+      try{ document.getElementById('out-subWrap').style.display = document.getElementById('out-kategori').value === 'D' ? '' : 'none'; }catch(e){}
+      try{
+        const k = document.getElementById('out-kategori').value;
+        document.getElementById('out-stokWrap').style.display = (k === 'B1' || k === 'B2') ? '' : 'none';
+        if(k === 'B1' || k === 'B2') ownOutSpFill();
+      }catch(e){}
+      ownOutPreview();
+    }
+    let _outSpFilled = false;
+    async function ownOutSpFill(){
+      if(_outSpFilled) return; _outSpFilled = true;
+      try{
+        const sp = await ownFetch('/inventory/spareparts');
+        const sel = document.getElementById('out-sp');
+        (Array.isArray(sp) ? sp : []).slice(0, 300).forEach(s => {
+          const o = document.createElement('option');
+          o.value = s.id; o.textContent = `${s.nama || '-'} (stok ${s.stok ?? '?'})`;
+          sel.appendChild(o);
+        });
+      }catch(e){ _outSpFilled = false; }
+    }
     function ownOutPreview(){
       try{
         const n = parseInt(String(document.getElementById('out-nominal').value || '').replace(/\D/g, '')) || 0;
         document.getElementById('out-nominalInfo').textContent = rp(n);
         const k = document.getElementById('out-keperluan').value || '-';
         const c = document.getElementById('out-kategori').value || '-';
-        document.getElementById('out-preview').innerHTML = `Akan dicatat: <strong>${esc(k)}</strong> [${esc(c)}] sebesar <strong>${rp(n)}</strong> — masuk Total Keluar Kas Toko + Laba-Rugi.`;
+        const dest = c === 'B1' || c === 'B2' ? 'HPP' : c === 'D' ? 'Aset (bukan biaya bulan ini)' : c === 'C1' ? 'Operasional gaji' : 'Operasional';
+        document.getElementById('out-preview').innerHTML = `Akan dicatat: <strong>${esc(k)}</strong> [${esc(expLbl(c))}] sebesar <strong>${rp(n)}</strong> — masuk <strong>${dest}</strong> + buku besar.`;
       }catch(e){}
     }
     async function ownOutSave(e){
@@ -2127,16 +2849,24 @@
         tanggal: document.getElementById('out-tanggal').value || undefined,
         keterangan: document.getElementById('out-ket').value.trim() || undefined,
       };
+      if(body.kategori === 'D') body.subkategori = document.getElementById('out-sub').value;
+      try{
+        const spId = parseInt(document.getElementById('out-sp')?.value) || 0;
+        const spQty = parseInt(document.getElementById('out-spqty')?.value) || 0;
+        if((body.kategori === 'B1' || body.kategori === 'B2') && spId && spQty > 0)
+          body.tambah_stok = {sparepart_id: spId, qty: spQty};
+      }catch(e){}
       try{
         await ownFetch('/finance/expenses', {method: 'POST', body: JSON.stringify(body)});
         ownOutClose();
         try{ document.getElementById('outForm').reset(); }catch(_){}
+        try{ ownLedInvalidate(); }catch(_){}
         await ownKeluar();
       }catch(err){ try{ ownAlert('err', 'Gagal simpan: ' + err.message); }catch(_){} }
     }
     async function ownOutDel(id){
       if(!confirm('Hapus catatan pengeluaran ini? (salah input)')) return;
-      try{ await ownFetch('/finance/expenses/' + id, {method: 'DELETE'}); await ownKeluar(); }
+      try{ await ownFetch('/finance/expenses/' + id, {method: 'DELETE'}); try{ ownLedInvalidate(); }catch(_){} await ownKeluar(); }
       catch(e){ ownAlert('err', 'Gagal hapus: ' + e.message); }
     }
     async function ownInList(){
@@ -2160,7 +2890,7 @@
     }
     async function ownInDel(id){
       if(!confirm('Hapus catatan pemasukan ini? (salah input)')) return;
-      try{ await ownFetch('/finance/incomes/' + id, {method: 'DELETE'}); await ownInList(); await ownKeluar(); }
+      try{ await ownFetch('/finance/incomes/' + id, {method: 'DELETE'}); try{ ownLedInvalidate(); }catch(_){} await ownInList(); await ownKeluar(); }
       catch(e){ ownAlert('err', 'Gagal hapus: ' + e.message); }
     }
     async function ownKeluar(){
@@ -2183,10 +2913,10 @@
         try{
           document.getElementById('outKatRow').innerHTML = Object.entries(ring.per_kategori || {})
             .sort((a, b) => b[1] - a[1])
-            .map(([k, v]) => `<span style="font-size:11.5px;background:#f9fafb;border:1px solid #ececec;border-radius:99px;padding:4px 10px"><strong>${esc(k)}</strong> ${rp(v)}</span>`).join('')
+            .map(([k, v]) => `<span style="font-size:11.5px;background:#f9fafb;border:1px solid #ececec;border-radius:99px;padding:4px 10px"><strong>${esc(expLbl(k))}</strong> ${rp(v)}</span>`).join('')
             || '<span style="font-size:11.5px;color:#8a8f98">Belum ada pengeluaran</span>';
         }catch(e){}
-        tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
+        tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td style="font-size:11px">${esc(expLbl(r.kategori))}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
           || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
         await ownLaba();
         await ownInList();
@@ -2195,95 +2925,259 @@
       }
     }
     async function ownLaba(){
-      // Laba bersih = omzet cair − komisi − hadir − refund − beban toko celaka − pengeluaran
+      // SATU rumus mentor via ownArus (sama dgn Ringkasan): komisi teknisi = HPP.
+      // Omzet penjualan ditampilkan penuh + HPP barang baris sendiri (net = profit, angka laba tidak berubah).
       const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
       try{
-        const _d = new Date();
-        const today = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
-        const ym = today.slice(0, 7);
-        const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
-        const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0, 10);
-        const arr = await ownServices();
-        const ok = arr.filter(d => SUKSES.includes(d.status));
-        const sum = (list) => list.reduce((s, d) => s + (Number(d.biaya) || 0), 0);
-        const omH = sum(ok.filter(d => actDate(d) === today)), omB = sum(ok.filter(d => actDate(d).slice(0, 7) === ym));
-        let komH = 0, komB = 0, hadH = 0, hadB = 0;
-        try{
-          const techs = await ownFetch('/technicians');
-          const list = Array.isArray(techs) ? techs : [];
-          for(const t of list){
-            try{
-              const j = await ownFetch(`/engine/kas/teknisi/${t.id}`);
-              (j.riwayat || []).forEach(l => {
-                const m = Number(l.masuk) || 0; if(!m) return;
-                const tt = String(l.tanggal || '').slice(0, 10);
-                const isHad = l.tipe === 'allowance';
-                if(tt === today){ if(isHad) hadH += m; else komH += m; }
-                if(tt.slice(0, 7) === ym){ if(isHad) hadB += m; else komB += m; }
-              });
-            }catch(e){}
-          }
-        }catch(e){}
-        let refH = 0, refB = 0, celH = 0, celB = 0, outH = 0, outB = 0, jualH = 0, jualB = 0, inH = 0, inB = 0;
-        try{
-          const rf = await ownFetch('/finance/refunds');
-          (Array.isArray(rf) ? rf : []).forEach(r => {
-            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
-            if(tt === today) refH += n;
-            if(tt.slice(0, 7) === ym) refB += n;
-          });
-        }catch(e){}
-        try{
-          const ac = await ownFetch('/finance/accidents');
-          (Array.isArray(ac) ? ac : []).forEach(a => {
-            const n = Number(a.beban_toko) || 0; if(!n) return;
-            const tt = String(a.tanggal || '').slice(0, 10);
-            if(tt === today) celH += n;
-            if(tt.slice(0, 7) === ym) celB += n;
-          });
-        }catch(e){}
-        try{
-          const ex = await ownFetch('/finance/expenses');
-          (Array.isArray(ex) ? ex : []).forEach(r => {
-            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
-            if(tt === today) outH += n;
-            if(tt.slice(0, 7) === ym) outB += n;
-          });
-        }catch(e){}
-        try{
-          const ic = await ownFetch('/finance/incomes');
-          (Array.isArray(ic) ? ic : []).forEach(r => {
-            const n = Number(r.nominal) || 0, tt = String(r.tanggal || '').slice(0, 10);
-            if(tt === today) inH += n;
-            if(tt.slice(0, 7) === ym) inB += n;
-          });
-        }catch(e){}
-        try{
-          const sl = await ownFetch('/sales?limit=300');
-          (Array.isArray(sl) ? sl : []).forEach(s => {
-            const n = Number(s.profit) || 0, tt = String(s.tanggal || '').slice(0, 10);
-            if(tt === today) jualH += n;
-            if(tt.slice(0, 7) === ym) jualB += n;
-          });
-        }catch(e){}
-        const labaH = omH + jualH + inH - komH - hadH - refH - celH - outH;
-        const labaB = omB + jualB + inB - komB - hadB - refB - celB - outB;
+        const A = await ownArus();
         const row = (label, h, b) => `<tr><td>${label}</td><td style="text-align:right">${rp(h)}</td><td style="text-align:right">${rp(b)}</td></tr>`;
         document.getElementById('tbodyLaba').innerHTML =
-          row('➕ Omzet cair bruto', omH, omB) +
-          row('➕ Profit barang/jasa', jualH, jualB) +
-          row('➕ Pemasukan lain/modal', inH, inB) +
-          row('➖ Komisi teknisi', -komH, -komB) +
-          row('➖ Uang hadir', -hadH, -hadB) +
-          row('➖ Refund nominal', -refH, -refB) +
-          row('➖ Beban toko kecelakaan', -celH, -celB) +
-          row('➖ Pengeluaran operasional', -outH, -outB) +
-          `<tr style="background:#f9fafb;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${labaH < 0 ? '#dc2626' : '#059669'}">${rp(labaH)}</td><td style="text-align:right;color:${labaB < 0 ? '#dc2626' : '#059669'}">${rp(labaB)}</td></tr>`;
-        set('labaHari', rp(labaH)); set('labaHariSub', `omzet ${rp(omH)} − beban ${rp(omH - labaH)}`);
-        set('labaBulan', rp(labaB)); set('labaBulanSub', `omzet ${rp(omB)} − beban ${rp(omB - labaB)}`);
+          row('➕ Omzet service cair', A.omSvcH, A.omSvcB) +
+          row('➕ Omzet penjualan kasir', A.jualH, A.jualB) +
+          row('➖ Refund (dari omzet)', -A.ref.h, -A.ref.b) +
+          row('➖ Komisi teknisi (HPP)', -A.komH, -A.komB) +
+          row('➖ Modal barang terjual (HPP)', -A.hppJualH, -A.hppJualB) +
+          row('➖ Beban toko kecelakaan (HPP)', -A.cel.h, -A.cel.b) +
+          row('➕ Pemasukan lain/modal (bukan omzet)', A.inc.h, A.inc.b) +
+          row('➖ Uang hadir', -A.hadH, -A.hadB) +
+          row('➖ Pengeluaran operasional', -A.out.h, -A.out.b) +
+          `<tr style="background:#f9fafb;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${A.labaH < 0 ? '#dc2626' : '#059669'}">${rp(A.labaH)}</td><td style="text-align:right;color:${A.labaB < 0 ? '#dc2626' : '#059669'}">${rp(A.labaB)}</td></tr>`;
+        set('labaHari', rp(A.labaH)); set('labaHariSub', `omzet ${rp(A.omH)} − HPP ${rp(A.hppH)} − ops ${rp(A.opsH)}`);
+        set('labaBulan', rp(A.labaB)); set('labaBulanSub', `omzet ${rp(A.omB)} − HPP ${rp(A.hppB)} − ops ${rp(A.opsB)}`);
       }catch(e){
         try{ document.getElementById('tbodyLaba').innerHTML = `<tr><td colspan="3" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`; }catch(_){}
       }
+    }
+
+    // ---------- Buku Besar pusat (pondasi mentor A-G) ----------
+    let _bbKat = null;
+    async function ownBbKategori(){
+      if(_bbKat) return _bbKat;
+      _bbKat = await ownFetch('/finance/kategori');
+      const groups = {};
+      Object.entries(_bbKat.kategori || {}).forEach(([kode, m]) => {
+        (groups[m.kelompok] = groups[m.kelompok] || []).push([kode, m.nama]);
+      });
+      const opts = Object.entries(groups).map(([g, arr]) =>
+        `<optgroup label="${esc((_bbKat.kelompok || {})[g] || g)}">` +
+        arr.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('') + '</optgroup>').join('');
+      try{
+        document.getElementById('bbKat').innerHTML = '<option value="">Semua Kategori</option>' + opts;
+        document.getElementById('led-kategori').innerHTML = opts;
+        // 'stok' hanya untuk auto-post sistem (HPP tanpa gerak kas) — bukan pilihan manual
+        const mo = Object.entries(_bbKat.media || {}).filter(([k]) => k !== 'stok').map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('');
+        const moAll = Object.entries(_bbKat.media || {}).map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('');
+        document.getElementById('bbMedia').innerHTML = '<option value="">Semua Media</option>' + moAll;
+        document.getElementById('led-media').innerHTML = mo;
+        document.getElementById('led-tujuan').innerHTML = mo;
+      }catch(e){}
+      return _bbKat;
+    }
+    async function ownBuku(){
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      const tb = document.getElementById('tbodyLedger');
+      try{ await ownBbKategori(); }catch(e){}
+      try{
+        const g = await ownFetch('/finance/ledger/ringkasan');
+        const col = v => v < 0 ? '#dc2626' : '#059669';
+        set('bbOmzet', rp(g.omzet || 0));
+        set('bbHpp', rp(g.hpp || 0));
+        set('bbOps', rp(g.operasional || 0));
+        set('bbKotor', rp(g.laba_kotor || 0));
+        try{ document.getElementById('bbKotor').style.color = col(g.laba_kotor || 0); }catch(e){}
+        set('bbBersih', rp(g.laba_bersih || 0));
+        try{ document.getElementById('bbBersih').style.color = col(g.laba_bersih || 0); }catch(e){}
+        set('bbNote', `${g.count || 0} baris • manual + auto • belanja barang = persediaan (belum HPP) • HPP terbentuk saat terjual/terpakai • transfer tidak masuk omzet`);
+      }catch(e){ set('bbNote', 'Gagal ringkasan: ' + e.message); }
+      try{
+        const q = [];
+        const j = document.getElementById('bbJenis')?.value || '';
+        const k = document.getElementById('bbKat')?.value || '';
+        const m = document.getElementById('bbMedia')?.value || '';
+        const s = document.getElementById('bbSince')?.value || '';
+        if(j) q.push('jenis=' + encodeURIComponent(j));
+        if(k) q.push('kategori=' + encodeURIComponent(k));
+        if(m) q.push('media=' + encodeURIComponent(m));
+        if(s) q.push('since=' + encodeURIComponent(s));
+        const rows = await ownFetch('/finance/ledger' + (q.length ? '?' + q.join('&') : ''));
+        const arr = Array.isArray(rows) ? rows : [];
+        const jpill = jn => jn === 'masuk' ? '<span class="pill ok">masuk</span>' : jn === 'keluar' ? '<span class="pill warn">keluar</span>' : '<span class="pill">transfer</span>';
+        tb.innerHTML = arr.slice(0, 200).map(r => {
+          const neg = r.jenis !== 'masuk';
+          const src = !r.ref_type || r.ref_type === 'manual' ? 'Manual' : r.ref_type === 'expense' ? '🧾 #' + r.ref_id : r.ref_type === 'income' ? '📥 #' + r.ref_id : esc(r.ref_type);
+          const canDel = !r.ref_type || r.ref_type === 'manual';
+          return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
+            + `<td><strong>${esc(r.keterangan || r.kategori_nama || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.dibuat_oleh || '')}</span></td>`
+            + `<td>${jpill(r.jenis)}</td><td style="font-size:11.5px;font-weight:600">${esc(r.subkategori || r.kategori_nama || r.kategori || '')}</td>`
+            + `<td style="text-align:right;font-weight:700;color:${neg ? '#dc2626' : '#059669'}">${neg ? '−' : '+'}${rp(r.nominal || 0)}</td>`
+            + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td>`
+            + `<td style="font-size:11px">${src}</td>`
+            + `<td style="text-align:center">${canDel ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownLedDel(${r.id})">🗑</button>` : '<span title="Baris auto — hapus dari modul sumbernya">🔒</span>'}</td></tr>`;
+        }).join('') || '<tr><td colspan="8" style="text-align:center;color:#8a8f98">Belum ada transaksi — klik + Catat Manual</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="8" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    function ownLedOpen(){
+      try{
+        const t = document.getElementById('led-tanggal');
+        if(t && !t.value){
+          const d = new Date();
+          t.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+        ownBbKategori().catch(() => {}).finally(() => { ownLedJenis(); ownLedPreview(); });
+        document.getElementById('ledModal').classList.add('show');
+        setTimeout(() => document.getElementById('led-nominal')?.focus(), 100);
+      }catch(e){}
+    }
+    function ownLedClose(){ try{ document.getElementById('ledModal').classList.remove('show'); }catch(e){} }
+    function ownLedJenis(){
+      try{
+        const j = document.getElementById('led-jenis').value;
+        document.getElementById('led-tujuanWrap').style.display = j === 'transfer' ? '' : 'none';
+        const k = document.getElementById('led-kategori');
+        if(j === 'transfer' && _bbKat && _bbKat.kategori && _bbKat.kategori['F1']) k.value = 'F1';
+        try{ document.getElementById('led-subWrap').style.display = k.value === 'D' ? '' : 'none'; }catch(e){}
+        ownLedPreview();
+      }catch(e){}
+    }
+    function ownLedPreview(){
+      try{
+        const n = parseInt(document.getElementById('led-nominal')?.value) || 0;
+        const j = document.getElementById('led-jenis')?.value || 'masuk';
+        const k = document.getElementById('led-kategori')?.value || '-';
+        const m = document.getElementById('led-media');
+        const mn = m ? (m.options[m.selectedIndex]?.text || m.value) : '-';
+        document.getElementById('led-nominalInfo').textContent = rp(n);
+        let note = '';
+        if(k === 'F1') note = 'Transfer antar kas — <strong>bukan omzet</strong>, hanya pindah media.';
+        else if(k === 'E2') note = 'Prive owner — <strong>bukan biaya operasional</strong>.';
+        else if(k === 'E1') note = 'Modal owner — masuk kas, <strong>bukan omzet</strong>.';
+        else if(k === 'F3') note = 'DP/titipan — <strong>belum omzet penuh</strong> sampai lunas.';
+        else if(k === 'D') note = 'Aset/investasi — tidak langsung mengecilkan laba bulan ini.';
+        const p = document.getElementById('led-preview');
+        let kn = k;
+        try{ kn = (_bbKat.kategori[k] || {}).nama || k; }catch(e){}
+        if(p) p.innerHTML = n > 0 ? `Akan dicatat: <strong>${esc(j)} • ${esc(kn)}</strong> sebesar <strong>${rp(n)}</strong> via <strong>${esc(mn)}</strong>.<br>${note}` : 'Isi nominal dulu.' + (note ? '<br>' + note : '');
+      }catch(e){}
+    }
+    async function ownLedSave(e){
+      if(e) e.preventDefault();
+      try{
+        const body = {
+          jenis: document.getElementById('led-jenis').value,
+          kategori: document.getElementById('led-kategori').value,
+          nominal: parseInt(document.getElementById('led-nominal').value) || 0,
+          media: document.getElementById('led-media').value,
+          keterangan: document.getElementById('led-ket').value.trim(),
+          tanggal: document.getElementById('led-tanggal').value || undefined,
+        };
+        if(body.jenis === 'transfer') body.media_tujuan = document.getElementById('led-tujuan').value;
+        if(document.getElementById('led-kategori').value === 'D') body.subkategori = document.getElementById('led-sub').value;
+        if(!body.keterangan) delete body.keterangan;
+        if(!body.tanggal) delete body.tanggal;
+        await ownFetch('/finance/ledger', {method: 'POST', body: JSON.stringify(body)});
+        ownLedClose();
+        try{ document.getElementById('ledForm')?.reset(); }catch(_){}
+        ownLedInvalidate();
+        await ownBuku();
+      }catch(err){ try{ ownAlert('err', 'Gagal simpan: ' + err.message); }catch(_){ alert(err.message); } }
+    }
+    async function ownLedDel(id){
+      if(!confirm('Hapus baris manual ini?')) return;
+      try{ await ownFetch('/finance/ledger/' + id, {method: 'DELETE'}); ownLedInvalidate(); await ownBuku(); }
+      catch(e){ try{ ownAlert('err', 'Gagal hapus: ' + e.message); }catch(_){} }
+    }
+
+    // ---------- Tutup Kas harian (ritual mentor) ----------
+    const BB_MEDIA = [['kas_utama', 'Kas Utama (laci)'], ['kas_kecil', 'Kas Kecil'], ['bank', 'Bank'], ['qris', 'QRIS / E-Wallet']];
+    function _bbToday(){
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    async function ownClose(){
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const inp = document.getElementById('clsTanggal');
+        if(inp && !inp.value) inp.value = _bbToday();
+        const tgl = (inp && inp.value) || _bbToday();
+        const p = tgl.split('-');
+        set('clsDate', `${p[2]}/${p[1]}/${p[0]} • hitung fisik malam ini`);
+        const [cfg, data] = await Promise.all([
+          ownFetch('/finance/cash/config').catch(() => null),
+          ownFetch('/finance/cash/close?tanggal=' + encodeURIComponent(tgl)),
+        ]);
+        const sist = data.sistem || {};
+        const t = data.tutup;
+        const fisik = {};
+        BB_MEDIA.forEach(([k]) => { fisik[k] = t && t.fisik ? (Number(t.fisik[k]) || 0) : null; });
+        set('clsSU', rp(sist.kas_utama || 0));
+        set('clsSK', rp(sist.kas_kecil || 0));
+        set('clsSUSub', 'sistem • buku besar');
+        set('clsSKSub', `sistem • limit ${rp((cfg && cfg.kas_kecil_limit) || 500000)}`);
+        set('clsSB', rp(sist.bank || 0));
+        set('clsSQ', rp(sist.qris || 0));
+        document.getElementById('tbodyClose').innerHTML = BB_MEDIA.map(([k, label]) => {
+          const s = Number(sist[k]) || 0;
+          const f = fisik[k];
+          const sel = f === null ? null : f - s;
+          return `<tr><td><strong>${label}</strong></td><td style="text-align:right" id="clsS_${k}">${rp(s)}</td>`
+            + `<td style="text-align:right"><input id="clsF_${k}" type="number" min="0" value="${f === null ? '' : f}" placeholder="${s}" oninput="ownCloseLive()" style="width:130px;text-align:right;padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px"></td>`
+            + `<td style="text-align:right;font-weight:700" id="clsD_${k}">${sel === null ? '<span style="color:#8a8f98">-</span>' : `<span style="color:${sel === 0 ? '#059669' : '#dc2626'}">${rp(sel)}</span>`}</td></tr>`;
+        }).join('');
+        try{
+          document.getElementById('clsLimit').value = (cfg && cfg.kas_kecil_limit) || '';
+          document.getElementById('clsLimitInfo').textContent = 'Limit sekarang ' + rp((cfg && cfg.kas_kecil_limit) || 500000) + ((cfg && cfg.disetel) ? '' : ' (default mentor)');
+        }catch(e){}
+        ownCloseLive();
+        set('clsInfo', t ? `Sudah ditutup oleh ${t.ditutup_oleh || '-'}${t.catatan ? ' • ' + t.catatan : ''} — buka lagi untuk koreksi.` : 'Hitung uang fisik + cek mutasi bank/QRIS, isi kolom fisik, simpan malam ini juga.');
+      }catch(e){
+        try{ document.getElementById('tbodyClose').innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }catch(_){}
+      }
+    }
+    function ownCloseLive(){
+      try{
+        let fs = 0, ss = 0;
+        BB_MEDIA.forEach(([k]) => {
+          const fv = document.getElementById('clsF_' + k)?.value;
+          const f = fv === '' || fv === undefined ? null : (parseInt(fv) || 0);
+          const s = Number((document.getElementById('clsS_' + k)?.textContent || '0').replace(/[^\d-]/g, '')) || 0;
+          ss += s;
+          const dEl = document.getElementById('clsD_' + k);
+          if(f === null){ if(dEl) dEl.innerHTML = '<span style="color:#8a8f98">-</span>'; return; }
+          fs += f;
+          const sel = f - s;
+          if(dEl) dEl.innerHTML = `<span style="color:${sel === 0 ? '#059669' : '#dc2626'}">${rp(sel)}</span>`;
+        });
+        const anyFilled = BB_MEDIA.some(([k]) => (document.getElementById('clsF_' + k)?.value ?? '') !== '');
+        const sel = anyFilled ? fs - ss : null;
+        const el = document.getElementById('clsSelisih');
+        if(el){
+          el.textContent = sel === null ? '-' : rp(sel);
+          el.style.color = sel === null ? '' : (sel === 0 ? '#059669' : '#dc2626');
+        }
+        const card = document.getElementById('clsSelisihCard');
+        if(card) card.style.borderLeftColor = sel === null ? '#f59e0b' : (sel === 0 ? '#059669' : '#dc2626');
+        const sub = document.getElementById('clsSelisihSub');
+        if(sub) sub.textContent = sel === null ? 'fisik − sistem • target Rp0' : (sel === 0 ? 'Cocok Rp0 — bagus, simpan!' : 'Ada selisih — cari malam ini juga');
+      }catch(e){}
+    }
+    async function ownCloseSave(){
+      try{
+        const tgl = document.getElementById('clsTanggal')?.value || _bbToday();
+        const fisik = {};
+        BB_MEDIA.forEach(([k]) => { fisik[k] = parseInt(document.getElementById('clsF_' + k)?.value) || 0; });
+        const r = await ownFetch('/finance/cash/close', {method: 'POST', body: JSON.stringify({tanggal: tgl, fisik, catatan: document.getElementById('clsCatatan')?.value?.trim() || undefined})});
+        try{ ownAlert('ok', r.ok ? '🌙 Tutup kas cocok Rp0 — mantap!' : `Tutup kas tersimpan, selisih ${rp(r.selisih)} — cari penyebabnya malam ini.`); }catch(e){}
+        await ownClose();
+      }catch(e){ try{ ownAlert('err', 'Gagal simpan tutup kas: ' + e.message); }catch(_){} }
+    }
+    async function ownKasLimit(){
+      try{
+        const n = parseInt(document.getElementById('clsLimit')?.value) || 0;
+        if(n <= 0){ try{ ownAlert('err', 'Limit harus > 0'); }catch(e){} return; }
+        const r = await ownFetch('/finance/cash/config', {method: 'PUT', body: JSON.stringify({kas_kecil_limit: n})});
+        try{ document.getElementById('clsLimitInfo').textContent = 'Limit sekarang ' + rp(r.kas_kecil_limit); }catch(e){}
+        await ownClose();
+      }catch(e){ try{ ownAlert('err', 'Gagal set limit (owner/admin saja): ' + e.message); }catch(_){} }
     }
 
     // ---------- Penjualan (real: GET/DELETE /sales + ringkasan) ----------
@@ -2310,7 +3204,7 @@
     }
     async function ownJualVoid(id, kode){
       if(!confirm(`Void struk ${kode}? Stok barang kembali, struk dihapus.`)) return;
-      try{ await ownFetch('/sales/' + id, {method: 'DELETE'}); await ownPenjualan(); }
+      try{ await ownFetch('/sales/' + id, {method: 'DELETE'}); try{ ownLedInvalidate(); }catch(_){} await ownPenjualan(); }
       catch(e){ try{ ownAlert('err', 'Gagal void: ' + e.message); }catch(_){} }
     }
 

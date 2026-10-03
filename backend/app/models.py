@@ -442,3 +442,60 @@ class CommissionLedger(Base):
     sisa_hutang_saat_itu = Column(Integer, default=0)
     keterangan = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
+
+
+class LedgerEntry(Base):
+    """BUKU BESAR PUSAT (pondasi mentor): SATU pembukuan, aliran dibedakan kode A-G.
+    Setiap transaksi: tanggal + keterangan + jenis + kategori + nominal + media (G).
+    Transfer (F1) = pindah media, bukan omzet. DP (F3) bukan omzet penuh."""
+    __tablename__ = "ledger_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    jenis = Column(String(20), nullable=False, index=True)  # masuk / keluar / transfer
+    kategori = Column(String(10), nullable=False, index=True)  # A1..F3 (lihat ledger_meta.KATEGORI)
+    subkategori = Column(String(40), nullable=True, index=True)  # opsional; D wajib: Aset/Investasi
+    keterangan = Column(Text, nullable=True)
+    nominal = Column(Integer, default=0)
+    media = Column(String(20), nullable=False, index=True)  # kas_utama/kas_kecil/bank/qris (asal; F1 = asal)
+    media_tujuan = Column(String(20), nullable=True)  # wajib utk F1
+    # Prinsip mentor: beli = persediaan (masuk_laba=False), HPP terbentuk saat terjual/terpakai.
+    masuk_laba = Column(Boolean, default=True)  # False = persediaan, belum hitung laba
+    pengaruh_kas = Column(Boolean, default=True)  # False = HPP terbentuk tanpa gerak kas (kas keluar saat beli)
+    ref_type = Column(String(30), nullable=True, index=True)  # expense/income/manual/... (dual-write guard)
+    ref_id = Column(Integer, nullable=True, index=True)
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class CashClose(Base):
+    """TUTUP KAS HARIAN (ritual mentor): sistem vs fisik per media, selisih target Rp0."""
+    __tablename__ = "cash_closes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, nullable=False, index=True)
+    kas_utama_sistem = Column(Integer, default=0)
+    kas_kecil_sistem = Column(Integer, default=0)
+    bank_sistem = Column(Integer, default=0)
+    qris_sistem = Column(Integer, default=0)
+    kas_utama_fisik = Column(Integer, default=0)
+    kas_kecil_fisik = Column(Integer, default=0)
+    bank_fisik = Column(Integer, default=0)
+    qris_fisik = Column(Integer, default=0)
+    selisih = Column(Integer, default=0)  # fisik_total - sistem_total
+    catatan = Column(String(255), nullable=True)
+    ditutup_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class CashConfig(Base):
+    """Konfigurasi kas per toko: limit Kas Kecil (petty cash mentor)."""
+    __tablename__ = "cash_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, unique=True, index=True)
+    kas_kecil_limit = Column(Integer, default=500000)
+    updated_oleh = Column(String(80), nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

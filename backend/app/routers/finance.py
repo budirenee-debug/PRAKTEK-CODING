@@ -6,9 +6,11 @@ import datetime
 
 from ..database import get_db
 from .. import models
+from .. import crud
 from ..audit import log_action
 from ..store_ctx import resolve_store, store_role, default_store
 from .. import engine_logic as el
+from .. import ledger_meta as lm
 from .auth import get_current_user
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
@@ -216,6 +218,49 @@ def close_accident(acc_id: int, db: Session = Depends(get_db), current=Depends(g
     return _accident_row(db, a)
 
 
+def _ledger_add(db, store_id, tanggal, jenis, kategori, keterangan, nominal,
+                media, media_tujuan=None, ref_type=None, ref_id=None, oleh=None,
+                subkategori=None, masuk_laba=True, pengaruh_kas=True):
+    """Tambah 1 baris buku besar (tanpa commit — caller yang commit).
+    Guard duplikat dual-write via (ref_type, ref_id).
+    Prinsip mentor: masuk_laba=False = persediaan (belum HPP); pengaruh_kas=False = tanpa gerak kas."""
+    err = lm.validate_entry(kategori, jenis, nominal, media, media_tujuan)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    if kategori == "D" and (subkategori or "") not in lm.SUB_D:
+        raise HTTPException(status_code=400, detail="kategori D wajib subkategori: " + "/".join(lm.SUB_D))
+    if ref_type and ref_id is not None:
+        dup = db.query(models.LedgerEntry).filter(
+            models.LedgerEntry.store_id == store_id,
+            models.LedgerEntry.ref_type == ref_type,
+            models.LedgerEntry.ref_id == ref_id).first()
+        if dup:
+            return dup
+    row = models.LedgerEntry(store_id=store_id, tanggal=tanggal, jenis=jenis,
+                             kategori=kategori, keterangan=keterangan, nominal=nominal,
+                             media=media, media_tujuan=media_tujuan,
+                             ref_type=ref_type, ref_id=ref_id, dibuat_oleh=oleh,
+                             subkategori=subkategori,
+                             masuk_laba=bool(masuk_laba), pengaruh_kas=bool(pengaruh_kas))
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _ledger_row(e: models.LedgerEntry):
+    meta = lm.KATEGORI.get(e.kategori, {})
+    return {"id": e.id, "tanggal": e.tanggal, "jenis": e.jenis,
+            "kategori": e.kategori, "kategori_nama": meta.get("nama"),
+            "kelompok": meta.get("kelompok"), "subkategori": e.subkategori,
+            "masuk_laba": True if e.masuk_laba is None else bool(e.masuk_laba),
+            "pengaruh_kas": True if e.pengaruh_kas is None else bool(e.pengaruh_kas),
+            "keterangan": e.keterangan, "nominal": e.nominal,
+            "media": e.media, "media_nama": lm.MEDIA.get(e.media),
+            "media_tujuan": e.media_tujuan,
+            "ref_type": e.ref_type, "ref_id": e.ref_id,
+            "dibuat_oleh": e.dibuat_oleh, "created_at": e.created_at}
+
+
 def _parse_tgl(v):
     if not v:
         return datetime.date.today()
@@ -346,6 +391,21 @@ def create_refund(payload: dict = Body(...), store_id: Optional[int] = Query(Non
         svc.keterangan = ((svc.keterangan or "") + f" | Refund {r.kode}: {alasan}").strip(" |")
         db.commit()
 
+    # buku besar: refund = PENGURANG omzet (keluar kelompok omzet, kas ikut keluar)
+    try:
+        _ledger_add(db, store.id, tanggal, "keluar", "A1",
+                    f"Refund {r.kode} {invoice or '-'}: {alasan}", nominal,
+                    lm.METODE_KE_MEDIA.get(metode, "kas_utama"),
+                    ref_type="refund", ref_id=r.id, oleh=getattr(current, "username", None),
+                    masuk_laba=True, pengaruh_kas=True)
+        db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("ledger refund skip:", e)
+
     log_action(db, "finance.refund", target=invoice or r.kode,
                detail=f"{r.kode} nominal={nominal} metode={metode} "
                       f"dari_pendapatan={dari_pendapatan} komisi_dibalik={komisi_dibalik}",
@@ -390,7 +450,13 @@ def list_expenses(store_id: Optional[int] = Query(None), kategori: Optional[str]
     store, _ = _ctx_read(db, current, store_id)
     q = db.query(models.Expense).filter(models.Expense.store_id == store.id)
     if kategori:
-        q = q.filter(models.Expense.kategori == kategori)
+        # kompatibel: filter nama lama ikut mencocokkan kode mentornya
+        legacy = {"Sewa": "C2", "Listrik": "C2", "Internet": "C3", "Gaji": "C1",
+                  "Belanja Part": "B1", "Operasional": "C4", "Lainnya": "C4"}
+        codes = {kategori}
+        if kategori in legacy:
+            codes.add(legacy[kategori])
+        q = q.filter(models.Expense.kategori.in_(codes))
     if since:
         try:
             d0 = datetime.datetime.strptime(since[:10], "%Y-%m-%d").date()
@@ -428,7 +494,8 @@ def ringkasan_expenses(store_id: Optional[int] = Query(None),
 @router.post("/expenses")
 def create_expense(payload: dict = Body(...), store_id: Optional[int] = Query(None),
                    db: Session = Depends(get_db), current=Depends(get_current_user)):
-    """Catat pengeluaran operasional. Tulis: owner/admin/kasir/superadmin (kasir dari Kas Toko). Hapus tetap owner/admin."""
+    """Catat pengeluaran: kode mentor (B1/B2/C1-C6/D) atau nama lama (kompatibel).
+    Tulis: owner/admin/kasir/superadmin (kasir dari Kas Toko). Hapus tetap owner/admin."""
     store, _ = _ctx_write(db, current, store_id)
     keperluan = (payload.get("keperluan") or "").strip()
     if not keperluan:
@@ -436,22 +503,62 @@ def create_expense(payload: dict = Body(...), store_id: Optional[int] = Query(No
     nominal = int(payload.get("nominal") or 0)
     if nominal <= 0:
         raise HTTPException(status_code=400, detail="nominal harus > 0")
-    kategori = (payload.get("kategori") or "Operasional").strip()
-    if kategori not in KAT_EXPENSE:
-        raise HTTPException(status_code=400, detail="kategori harus: " + "/".join(KAT_EXPENSE))
+    kat_in = (payload.get("kategori") or "C4").strip()
+    # nama lama -> kode mentor (kompatibel data/form lama)
+    kat_legacy = {"Sewa": "C2", "Listrik": "C2", "Internet": "C3", "Gaji": "C1",
+                  "Belanja Part": "B1", "Operasional": "C4", "Lainnya": "C4"}
+    if kat_in in lm.KAT_EXPENSE_NEW:
+        kode = kat_in
+    elif kat_in in kat_legacy:
+        kode = kat_legacy[kat_in]
+    else:
+        raise HTTPException(status_code=400, detail="kategori harus kode mentor: " + "/".join(sorted(lm.KAT_EXPENSE_NEW.keys())))
+    kategori = kode  # simpan kode mentor (C4, B1, D, ...)
     metode = (payload.get("metode") or "Tunai").strip()
     if metode not in METODE:
         raise HTTPException(status_code=400, detail="metode harus Tunai/Transfer/QRIS")
+    subkategori = (payload.get("subkategori") or "").strip() or None
+    if kode == "D" and (subkategori or "") not in lm.SUB_D:
+        raise HTTPException(status_code=400, detail="kategori D wajib subkategori: " + "/".join(lm.SUB_D))
     e = models.Expense(store_id=store.id, tanggal=_parse_tgl(payload.get("tanggal")),
                        kategori=kategori, keperluan=keperluan, nominal=nominal,
                        metode=metode,
                        keterangan=(payload.get("keterangan") or "").strip() or None,
                        dibuat_oleh=getattr(current, "username", None))
     db.add(e)
+    db.flush()
+    # dual-write ke buku besar pusat (kode mentor, media dari metode bayar).
+    # Prinsip mentor: belanja barang (B1/B2) = PERSEDIAAN (masuk_laba=False), HPP saat terjual/terpakai.
+    label = lm.KAT_EXPENSE_NEW.get(kode, kode)
+    is_belanja = kode in ("B1", "B2")
+    _ledger_add(db, store.id, e.tanggal, "keluar", kode,
+                f"{label}: {keperluan}", nominal,
+                lm.METODE_KE_MEDIA.get(metode, "kas_utama"),
+                ref_type="expense", ref_id=e.id, oleh=getattr(current, "username", None),
+                subkategori=subkategori, masuk_laba=not is_belanja, pengaruh_kas=True)
+    # Prinsip mentor: beli = uang berkurang + STOK BERTAMBAH (opsional, pilih barangnya).
+    stok_info = ""
+    if is_belanja:
+        ts = payload.get("tambah_stok") or {}
+        try:
+            sp_id = int(ts.get("sparepart_id") or 0)
+            qty = int(ts.get("qty") or 0)
+        except Exception:
+            sp_id, qty = 0, 0
+        if sp_id and qty > 0:
+            sp = db.query(models.Sparepart).filter(
+                models.Sparepart.id == sp_id,
+                models.Sparepart.store_id == store.id).first()
+            if not sp:
+                raise HTTPException(status_code=404, detail="barang stok tidak ditemukan di toko ini")
+            sp, err = crud.masuk_part(db, sp, qty, actor=current, ref=f"EXP-{e.id}")
+            if err:
+                raise HTTPException(status_code=400, detail=err)
+            stok_info = f" + stok {sp.nama} +{qty}"
     db.commit()
     db.refresh(e)
     log_action(db, "finance.expense", target=f"EXP-{e.id}",
-               detail=f"{kategori} {keperluan} nominal={nominal} metode={metode}",
+               detail=f"{kategori} {keperluan} nominal={nominal} metode={metode}{stok_info}",
                actor=current, store_id=store.id)
     return _expense_row(e)
 
@@ -466,6 +573,10 @@ def delete_expense(exp_id: int, store_id: Optional[int] = Query(None),
     if not e:
         raise HTTPException(status_code=404, detail="Pengeluaran tidak ditemukan di toko ini")
     info = f"{e.kategori} {e.keperluan} nominal={e.nominal}"
+    db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.ref_type == "expense",
+        models.LedgerEntry.ref_id == exp_id).delete()
     db.delete(e)
     db.commit()
     log_action(db, "finance.expense_hapus", target=f"EXP-{exp_id}",
@@ -549,6 +660,12 @@ def create_income(payload: dict = Body(...), store_id: Optional[int] = Query(Non
                           keterangan=(payload.get("keterangan") or "").strip() or None,
                           dibuat_oleh=getattr(current, "username", None))
     db.add(e)
+    db.flush()
+    # dual-write ke buku besar pusat (E1 modal / A4 pendapatan lain)
+    _ledger_add(db, store.id, e.tanggal, "masuk", lm.INCOME_CAT_MAP.get(kategori, "A4"),
+                f"{kategori}: {sumber}", nominal,
+                lm.METODE_KE_MEDIA.get(metode, "kas_utama"),
+                ref_type="income", ref_id=e.id, oleh=getattr(current, "username", None))
     db.commit()
     db.refresh(e)
     log_action(db, "finance.income", target=f"IN-{e.id}",
@@ -567,11 +684,277 @@ def delete_income(inc_id: int, store_id: Optional[int] = Query(None),
     if not e:
         raise HTTPException(status_code=404, detail="Pemasukan tidak ditemukan di toko ini")
     info = f"{e.kategori} {e.sumber} nominal={e.nominal}"
+    db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.ref_type == "income",
+        models.LedgerEntry.ref_id == inc_id).delete()
     db.delete(e)
     db.commit()
     log_action(db, "finance.income_hapus", target=f"IN-{inc_id}",
                detail=info, actor=current, store_id=store.id)
     return {"ok": True, "id": inc_id}
+
+
+# ================= BUKU BESAR PUSAT (pondasi mentor A-G) =================
+@router.get("/kategori")
+def get_kategori(current=Depends(get_current_user)):
+    """Peta kategori mentor A-G + media G untuk dropdown frontend. Login saja cukup."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    return {"kategori": lm.KATEGORI, "kelompok": lm.KELOMPOK, "media": lm.MEDIA,
+            "jenis": lm.JENIS, "expense_map": lm.EXPENSE_CAT_MAP,
+            "income_map": lm.INCOME_CAT_MAP,
+            "expense_codes": lm.KAT_EXPENSE_NEW, "sub_d": lm.SUB_D,
+            "kas_kecil_default": lm.KAS_KECIL_DEFAULT}
+
+
+@router.get("/ledger/ringkasan")
+def ringkasan_ledger(store_id: Optional[int] = Query(None),
+                     db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """5 angka mentor dari buku besar: omzet − HPP = laba kotor − operasional = laba bersih.
+    Prinsip mentor: hanya baris masuk_laba yang hitung laba (persediaan dikecualikan);
+    omzet = masuk − pengurang (refund); arus/media hanya yang pengaruh_kas."""
+    store, _ = _ctx_read(db, current, store_id)
+    rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id).all()
+    g = {"omzet": 0, "hpp": 0, "operasional": 0, "aset": 0,
+         "modal": 0, "prive": 0, "non_masuk": 0, "non_keluar": 0,
+         "total_masuk": 0, "total_keluar": 0, "persediaan": 0}
+    for e in rows:
+        n = int(e.nominal or 0)
+        kel = lm.kelompok_of(e.kategori or "")
+        laba = e.masuk_laba is not False
+        kas = e.pengaruh_kas is not False
+        if e.jenis == "transfer":
+            continue  # F1 pindah media, bukan omzet/biaya
+        if e.jenis == "masuk":
+            if kas:
+                g["total_masuk"] += n
+            if not laba:
+                continue
+            if kel == "omzet":
+                g["omzet"] += n
+            elif kel == "owner":
+                g["modal"] += n
+            elif kel == "non":
+                g["non_masuk"] += n
+        elif e.jenis == "keluar":
+            if kas:
+                g["total_keluar"] += n
+            if kel == "hpp" and not laba:
+                g["persediaan"] += n  # beli barang: kas keluar, stok bertambah, BELUM HPP
+                continue
+            if not laba:
+                continue
+            if kel == "hpp":
+                g["hpp"] += n
+            elif kel == "omzet":
+                g["omzet"] -= n  # refund: pengurang omzet
+            elif kel == "operasional":
+                g["operasional"] += n
+            elif kel == "aset":
+                g["aset"] += n
+            elif kel == "owner":
+                g["prive"] += n
+            elif kel == "non":
+                g["non_keluar"] += n
+    kotor = g["omzet"] - g["hpp"]
+    return {**g, "laba_kotor": kotor, "laba_bersih": kotor - g["operasional"],
+            "arus_bersih": g["total_masuk"] - g["total_keluar"],
+            "per_media": _sistem_media(db, store.id), "count": len(rows)}
+
+
+@router.get("/ledger")
+def list_ledger(store_id: Optional[int] = Query(None), kategori: Optional[str] = Query(None),
+                jenis: Optional[str] = Query(None), media: Optional[str] = Query(None),
+                subkategori: Optional[str] = Query(None),
+                masuk_laba: Optional[bool] = Query(None),
+                since: Optional[str] = Query(None), limit: int = Query(300, le=1000),
+                db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    q = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id)
+    if kategori:
+        q = q.filter(models.LedgerEntry.kategori == kategori)
+    if subkategori:
+        q = q.filter(models.LedgerEntry.subkategori == subkategori)
+    if masuk_laba is not None:
+        q = q.filter(models.LedgerEntry.masuk_laba == masuk_laba)
+    if jenis:
+        q = q.filter(models.LedgerEntry.jenis == jenis)
+    if media:
+        q = q.filter(models.LedgerEntry.media == media)
+    if since:
+        try:
+            d0 = datetime.datetime.strptime(since[:10], "%Y-%m-%d").date()
+            q = q.filter(models.LedgerEntry.tanggal >= d0)
+        except Exception:
+            raise HTTPException(status_code=400, detail="since harus YYYY-MM-DD")
+    rows = q.order_by(models.LedgerEntry.tanggal.desc(), models.LedgerEntry.id.desc()).limit(limit).all()
+    return [_ledger_row(e) for e in rows]
+
+
+@router.post("/ledger")
+def create_ledger(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                  db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Catat manual ke buku besar: wajib jenis + kategori A-G + media G.
+    Karyawan (kasir) boleh catat harian; transfer F1 bukan omzet; DP F3 bukan omzet penuh."""
+    store, _ = _ctx_write(db, current, store_id)
+    jenis = (payload.get("jenis") or "").strip().lower()
+    kategori = (payload.get("kategori") or "").strip().upper()
+    try:
+        nominal = int(payload.get("nominal") or 0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="nominal harus angka")
+    media = (payload.get("media") or "").strip().lower()
+    mt = (payload.get("media_tujuan") or "").strip().lower() or None
+    keterangan = (payload.get("keterangan") or "").strip() or None
+    subkategori = (payload.get("subkategori") or "").strip() or None
+    masuk_laba = payload.get("masuk_laba", True)
+    masuk_laba = False if masuk_laba is False or str(masuk_laba).lower() in ("0", "false", "no") else True
+    pengaruh_kas = payload.get("pengaruh_kas", True)
+    pengaruh_kas = False if pengaruh_kas is False or str(pengaruh_kas).lower() in ("0", "false", "no") else True
+    row = _ledger_add(db, store.id, _parse_tgl(payload.get("tanggal")), jenis, kategori,
+                      keterangan, nominal, media, mt,
+                      ref_type="manual", ref_id=None, oleh=getattr(current, "username", None),
+                      subkategori=subkategori, masuk_laba=masuk_laba, pengaruh_kas=pengaruh_kas)
+    db.commit()
+    db.refresh(row)
+    log_action(db, "finance.ledger", target=f"LED-{row.id}",
+               detail=f"{jenis} {kategori} {nominal} via {media}",
+               actor=current, store_id=store.id)
+    return _ledger_row(row)
+
+
+@router.delete("/ledger/{led_id}")
+def delete_ledger(led_id: int, store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Hapus baris MANUAL saja. Baris auto (expense/income) dihapus dari modul sumbernya."""
+    store, _ = _ctx(db, current, store_id)
+    e = db.query(models.LedgerEntry).filter(models.LedgerEntry.id == led_id,
+                                            models.LedgerEntry.store_id == store.id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Baris buku besar tidak ditemukan di toko ini")
+    if (e.ref_type or "manual") != "manual":
+        raise HTTPException(status_code=400, detail=f"Baris auto dari {e.ref_type} — hapus dari modul sumbernya")
+    info = f"{e.jenis} {e.kategori} nominal={e.nominal}"
+    db.delete(e)
+    db.commit()
+    log_action(db, "finance.ledger_hapus", target=f"LED-{led_id}",
+               detail=info, actor=current, store_id=store.id)
+    return {"ok": True, "id": led_id}
+
+
+def _sistem_media(db, store_id: int):
+    """Saldo sistem per media dari buku besar (transfer menggeser kedua sisi).
+    Hanya baris pengaruh_kas (HPP terbentuk tanpa gerak kas dikecualikan)."""
+    saldo = {m: 0 for m in lm.MEDIA.keys()}
+    rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store_id).all()
+    for e in rows:
+        if e.pengaruh_kas is False:
+            continue
+        n = int(e.nominal or 0)
+        if e.jenis == "masuk" and e.media in saldo:
+            saldo[e.media] += n
+        elif e.jenis == "keluar" and e.media in saldo:
+            saldo[e.media] -= n
+        elif e.jenis == "transfer":
+            if e.media in saldo:
+                saldo[e.media] -= n
+            if (e.media_tujuan or "") in saldo:
+                saldo[e.media_tujuan] += n
+    return saldo
+
+
+@router.get("/cash/config")
+def get_cash_config(store_id: Optional[int] = Query(None),
+                    db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    cfg = db.query(models.CashConfig).filter(models.CashConfig.store_id == store.id).first()
+    return {"store_id": store.id,
+            "kas_kecil_limit": cfg.kas_kecil_limit if cfg else lm.KAS_KECIL_DEFAULT,
+            "disetel": bool(cfg)}
+
+
+@router.put("/cash/config")
+def put_cash_config(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                    db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Set limit Kas Kecil (petty cash mentor). Owner/admin saja."""
+    store, _ = _ctx(db, current, store_id)
+    try:
+        limit = int(payload.get("kas_kecil_limit") or 0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="kas_kecil_limit harus angka")
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="kas_kecil_limit harus > 0")
+    cfg = db.query(models.CashConfig).filter(models.CashConfig.store_id == store.id).first()
+    if not cfg:
+        cfg = models.CashConfig(store_id=store.id)
+        db.add(cfg)
+    cfg.kas_kecil_limit = limit
+    cfg.updated_oleh = getattr(current, "username", None)
+    db.commit()
+    db.refresh(cfg)
+    log_action(db, "finance.kas_kecil", target=f"store-{store.id}",
+               detail=f"limit kas kecil = {limit}", actor=current, store_id=store.id)
+    return {"store_id": store.id, "kas_kecil_limit": cfg.kas_kecil_limit, "disetel": True}
+
+
+@router.get("/cash/close")
+def get_cash_close(tanggal: Optional[str] = Query(None), store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Ambil tutup kas tanggal tertentu + snapshot sistem per media saat ini."""
+    store, _ = _ctx_read(db, current, store_id)
+    tgl = _parse_tgl(tanggal) if tanggal else datetime.date.today()
+    c = db.query(models.CashClose).filter(models.CashClose.store_id == store.id,
+                                          models.CashClose.tanggal == tgl).first()
+    out = None
+    if c:
+        out = {"tanggal": c.tanggal, "sistem": {"kas_utama": c.kas_utama_sistem,
+               "kas_kecil": c.kas_kecil_sistem, "bank": c.bank_sistem, "qris": c.qris_sistem},
+               "fisik": {"kas_utama": c.kas_utama_fisik, "kas_kecil": c.kas_kecil_fisik,
+               "bank": c.bank_fisik, "qris": c.qris_fisik},
+               "selisih": c.selisih, "catatan": c.catatan, "ditutup_oleh": c.ditutup_oleh}
+    return {"tanggal": tgl, "tutup": out, "sistem": _sistem_media(db, store.id)}
+
+
+@router.post("/cash/close")
+def post_cash_close(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                    db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Ritual TUTUP KAS malam: cocokkan fisik vs sistem per media. Selisih target Rp0.
+    Tulis: owner/admin/kasir (kasir tutup kasirannya malam ini)."""
+    store, _ = _ctx_write(db, current, store_id)
+    tgl = _parse_tgl(payload.get("tanggal"))
+    fisik = payload.get("fisik") or {}
+    try:
+        f = {m: int(fisik.get(m) or 0) for m in lm.MEDIA.keys()}
+    except Exception:
+        raise HTTPException(status_code=400, detail="fisik harus angka per media")
+    if any(v < 0 for v in f.values()):
+        raise HTTPException(status_code=400, detail="fisik tidak boleh negatif")
+    sist = _sistem_media(db, store.id)
+    selisih = sum(f.values()) - sum(sist.values())
+    c = db.query(models.CashClose).filter(models.CashClose.store_id == store.id,
+                                          models.CashClose.tanggal == tgl).first()
+    if not c:
+        c = models.CashClose(store_id=store.id, tanggal=tgl)
+        db.add(c)
+    c.kas_utama_sistem = sist["kas_utama"]
+    c.kas_kecil_sistem = sist["kas_kecil"]
+    c.bank_sistem = sist["bank"]
+    c.qris_sistem = sist["qris"]
+    c.kas_utama_fisik = f["kas_utama"]
+    c.kas_kecil_fisik = f["kas_kecil"]
+    c.bank_fisik = f["bank"]
+    c.qris_fisik = f["qris"]
+    c.selisih = selisih
+    c.catatan = (payload.get("catatan") or "").strip() or None
+    c.ditutup_oleh = getattr(current, "username", None)
+    db.commit()
+    db.refresh(c)
+    log_action(db, "finance.tutup_kas", target=str(tgl),
+               detail=f"selisih={selisih} fisik={sum(f.values())} sistem={sum(sist.values())}",
+               actor=current, store_id=store.id)
+    return {"tanggal": c.tanggal, "sistem": sist, "fisik": f,
+            "selisih": selisih, "ok": selisih == 0}
 
 
 def _wa_quote(t: str) -> str:

@@ -3,6 +3,45 @@ import datetime
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from . import models
+from . import ledger_meta as lm
+
+
+def _ledger_post_safe(db: Session, store_id, tanggal, jenis, kategori, keterangan,
+                      nominal, media, ref_type, invoice, oleh,
+                      subkategori=None, masuk_laba=True, pengaruh_kas=True):
+    """Post buku besar anti-gagal: tidak boleh menggagalkan alur cair/service.
+    Service ber-PK invoice string → guard duplikat via ref_type + invoice di keterangan."""
+    try:
+        from .routers.finance import _ledger_add
+        dup = db.query(models.LedgerEntry).filter(
+            models.LedgerEntry.store_id == store_id,
+            models.LedgerEntry.ref_type == ref_type,
+            models.LedgerEntry.keterangan.like(f"%{invoice}%")).first()
+        if dup:
+            return dup
+        return _ledger_add(db, store_id, tanggal, jenis, kategori, keterangan,
+                           nominal, media, None, ref_type, None, oleh,
+                           subkategori=subkategori,
+                           masuk_laba=masuk_laba, pengaruh_kas=pengaruh_kas)
+    except Exception as e:
+        print("ledger auto-post skip:", ref_type, invoice, e)
+        return None
+
+
+def _svc_media(svc) -> str:
+    return lm.METODE_KE_MEDIA.get((svc.metode_bayar or "").strip(), "kas_utama")
+
+
+def _svc_tanggal(svc):
+    d = svc.diambil_at or datetime.date.today()
+    try:
+        if isinstance(d, datetime.datetime):
+            return d.date()
+        if isinstance(d, str):
+            return datetime.datetime.strptime(d[:10], "%Y-%m-%d").date()
+        return d
+    except Exception:
+        return datetime.date.today()
 
 
 def get_settings(db: Session, store_id: int) -> models.StoreSettings:
@@ -185,6 +224,11 @@ def cairkan(db: Session, svc: models.Service, actor=None):
     row.komisi_teknisi = komisi
     tid = tech_id(db, svc.store_id, svc.teknisi)
     if not tid or komisi <= 0:
+        # Sukses TANPA komisi: omzet jasa tetap terbentuk di buku besar.
+        _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "masuk", "A1",
+                          f"Service {svc.invoice}: {svc.device or ''}",
+                          max(0, int(svc.biaya or 0)), _svc_media(svc),
+                          "service", svc.invoice, getattr(actor, "username", None))
         row.komisi_status = "cair"
         db.commit()
         return row
@@ -223,6 +267,17 @@ def cairkan(db: Session, svc: models.Service, actor=None):
             sisa_hutang_saat_itu=sisa_sesudah,
             keterangan=f"Cicil hutang max {sett.cicilan_max_pct}% dari {svc.invoice}"))
     row.komisi_status = "cair"
+    # Buku besar (prinsip mentor): SUKSES = omzet jasa terbentuk + HPP komisi terbentuk.
+    _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "masuk", "A1",
+                      f"Service {svc.invoice}: {svc.device or ''}",
+                      max(0, int(svc.biaya or 0)), _svc_media(svc),
+                      "service", svc.invoice, getattr(actor, "username", None))
+    if komisi > 0:
+        _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "keluar", "B1",
+                          f"Komisi {svc.teknisi or ''} {svc.invoice} ({pct}%)",
+                          komisi, _svc_media(svc),
+                          "service_komisi", svc.invoice, getattr(actor, "username", None),
+                          subkategori="Komisi")
     db.commit()
     db.refresh(row)
     return row

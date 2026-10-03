@@ -634,6 +634,23 @@ def pakai_part(db: Session, sp, svc, qty: int = 1, actor=None):
     catat_mutasi(db, sp, "pakai", -qty, stok, stok - qty, ref=svc.invoice, actor=actor)
     db.commit()
     db.refresh(part)
+    # Buku besar (prinsip mentor): TERPAKAI = HPP terbentuk (tanpa gerak kas).
+    try:
+        from .routers.finance import _ledger_add
+        _ledger_add(db, part.store_id,
+                    date.today(), "keluar", "B1",
+                    f"HPP {svc.invoice}: {part.nama_snapshot} x{qty}",
+                    int(part.modal_asli_snapshot or 0) * int(part.qty or 0),
+                    "stok", ref_type="servicepart", ref_id=part.id,
+                    oleh=getattr(actor, "username", None),
+                    masuk_laba=True, pengaruh_kas=False)
+        db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("ledger pakai_part skip:", e)
     sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp.id).first()
     return sp, part, None
 
@@ -658,6 +675,14 @@ def kembalikan_part(db: Session, part, actor=None):
     catat_mutasi_plain(db, part.sparepart_id, part.store_id, nama, "batal", qty,
                        (sp.stok if sp is not None else 0), (sp.stok + qty if sp is not None else qty),
                        ref=part.invoice, actor=actor)
+    # batal pakai = HPP yang terbentuk ikut batal
+    try:
+        from . import models as _m
+        db.query(_m.LedgerEntry).filter(
+            _m.LedgerEntry.ref_type == "servicepart",
+            _m.LedgerEntry.ref_id == part.id).delete(synchronize_session=False)
+    except Exception as e:
+        print("ledger kembalikan skip:", e)
     db.commit()
     return True
 
