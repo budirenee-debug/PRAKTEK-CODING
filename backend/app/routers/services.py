@@ -168,10 +168,11 @@ def update_service(
                        target=svc.invoice, detail="; ".join(berubah)[:480], actor=current, store_id=_sid(store))
     except Exception as e:
         print("audit service.update fail:", e)
-    # Business Engine: CAIR jika status berubah jadi Sudah Diambil via PATCH
+    # Business Engine: CAIR saat Service Sukses (deal + bayar di sini) / Sudah Diambil via PATCH.
+    # Idempotent: kalau sudah cair, cairkan() langsung return tanpa tulis ganda.
     try:
         data_status = payload.model_dump(exclude_unset=True).get("status")
-        if data_status == "Sudah Diambil":
+        if data_status in ("Service Sukses", "Selesai", "Sudah Diambil"):
             from .. import engine_logic
             engine_logic.cairkan(db, svc, actor=current)
     except Exception as e:
@@ -226,8 +227,9 @@ def update_status(
                       + (f" • ambil oleh {svc.diambil_oleh}" if svc.diambil_oleh else "")
                       + (f" • bayar {svc.metode_bayar}" if svc.metode_bayar else ""),
                actor=current, store_id=_sid(store))
-    # Business Engine: CAIR hanya saat Sudah Diambil (Sukses masih PENDING)
-    if status == "Sudah Diambil":
+    # Business Engine: CAIR saat Service Sukses (deal + metode bayar ditentukan di sini)
+    # dan Sudah Diambil. "Selesai" sudah dinormalisasi ke Service Sukses di atas.
+    if status in ("Service Sukses", "Sudah Diambil"):
         try:
             from .. import engine_logic
             engine_logic.cairkan(db, svc, actor=current)

@@ -169,7 +169,7 @@ def cek_penghasilan_hari_ini(db: Session, store_id: int):
 
 
 def cairkan(db: Session, svc: models.Service, actor=None):
-    """CAIR saat Sudah Diambil. Hitung ulang jasa/komisi, potong hutang max 20%, tulis ledger. Idempotent."""
+    """CAIR saat Service Sukses (deal + bayar) atau Sudah Diambil. Hitung ulang jasa/komisi, potong hutang max 20%, tulis ledger. Idempotent."""
     row = db.query(models.ServiceEngine).filter(models.ServiceEngine.invoice == svc.invoice).first()
     if not row:
         row = ensure_engine_row(db, svc, None, 0, 0)
