@@ -198,6 +198,28 @@ def create_accident(payload: dict = Body(...), store_id: Optional[int] = Query(N
                detail=f"{jenis} modal={modal} teknisi={tech.nama if tech else '-'} "
                       f"beban_teknisi={a.beban_teknisi} bayar={bayar}",
                actor=current, store_id=store.id)
+    # Buku besar (prinsip mentor): beban TOKO kecelakaan = HPP (ikut komisi+modal).
+    # sumber=beli_luar → kas keluar beneran; sumber=persediaan → HPP tanpa gerak kas
+    # (stok berkurang dihitung via mutasi, kas tidak gerak — pola sama seperti pakai part).
+    if int(a.beban_toko or 0) > 0:
+        try:
+            dari_stok = (sumber == "persediaan")
+            _ledger_add(db, store.id, tanggal, "keluar", "B1",
+                        f"Beban toko {invoice or f'ACC-{a.id}'}: {jenis}"
+                        f"{f' {a.part_pengganti}' if a.part_pengganti else ''}"
+                        f" ({sumber})",
+                        int(a.beban_toko),
+                        "stok" if dari_stok else lm.METODE_KE_MEDIA.get("Tunai", "kas_utama"),
+                        ref_type="accident", ref_id=a.id,
+                        oleh=getattr(current, "username", None),
+                        masuk_laba=True, pengaruh_kas=not dari_stok)
+            db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            print("ledger accident skip:", e)
     return _accident_row(db, a)
 
 
@@ -812,6 +834,10 @@ def create_ledger(payload: dict = Body(...), store_id: Optional[int] = Query(Non
     masuk_laba = False if masuk_laba is False or str(masuk_laba).lower() in ("0", "false", "no") else True
     pengaruh_kas = payload.get("pengaruh_kas", True)
     pengaruh_kas = False if pengaruh_kas is False or str(pengaruh_kas).lower() in ("0", "false", "no") else True
+    # Prinsip mentor: media stok = persediaan, bukan uang tunai — paksa tanpa gerak kas
+    # agar saldo per media + selisih tutup kas tidak kotor.
+    if media == "stok":
+        pengaruh_kas = False
     row = _ledger_add(db, store.id, _parse_tgl(payload.get("tanggal")), jenis, kategori,
                       keterangan, nominal, media, mt,
                       ref_type="manual", ref_id=None, oleh=getattr(current, "username", None),

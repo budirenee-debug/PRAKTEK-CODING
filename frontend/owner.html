@@ -407,15 +407,15 @@
           <div id="hubPanel-operasional" style="display:none">
             <div class="tabs" style="margin-bottom:12px">
               <button class="tab active" data-subg="ops" data-subk="all" onclick="ownOpsSub('all')">Semua</button>
-              <button class="tab" data-subg="ops" data-subk="C1" onclick="ownOpsSub('C1')">C1 Gaji</button>
-              <button class="tab" data-subg="ops" data-subk="C2" onclick="ownOpsSub('C2')">C2 Tempat</button>
-              <button class="tab" data-subg="ops" data-subk="C3" onclick="ownOpsSub('C3')">C3 Internet</button>
-              <button class="tab" data-subg="ops" data-subk="C4" onclick="ownOpsSub('C4')">C4 Harian</button>
-              <button class="tab" data-subg="ops" data-subk="C5" onclick="ownOpsSub('C5')">C5 Marketing</button>
-              <button class="tab" data-subg="ops" data-subk="C6" onclick="ownOpsSub('C6')">C6 Maintenance</button>
+              <button class="tab" data-subg="ops" data-subk="C1" onclick="ownOpsSub('C1')">Gaji</button>
+              <button class="tab" data-subg="ops" data-subk="C2" onclick="ownOpsSub('C2')">Tempat</button>
+              <button class="tab" data-subg="ops" data-subk="C3" onclick="ownOpsSub('C3')">Internet</button>
+              <button class="tab" data-subg="ops" data-subk="C4" onclick="ownOpsSub('C4')">Harian</button>
+              <button class="tab" data-subg="ops" data-subk="C5" onclick="ownOpsSub('C5')">Marketing</button>
+              <button class="tab" data-subg="ops" data-subk="C6" onclick="ownOpsSub('C6')">Maintenance</button>
             </div>
             <div class="card">
-              <div class="card-head toolbar"><div class="toolbar-left"><h3>🏪 Biaya Operasional</h3><span class="muted" id="opsSub">buku besar C1–C6 + uang hadir</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOperasional(true)">↻</button></div></div>
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>🏪 Biaya Operasional</h3><span class="muted" id="opsSub">buku besar + uang hadir</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOperasional(true)">↻</button></div></div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyOps"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
             </div>
             <div id="hubOperasional"></div>
@@ -2153,7 +2153,7 @@
     const HUB_TITLES = {
       pendapatan: ['Pendapatan', 'Jasa • Accessories • Unit • Lain − refund'],
       hpp: ['HPP / Modal', 'Komisi teknisi + modal barang + insiden'],
-      operasional: ['Operasional', 'C1–C6 + uang hadir'],
+      operacional: ['Operasional', 'semua biaya + uang hadir'],
       aset: ['Aset / Investasi', 'D • tidak langsung mengecilkan laba'],
       owner: ['Transaksi Owner', 'Modal & prive — bukan omzet'],
       non: ['Non-Pendapatan / Non-Biaya', 'Transfer • hutang • DP'],
@@ -2400,7 +2400,7 @@
     async function ownOperasional(force){
       const tb = document.getElementById('tbodyOps');
       const sub = ownSubGet('ops');
-      const names = {all: 'buku besar C1–C6 + uang hadir', C1: 'gaji & upah', C2: 'tempat', C3: 'internet & sistem', C4: 'operasional harian', C5: 'marketing', C6: 'maintenance'};
+      const names = {all: 'buku besar + uang hadir', C1: 'gaji & upah', C2: 'tempat', C3: 'internet & sistem', C4: 'operasional harian', C5: 'marketing', C6: 'maintenance'};
       try{ document.getElementById('opsSub').textContent = names[sub] || names.all; }catch(e){}
       try{
         const led = (await ownLedCached(force)).filter(r => r.kelompok === 'operasional' && (sub === 'all' || r.kategori === sub));
@@ -3470,9 +3470,12 @@
     function oAutoJual(fromId, toId){
       const to = document.getElementById(toId);
       if(!to) return;
-      if(to.value && to.dataset.auto !== '1') return; // jangan timpa jual yang diketik manual
       const beli = oParseRp(document.getElementById(fromId)?.value);
       if(!beli) return;
+      const jualNow = oParseRp(to.value);
+      // Jual manual yang LEBIH TINGGI dari beli = harga sengaja → jangan timpa.
+      // Selain itu (kosong / auto / jual <= beli) ikut margin otomatis.
+      if(to.value && to.dataset.auto !== '1' && jualNow > beli) return;
       const jual = Math.round(beli * (1 + oInvMargin() / 100));
       to.value = jual.toLocaleString('id-ID');
       to.dataset.auto = '1';
@@ -3597,10 +3600,16 @@
       if(!it) return;
       const n = (field === 'harga' || field === 'harga_beli') ? oParseRp(val) : (parseInt(val) || 0);
       if(field === 'harga') it.harga = n;
-      else if(field === 'harga_beli') it.harga_beli = n;
+      else if(field === 'harga_beli'){
+        it.harga_beli = n;
+        // Beli diubah langsung di tabel → jual ikut margin, kecuali jual manual
+        // yang lebih tinggi dari beli (harga sengaja, pola oAutoJual).
+        if(!it.harga || it.harga <= n) it.harga = Math.round(n * (1 + oInvMargin() / 100));
+      }
       it.tgl = oToday();
       try{ await ownFetch(`/inventory/spareparts/${id}`, {method: 'PUT', body: JSON.stringify({harga: it.harga, harga_beli: it.harga_beli})}); }
       catch(e){ ownAlert('err', 'Gagal simpan: ' + e.message); await ownInvLoad(); return; }
+      try{ ownInvRenderSp(); }catch(e){}
       const sumEl = document.getElementById('sparepartSummary');
       if(sumEl) sumEl.textContent = `${ownInvSp.length} item • Total nilai stok (jual): ${rp(ownInvSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Tersimpan ✅`;
     }

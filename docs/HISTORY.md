@@ -197,6 +197,18 @@
 - UI: badge 📦 Persediaan di tab HPP + kartu HPP-only (persediaan di sub), Buku Besar tampil subkategori.
 - Uji: TestClient 50/50 (stok 8−1+5=12, HPP=komisi+part+sale, kas tidak ganda).
 
+## 5s. AUDIT + FIX ALIRAN UANG MENTOR (6 Okt 2026)
+- Audit backend+frontend vs `ledger_meta.py`: 8 menu Owner + Kas Toko + Laba-Rugi dipetakan ke endpoint (lihat laporan sesi).
+- **BUG HPP kasir (berat, SUDAH FIX):** `sales.py:190` HPP=(jual−beli)×qty = profit! Fix → `beli×qty` (modal). Terbukti TestClient: jual 145rb/beli 100rb → dulu HPP 45rb (laba kotor 100rb), sekarang HPP 100rb (laba 45rb). Catatan: uji 50/50 §5r ikut mengabadikan rumus salah — jangan pakai sebagai acuan.
+- **Uang hadir → C1 (FIX):** `engine.py check-in` kini auto-post `C1 keluar/kas_utama` ref `(allowance, attendance.id)` idempoten. Dulu cuma buku teknisi → laba + saldo kas kegedean.
+- **Beban toko celaka → B1 (FIX):** `finance.py create_accident` auto-post beban_toko ref `(accident, id)`; beli_luar=kas keluar, persediaan=media stok non-kas.
+- **Backfill produksi (sekali, idempoten):** backup `b_gadget.backup-pre-ledger-backfill-20261006-*.db`; 2 sale (omzet A2 175rb; HPP Rp0 karena harga_beli tak tercatat) + 6 service Sukses (A1 1,23jt + komisi B1 514,5rb) + 1 expense + 1 income. Buku: 1 → 17 baris; ringkasan omzet 1.405.000 / HPP 654.500 / persediaan 135.000 / modal 125.000 / laba 750.500. Attendances & accidents produksi = 0 (tak ada yang perlu backfill).
+- **Kas Toko vs refund (FIX minimal):** `engine.js?v=eng8` — refund yang servicenya sudah Failed (tutup klaim) kini dikompensasi baris penerimaan awalnya, net = porsi ditahan (biaya−refund).
+- **Guard manual stok (FIX):** `POST /ledger` media=stok dipaksa `pengaruh_kas=False` (opsi 7).
+- **Tidak diubah (keputusan):** komisi service refund tetap penuh di B1 (kas sudah keluar; baliknya via cicilan) — tanya mentor bila mau dibalik proporsional. Data lama harga_beli=0 semua (5 sparepart + 2 struk + 3 part terpakai) → HPP Rp0, wajib isi harga beli master ke depan.
+- Tab Operasional: label sub-tab C1–C6 dibersihkan (Gaji/Tempat/Internet/Harian/Marketing/Maintenance), kode tetap di dalam.
+- Uji: TestClient DB temp 16/16 LULUS (sale, allowance±idempoten, celaka kas+stok, manual stok, service penuh A1/komisi/part, ringkasan konsisten) + `node --check engine.js` OK.
+
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3→BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.
 - Nanti: laporan gabungan owner, paket/billing, root `/` → landing (butuh edit `main.py`).

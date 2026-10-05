@@ -149,6 +149,16 @@ def check_in(store_id: Optional[int] = Query(None),
             store_id=store.id, technician_id=tech.id, tanggal=today, invoice=None,
             tipe="allowance", masuk_rp=allowance, keluar_rp=0,
             sisa_hutang_saat_itu=sisa, keterangan=f"Uang hadir {jam_now}"))
+        # Buku besar (prinsip mentor): uang hadir = biaya gaji & upah (C1), kas keluar.
+        # Guard duplikat via (allowance, attendance.id) agar check-in ganda aman.
+        try:
+            from .finance import _ledger_add
+            _ledger_add(db, store.id, today, "keluar", "C1",
+                        f"Uang hadir {tech.nama} {jam_now}", allowance,
+                        "kas_utama", ref_type="allowance", ref_id=row.id,
+                        oleh=getattr(current, "username", None))
+        except Exception as e:
+            print("ledger allowance skip:", e)
         db.commit()
     log_action(db, "engine.checkin", target=tech.nama,
                detail=f"{jam_now} on_time={on_time} allowance={allowance}",

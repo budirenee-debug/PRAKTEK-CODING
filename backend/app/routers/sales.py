@@ -187,7 +187,7 @@ def create_sale(payload: dict = Body(...), store_id: Optional[int] = Query(None)
         oleh = getattr(current, "username", None)
         om_barang = sum(b["jual"] * b["qty"] for b in built if b["tipe"] == "barang")
         om_jasa = sum(b["jual"] * b["qty"] for b in built if b["tipe"] == "jasa")
-        hpp_barang = sum((b["jual"] - b["beli"]) * b["qty"] for b in built if b["tipe"] == "barang")
+        hpp_barang = sum(b["beli"] * b["qty"] for b in built if b["tipe"] == "barang")
         if om_barang > 0:
             _ledger_add(db, store.id, tanggal, "masuk", "A2",
                         f"Kasir {s.kode}: accessories/barang", om_barang, media,

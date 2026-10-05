@@ -84,6 +84,7 @@ async function loadInventory(){
           keluar: r.keluar||0,
           stok: r.stok!=null ? r.stok : Math.max(0,(r.masuk||0)-(r.keluar||0)),
           harga: r.harga||0,
+          harga_beli: r.harga_beli||0,
           tgl: (r.tgl||'').slice(0,10) || todayISO()
         }));
         // cache lokal juga untuk offline
@@ -167,6 +168,27 @@ function parseRupiah(s){
   const clean = String(s).replace(/\./g,'').replace(/[^0-9]/g,'');
   return parseInt(clean)||0;
 }
+// Margin toko ikut Owner (localStorage ownInvMargin, default 8%) — pola sama oAutoJual owner:
+// jual manual yang LEBIH TINGGI dari beli dipertahankan, sisanya ikut margin otomatis.
+function tokoInvMargin(){
+  try{ const v=parseFloat(localStorage.getItem('ownInvMargin')); if(!isNaN(v)) return v; }catch(e){}
+  return 8;
+}
+function tokoHitungJual(beli){ return Math.round((Number(beli)||0)*(1+tokoInvMargin()/100)); }
+function tokoAutoJualFill(beliEl, jualEl, prevEl){
+  const b=beliEl ? parseRupiah(beliEl.value) : 0;
+  if(beliEl) beliEl.value = b ? formatAngka(b) : '';
+  if(!jualEl) return;
+  const jNow=parseRupiah(jualEl.value);
+  if(!jualEl.value || jualEl.dataset.auto==='1' || jNow<=b){
+    const j=tokoHitungJual(b);
+    jualEl.value = b ? formatAngka(j) : '';
+    jualEl.dataset.auto='1';
+    if(prevEl){ prevEl.textContent = b ? formatRupiah(j) : 'Rp 0'; prevEl.style.display = b ? 'inline' : 'none'; }
+  }
+}
+function tokoBeliInput(){ tokoAutoJualFill(document.getElementById('sp-beli'), document.getElementById('sp-harga'), document.getElementById('sp-harga-preview')); }
+function tokoBeliEditInput(){ tokoAutoJualFill(document.getElementById('spEditBeli'), document.getElementById('spEditHarga'), document.getElementById('spEditHarga-preview')); }
 function attachRupiahLive(){
   const pairs = [
     ['f-biaya', 'f-biaya-preview'],
@@ -2742,7 +2764,9 @@ async function handleSparepartAdd(e){
   const masuk=parseInt(document.getElementById('sp-masuk').value)||0;
   const keluar=parseInt(document.getElementById('sp-keluar').value)||0;
   let stokRaw=document.getElementById('sp-stok').value;
-  const harga=parseRupiah(document.getElementById('sp-harga').value);
+  const beli=parseRupiah(document.getElementById('sp-beli')?.value);
+  let harga=parseRupiah(document.getElementById('sp-harga').value);
+  if(harga<=0 && beli>0) harga=tokoHitungJual(beli);
   if(!nama) return showToast('Nama part wajib');
   if(!merk) return showToast('Merk wajib');
   if(!kategori) return showToast('Kategori wajib');
@@ -2753,7 +2777,7 @@ async function handleSparepartAdd(e){
   if(inventory.some(i=>i.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama part sudah ada — pakai Edit');
   if(USE_API){
     try{
-      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, tgl: todayISO()});
+      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO()});
       showToast(`✅ ${created.nama} ditambahkan — Stok ${created.stok} (sync multi-PC)`);
       e.target.reset();
       // reset preview
@@ -2767,7 +2791,7 @@ async function handleSparepartAdd(e){
       showToast('Gagal API, fallback lokal: '+err.message);
     }
   }
-  const newItem={id:nextInventoryId(), nama, merk, kategori, masuk, keluar, stok, harga, tgl: todayISO()};
+  const newItem={id:nextInventoryId(), nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO()};
   inventory.unshift(newItem);
   saveInventory();
   e.target.reset();
@@ -2791,6 +2815,8 @@ function openSpEditModal(id){
   const kEl=document.getElementById('spEditKeluar'); if(kEl){ kEl.value=it.keluar; kEl.disabled=true; kEl.title='Dikunci — keluar via Pakai/Jual'; }
   const sEl=document.getElementById('spEditStok'); if(sEl){ sEl.value=it.stok; sEl.disabled=true; sEl.title='🔒 Stok = Masuk − Keluar (otomatis)'; }
   document.getElementById('spEditHarga').value=it.harga ? Number(it.harga).toLocaleString('id-ID') : '';
+  const beliEl=document.getElementById('spEditBeli'); if(beliEl){ beliEl.value=it.harga_beli ? Number(it.harga_beli).toLocaleString('id-ID') : ''; }
+  try{ document.getElementById('spEditHarga').dataset.auto = (it.harga && it.harga_beli && it.harga<=it.harga_beli) || !it.harga ? '1' : ''; }catch(e){}
   // update preview
   const prev=document.getElementById('spEditHarga-preview'); if(prev){ prev.textContent=it.harga?formatRupiah(it.harga):'Rp 0'; prev.style.display=it.harga?'inline':'none'; }
   document.getElementById('spEditModal').classList.add('show');
@@ -2806,13 +2832,14 @@ async function submitSpEdit(e){
   const kategori=document.getElementById('spEditKategori').value;
   if(kategori==='Aksesoris'){ showToast('🎧 Aksesoris pindah ke tab Asesories — edit dari sana'); return; }
   const harga=parseRupiah(document.getElementById('spEditHarga').value);
+  const harga_beli=parseRupiah(document.getElementById('spEditBeli')?.value);
   if(!nama) return showToast('Nama wajib');
   // cek duplikat kecuali diri sendiri
   if(inventory.some(x=>x.id!==id && x.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama sudah dipakai item lain');
   if(USE_API){
     try{
-      // Hanya nama/merk/kategori/harga yang boleh diedit — masuk/keluar/stok dikunci (auto DB)
-      await apiInventoryUpdate(id, {nama, merk, kategori, harga});
+      // Hanya nama/merk/kategori/harga/harga_beli yang boleh diedit — masuk/keluar/stok dikunci (auto DB)
+      await apiInventoryUpdate(id, {nama, merk, kategori, harga, harga_beli});
       await loadInventory();
       closeSpEditModal();
       renderSparepart();
@@ -2821,7 +2848,7 @@ async function submitSpEdit(e){
       return;
     }catch(err){ showToast('Gagal API: '+err.message); return; }
   }
-  it.nama=nama; it.merk=merk; it.kategori=kategori; it.harga=harga; it.tgl=todayISO();
+  it.nama=nama; it.merk=merk; it.kategori=kategori; it.harga=harga; it.harga_beli=harga_beli; it.tgl=todayISO();
   saveInventory();
   closeSpEditModal();
   renderSparepart();

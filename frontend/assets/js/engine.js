@@ -162,12 +162,28 @@ async function renderKasToko(force){
     }catch(e){}
     // Refund nominal = keluar (dari omzet + jadi pengeluaran)
     let refundKeluar = 0;
+    const cairInv = new Set(cair.map(d=>d.invoice));
+    const svcByInv = {};
+    (Array.isArray(services)?services:[]).forEach(d=>{ if(d.invoice) svcByInv[d.invoice]=d; });
+    const kompensasiInv = new Set();
     try{
       const rf = await apiFetch('/finance/refunds');
       const rlist = Array.isArray(rf)?rf:(rf.rows||[]);
       rlist.forEach(r=>{
         const n = Number(r.nominal)||0; refundKeluar += n;
         rows.push({t: String(r.tanggal||'').slice(0,10), ref: r.kode||r.invoice||'-', tipe: '💸 Refund', masuk: 0, keluar: n, ket: `${r.invoice||''} • ${r.alasan||''}`});
+        // Kompensasi mentor: service yang di-refund + tutup klaim (status Failed) sudah
+        // keluar dari daftar cair di atas, padahal uangnya pernah diterima. Catat penerimaan
+        // awalnya di sini agar net = porsi yang ditahan (biaya − refund), bukan −refund.
+        const s = r.invoice && svcByInv[r.invoice];
+        if(s && !cairInv.has(s.invoice) && !kompensasiInv.has(s.invoice)){
+          kompensasiInv.add(s.invoice);
+          const b = Number(s.biaya)||0;
+          if(b > 0){
+            masukTotal += b;
+            rows.push({t: actDate(s), ref: s.invoice||'-', tipe: '💰 Pendapatan cair', masuk: b, keluar: 0, ket: `${s.device||''} • (${s.status}, lalu refund ${r.kode||''})`});
+          }
+        }
       });
     }catch(e){}
     // Kecelakaan kerja: beban toko = keluar
