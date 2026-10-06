@@ -14,6 +14,7 @@ load_dotenv()
 
 from .database import Base, engine, get_db
 from .routers import services, customers, technicians, stats, auth, inventory, stores, invites, audit, track
+from .routers import ai as ai_router
 from .routers import engine as engine_router
 from .routers import finance as finance_router
 from .routers import sales as sales_router
@@ -492,6 +493,7 @@ app.include_router(track.router, prefix="/api")
 app.include_router(engine_router.router, prefix="/api")
 app.include_router(finance_router.router, prefix="/api")
 app.include_router(sales_router.router, prefix="/api")
+app.include_router(ai_router.router, prefix="/api")
 
 # Serve frontend static (rapi: frontend/assets/*) — single source, hapus mount /root ambigu (fix P0-2)
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")

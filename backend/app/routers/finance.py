@@ -785,6 +785,79 @@ def ringkasan_ledger(store_id: Optional[int] = Query(None),
             "per_media": _sistem_media(db, store.id), "count": len(rows)}
 
 
+@router.get("/tren-bulanan")
+def tren_bulanan(store_id: Optional[int] = Query(None), bulan: int = Query(6, ge=2, le=12),
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Tren N bulan terakhir untuk Owner Space: omzet/laba + volume per bulan.
+
+    Rumus SAMA dengan kartu Ringkasan (ownArus, tabel-based agar angkanya nyambung):
+    omzet = service cair + penjualan − refund; HPP = komisi + modal barang + beban toko;
+    operasional = pengeluaran + uang hadir. Act-date service = diambil_at/updated_at/date
+    (slice mentah, persis perilaku frontend).
+    """
+    store, _ = _ctx_read(db, current, store_id)
+    n = max(2, min(12, int(bulan or 6)))
+    today = datetime.date.today()
+    yms = []
+    y, m = today.year, today.month
+    for _ in range(n):
+        yms.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    yms.reverse()
+    NAMA_BLN = ["", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+    b = {ym: {"ym": ym, "label": f"{NAMA_BLN[int(ym[5:7])]} {ym[2:4]}",
+              "omzet": 0, "hpp": 0, "operasional": 0, "kotor": 0, "bersih": 0,
+              "masuk": 0, "sukses": 0, "struk": 0} for ym in yms}
+    SUKSES = {"Service Sukses", "Sudah Diambil", "Selesai"}
+    for s in db.query(models.Service).filter(models.Service.store_id == store.id).all():
+        ym_in = str(s.date or "")[:7]
+        if ym_in in b:
+            b[ym_in]["masuk"] += 1
+        if (s.status or "") in SUKSES:
+            ym_ac = str(s.diambil_at or s.updated_at or s.date or "")[:7]
+            if ym_ac in b:
+                b[ym_ac]["omzet"] += int(s.biaya or 0)
+                b[ym_ac]["sukses"] += 1
+    for sl in db.query(models.Sale).filter(models.Sale.store_id == store.id).all():
+        ym = str(sl.tanggal or "")[:7]
+        if ym in b:
+            b[ym]["omzet"] += int(sl.total or 0)
+            b[ym]["hpp"] += max(0, int(sl.total or 0) - int(sl.profit or 0))
+            b[ym]["struk"] += 1
+    for r in db.query(models.Refund).filter(models.Refund.store_id == store.id).all():
+        ym = str(r.tanggal or "")[:7]
+        if ym in b:
+            b[ym]["omzet"] -= int(r.nominal or 0)
+    for a in db.query(models.WorkAccident).filter(models.WorkAccident.store_id == store.id).all():
+        ym = str(a.tanggal or "")[:7]
+        if ym in b:
+            b[ym]["hpp"] += int(a.beban_toko or 0)
+    for e in db.query(models.Expense).filter(models.Expense.store_id == store.id).all():
+        ym = str(e.tanggal or "")[:7]
+        if ym in b:
+            b[ym]["operasional"] += int(e.nominal or 0)
+    for c in db.query(models.CommissionLedger).filter(models.CommissionLedger.store_id == store.id).all():
+        ym = str(c.tanggal or "")[:7]
+        if ym not in b:
+            continue
+        masuk = int(c.masuk_rp or 0)
+        if not masuk:
+            continue
+        if (c.tipe or "") == "allowance":
+            b[ym]["operasional"] += masuk
+        elif (c.tipe or "") != "hutang_baru":
+            b[ym]["hpp"] += masuk
+    out = []
+    for ym in yms:
+        r = b[ym]
+        r["kotor"] = r["omzet"] - r["hpp"]
+        r["bersih"] = r["kotor"] - r["operasional"]
+        out.append(r)
+    return {"store_id": store.id, "bulan": out}
+
+
 @router.get("/ledger")
 def list_ledger(store_id: Optional[int] = Query(None), kategori: Optional[str] = Query(None),
                 jenis: Optional[str] = Query(None), media: Optional[str] = Query(None),

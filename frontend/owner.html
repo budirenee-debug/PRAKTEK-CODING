@@ -253,6 +253,7 @@
         <!-- RINGKASAN -->
         <section class="view active" id="view-own-ringkas">
           <div id="demoBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px">🧪 <strong>DATA CONTOH (demo)</strong> — toko belum ada service, angka di bawah hanya ilustrasi. Otomatis terganti data asli setelah ada service masuk.</div>
+          <div id="kasBar" style="display:none;border:1px solid;border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px"></div>
           <div class="stats">
             <div class="stat-card" onclick="ownShow('penjualan')" style="cursor:pointer;border-left:4px solid #059669">
               <div class="stat-head"><span>① Omzet Hari Ini</span><span class="stat-icon">💰</span></div>
@@ -328,10 +329,19 @@
           </div>
           <div class="card">
             <div class="card-head"><h3>💳 Metode Bayar</h3><span class="muted">Akumulasi cair</span></div>
-            <div class="bayar-row"><span>💵 Tunai</span><span style="text-align:right"><strong id="finTunai">-</strong><br><span class="muted" id="finTunaiSub" style="font-size:10.5px">-</span></span></div>
-            <div class="bayar-row"><span>🏦 Transfer</span><span style="text-align:right"><strong id="finTransfer">-</strong><br><span class="muted" id="finTransferSub" style="font-size:10.5px">-</span></span></div>
-            <div class="bayar-row"><span>📱 QRIS</span><span style="text-align:right"><strong id="finQris">-</strong><br><span class="muted" id="finQrisSub" style="font-size:10.5px">-</span></span></div>
+            <div class="bayar-row"><span>💵 Tunai</span><span style="text-align:right"><strong id="finTunai">-</strong><br><span class="muted" id="finTunaiSub" style="font-size:10px">-</span></span></div>
+            <div class="bayar-row"><span>🏦 Transfer</span><span style="text-align:right"><strong id="finTransfer">-</strong><br><span class="muted" id="finTransferSub" style="font-size:10px">-</span></span></div>
+            <div class="bayar-row"><span>📱 QRIS</span><span style="text-align:right"><strong id="finQris">-</strong><br><span class="muted" id="finQrisSub" style="font-size:10px">-</span></span></div>
           </div>
+          </div>
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📅 Tren Bulanan</h3><span class="muted" id="trenRange">6 bulan • rumus sama dengan kartu atas</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownTren()">↻</button></div>
+            </div>
+            <div id="trenDelta" style="font-size:12px;color:#4b5563;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:8px 12px;margin-bottom:8px">Memuat tren...</div>
+            <div id="trenChart" style="display:flex;align-items:flex-end;gap:8px;height:110px;padding:4px 2px 0"></div>
+            <div class="table-wrap" style="margin-top:8px"><table class="table compact"><thead><tr><th>Bulan</th><th style="text-align:right">Omzet</th><th style="text-align:right">Laba Bersih</th><th style="text-align:center">Masuk</th><th style="text-align:center">Sukses</th></tr></thead><tbody id="tbodyTren"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
           </div>
           <div class="own-grid2">
           <div class="card">
@@ -885,10 +895,10 @@
                 <select id="filterMerkSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Merk</option><option>IPHONE</option><option>SAMSUNG</option><option>XIAOMI</option><option>OPPO</option><option>VIVO</option><option>INFINIX</option><option>ROBOT</option><option>OLIKE</option><option>BASEUS</option><option>ANKER</option><option>UNEED</option><option>KAKU</option><option>HIPPO</option><option>ORIGINAL</option><option>GENERIC</option><option>LAIN</option></select>
                 <select id="filterKategoriSp" onchange="ownInvRenderSp()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px"><option value="">Semua Kategori</option><option>Display</option><option>Baterai</option><option>Kamera</option><option>Mesin</option><option>Fleksibel</option><option>Konsumsi</option></select>
                 <label title="Rumus harga jual otomatis = beli + margin%" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#4b5563;background:#f9fafb;border:1px solid #ececec;border-radius:10px;padding:7px 10px;white-space:nowrap">⚡ Margin <input id="ownMargin" type="number" min="0" max="1000" value="8" onchange="oMarginSave()" style="width:48px;padding:3px 6px;border:1px solid #d9d9de;border-radius:7px;font-size:12px;text-align:center">%</label>
-                <button class="btn btn-dark small" onclick="ownInvToggleAdd()">+ Tambah Item</button>
+                <span class="muted" style="font-size:11px">Monitor + atur harga • tambah/terima barang di Dashboard Toko</span>
               </div>
             </div>
-            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">🔒 <strong>Stok dikunci (auto = Masuk − Keluar)</strong> dari database. <strong>Masuk</strong> via tombol <strong>+ Masuk</strong>, <strong>Keluar</strong> via Pakai/Jual. Yang bisa diedit langsung: <strong>Beli</strong> / <strong>Jual</strong> lalu <strong>💾 Simpan</strong>.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">👁️ <strong>Mode monitor:</strong> stok dikunci (auto = Masuk − Keluar). Di sini owner hanya atur <strong>Beli / Jual</strong> lalu <strong>💾 Simpan</strong> (⚡ = hitung Jual dari margin). Tambah item &amp; terima barang (+Masuk) di <strong>Dashboard Toko → Sparepart</strong>. 📜 = riwayat mutasi.</p>
             <div class="card form-card" id="ownSpAddCard" style="display:none;box-shadow:none;border:1px solid #ececec;margin-bottom:12px">
               <div class="card-head"><h3>Tambah Sparepart</h3></div>
               <form id="spAddForm" onsubmit="ownInvSpAdd(event)">
@@ -956,10 +966,10 @@
               <div class="toolbar-right">
                 <div class="search-box small"><span>⌕</span><input id="searchAlat" placeholder="Cari alat, peminjam..." oninput="ownInvRenderAlat()" onkeydown="if(event.key==='Escape'){this.value='';ownInvRenderAlat()}"></div>
                 <select id="filterKondisiAlat" onchange="ownInvRenderAlat()" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kondisi</option><option>Baik</option><option>Perlu Kalibrasi</option><option>Rusak</option><option>Dipinjam</option></select>
-                <button class="btn btn-dark small" onclick="ownInvAlatAdd()">+ Tambah Alat</button>
+                <span class="muted" style="font-size:11px">Monitor + atur harga • tambah di Dashboard Toko</span>
               </div>
             </div>
-            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">✏️ Tiap baris bisa diedit: <strong>Kondisi</strong> &amp; <strong>Peminjam</strong> (dropdown), <strong>Masuk / Keluar / Stok / Harga</strong> (angka) lalu <strong>Simpan</strong>.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">👁️ <strong>Mode monitor:</strong> Masuk/Keluar/Stok hanya tampil (kelola di <strong>Dashboard Toko → Alat</strong>). Di sini owner pantau <strong>Kondisi</strong> &amp; <strong>Peminjam</strong> + atur <strong>Harga</strong> lalu <strong>Simpan</strong>.</p>
             <div class="table-wrap">
               <table class="table compact" id="tableAlat">
                 <thead><tr><th style="min-width:140px">Nama Alat</th><th style="min-width:120px">Kondisi</th><th style="min-width:120px">Peminjam</th><th style="text-align:center;min-width:75px">Masuk</th><th style="text-align:center;min-width:75px">Keluar</th><th style="text-align:center;min-width:85px">Stok</th><th style="text-align:right;min-width:110px">Harga</th><th style="text-align:center;min-width:150px">Aksi</th></tr></thead>
@@ -1280,6 +1290,8 @@
       try{
         const loaders = {
           ringkas: () => ownStats().then(() => ownAnalytics()).then(() => {
+            try{ ownTren(); }catch(e){}
+            try{ ownKasBar(); }catch(e){}
             if(window._ownDemo && window._ownDemoStats){
               document.getElementById('stProses').textContent = window._ownDemoStats.proses;
               document.getElementById('stSukses').textContent = window._ownDemoStats.sukses;
@@ -1379,7 +1391,7 @@
       // Tombol ↻ pojok kanan atas: bersihkan juga search/filter inventori → kembali ke semua
       try{ ownInvResetFilters(); }catch(e){}
       try{ const s = document.getElementById('potTeknisi'); if(s) delete s.dataset.filled; }catch(e){}
-      await Promise.allSettled([ownStats(), ownAnalytics(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownBuku(), ownClose(), ownPenjualan(), ownLaporan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan(), ownApproval()]);
+      await Promise.allSettled([ownStats(), ownAnalytics(), ownTren(), ownKasBar(), ownStoreProfile(), ownEngine(), ownKasAll(), ownPotongan(), ownAccidents(), ownRefunds(), ownFinSukses(), ownBayar(), ownKeluar(), ownBuku(), ownClose(), ownPenjualan(), ownLaporan(), ownInvLoad(), ownTeam(), ownAntifraud(), ownJaringan(), ownApproval()]);
       // Jika mode demo (toko kosong), pastikan kartu operasional ikut angka contoh
       // (ownStats dari /stats backend tetap 0 untuk toko kosong).
       try{
@@ -1887,6 +1899,69 @@
       }catch(e){
         if(tbSp) tbSp.innerHTML = `<tr><td colspan="4" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`;
       }
+    }
+
+    async function ownTren(){
+      // 📅 Tren 6 bulan dari backend (rumus sama dengan kartu Ringkasan).
+      const tb = document.getElementById('tbodyTren');
+      const ch = document.getElementById('trenChart');
+      const dl = document.getElementById('trenDelta');
+      try{
+        const j = await ownFetch('/finance/tren-bulanan?bulan=6');
+        const rows = (j && j.bulan) || [];
+        if(!rows.length) throw new Error('kosong');
+        const max = Math.max(1, ...rows.map(r => r.omzet));
+        ch.innerHTML = rows.map((r, i) => {
+          const h = Math.max(4, Math.round((r.omzet / max) * 100));
+          const last = i === rows.length - 1;
+          const v = r.omzet >= 1000000 ? (r.omzet / 1000000).toFixed(1) + 'jt' : r.omzet ? Math.round(r.omzet / 1000) + 'rb' : '';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px" title="${r.label}: omzet ${rp(r.omzet)} • bersih ${rp(r.bersih)} • ${r.masuk} masuk/${r.sukses} sukses">`
+            + `<span style="font-size:10px;font-weight:700;color:${r.omzet ? '#059669' : '#9ca3af'}">${v}</span>`
+            + `<div style="width:100%;height:${h}px;border-radius:8px 8px 4px 4px;background:${last ? '#059669' : r.omzet ? '#04074a' : '#e5e7eb'}"></div>`
+            + `<span style="font-size:10px;color:${last ? '#059669' : '#6b7280'};font-weight:${last ? 700 : 400}">${r.label}</span></div>`;
+        }).join('');
+        tb.innerHTML = rows.map((r, i) => {
+          const last = i === rows.length - 1;
+          return `<tr style="${last ? 'background:#ecfdf5' : ''}"><td><strong>${r.label}</strong>${last ? ' <span class="pill ok">INI</span>' : ''}</td>`
+            + `<td style="text-align:right;font-weight:700">${rp(r.omzet)}</td>`
+            + `<td style="text-align:right;font-weight:700;color:${r.bersih < 0 ? '#dc2626' : '#059669'}">${rp(r.bersih)}</td>`
+            + `<td style="text-align:center">${r.masuk}</td><td style="text-align:center">${r.sukses}</td></tr>`;
+        }).join('');
+        const cur = rows[rows.length - 1], prev = rows[rows.length - 2];
+        const pct = prev.omzet ? Math.round((cur.omzet - prev.omzet) / prev.omzet * 100) : (cur.omzet ? 100 : 0);
+        const arrow = pct > 0 ? '📈 naik' : pct < 0 ? '📉 turun' : '➖ stagnan';
+        const totMasuk = rows.reduce((s, r) => s + r.masuk, 0), totSukses = rows.reduce((s, r) => s + r.sukses, 0);
+        dl.innerHTML = `${cur.label} vs ${prev.label}: omzet <strong>${arrow} ${Math.abs(pct)}%</strong> (${rp(prev.omzet)} → ${rp(cur.omzet)}) • 6 bln: ${totMasuk} masuk / ${totSukses} sukses`;
+      }catch(e){
+        if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 120)}</td></tr>`;
+        if(dl) dl.textContent = 'Tren belum bisa dimuat.';
+      }
+    }
+
+    async function ownKasBar(){
+      // 🌙 Disiplin Tutup Kas: banner di Ringkasan kalau hari ini belum ditutup.
+      const bar = document.getElementById('kasBar');
+      if(!bar) return;
+      try{
+        const j = await ownFetch('/finance/cash/close');
+        const t = j && j.tutup;
+        if(!t){
+          bar.style.display = '';
+          bar.style.background = '#fffbeb'; bar.style.borderColor = '#fde68a'; bar.style.color = '#92400e';
+          bar.style.cursor = 'pointer';
+          bar.onclick = () => { try{ ownShowKeu('kas'); }catch(e){} };
+          bar.innerHTML = `🌙 <strong>Kas hari ini belum ditutup.</strong> Saldo ⑤ di atas masih estimasi — hitung uang fisik + cek bank/QRIS malam ini. <button class="btn btn-dark small" style="margin-left:8px" onclick="event.stopPropagation();ownShowKeu('kas')">Tutup Kas →</button>`;
+        } else if(Number(t.selisih || 0) !== 0){
+          bar.style.display = '';
+          bar.style.background = '#fef2f2'; bar.style.borderColor = '#fecaca'; bar.style.color = '#b91c1c';
+          bar.style.cursor = 'pointer';
+          bar.onclick = () => { try{ ownShowKeu('kas'); }catch(e){} };
+          bar.innerHTML = `⚠ <strong>Kas hari ini selisih ${rp(t.selisih)}.</strong> Sudah ditutup oleh ${esc(t.ditutup_oleh || '-')} tapi fisik ≠ sistem — telusuri sebelum besok. <button class="btn btn-ghost small" style="margin-left:8px" onclick="event.stopPropagation();ownShowKeu('kas')">Cek →</button>`;
+        } else {
+          bar.style.display = 'none';
+          bar.onclick = null;
+        }
+      }catch(e){ bar.style.display = 'none'; }
     }
 
     async function ownStoreProfile(){
@@ -3563,7 +3638,7 @@
       const ord = {IPHONE:0,SAMSUNG:1,XIAOMI:2,OPPO:3,VIVO:4,INFINIX:5,LAIN:6};
       filtered.sort((a, b) => (ord[oNormMerk(a.merk)] ?? 6) - (ord[oNormMerk(b.merk)] ?? 6) || a.stok - b.stok);
       if(!filtered.length){
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q || fCat || fMerk ? ' sesuai filter' : ''} — <a href="#" onclick="ownInvToggleAdd(true);return false">Tambah item</a></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q || fCat || fMerk ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Sparepart</td></tr>`;
       } else {
         tbody.innerHTML = filtered.map(it => {
           const merkNorm = oNormMerk(it.merk);
@@ -3574,13 +3649,13 @@
             <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${esc(it.nama)}</strong><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar} → akhir ${it.stok}</span></div></td>
             <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${oMerkBadge(merkNorm)}">${esc(merkNorm)}</span></td>
             <td><span class="badge-status" style="background:#f3f4f6;border:1px solid #ececec;font-size:11px">${esc(it.kategori)}</span></td>
-            <td style="text-align:center"><div style="font-weight:700;font-size:13px">+${it.masuk}</div><div style="font-size:9px;color:#8a8f98">masuk</div><button class="btn btn-ghost small" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="ownInvSpMasuk(${it.id})" title="Terima barang — catat ke database">+ Masuk</button></td>
+            <td style="text-align:center"><div style="font-weight:700;font-size:13px">+${it.masuk}</div><div style="font-size:9px;color:#8a8f98">masuk</div></td>
             <td style="text-align:center"><div style="font-weight:700;font-size:13px">−${it.keluar}</div><div style="font-size:9px;color:#8a8f98">keluar</div><button class="btn btn-ghost small" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="ownInvSpRiwayat(${it.id})" title="Riwayat masuk & keluar dari database">📜 Riwayat</button></td>
             <td style="text-align:center"><span title="Stok = Masuk − Keluar (otomatis, tidak bisa diedit)" style="display:inline-block;min-width:56px;padding:7px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid;background:${stokBg};${it.stok <= 2 ? 'color:#dc2626;border-color:#fecaca' : it.stok <= 5 ? 'color:#b45309;border-color:#fde68a' : 'color:#059669;border-color:#a7f3d0'}">🔒 ${it.stok}</span><div style="font-size:9px;color:#8a8f98;margin-top:3px">auto</div></td>
             <td style="font-size:11px;color:#4b5563;white-space:nowrap;text-align:center">${esc(oFmtTgl(it.tgl))}</td>
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga_beli ? Number(it.harga_beli).toLocaleString('id-ID') : ''}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvSpField(${it.id},'harga_beli',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga_beli)}</div></td>
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvSpField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga)}</div></td>
-            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvSpSave(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" title="Hitung Jual = Beli + margin" onclick="ownInvSpMagic(${it.id})">⚡</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="ownInvSpModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownInvSpDel(${it.id})">🗑</button></div></td>
+            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvSpSave(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" title="Hitung Jual = Beli + margin" onclick="ownInvSpMagic(${it.id})">⚡</button></div></td>
           </tr>`;
         }).join('');
       }
@@ -3759,7 +3834,7 @@
       const order = {Rusak:0,'Perlu Kalibrasi':1,Dipinjam:2,Baik:3};
       filtered.sort((a, b) => (order[a.kondisi] ?? 9) - (order[b.kondisi] ?? 9) || a.stok - b.stok);
       if(!filtered.length){
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q || fK ? ' sesuai filter' : ''} — <a href="#" onclick="ownInvAlatAdd();return false">Tambah alat</a></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q || fK ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Alat</td></tr>`;
       } else {
         const peminjamOptions = ['-', ...ownInvTechs];
         tbody.innerHTML = filtered.map(it => {
@@ -3773,11 +3848,11 @@
             <td><strong style="font-size:12px">${esc(it.nama)}</strong><div style="font-size:10px;color:#8a8f98">#${it.id}</div></td>
             <td><select style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${oKondisiBadge(it.kondisi)}" onchange="ownInvAlatField(${it.id},'kondisi',this.value)">${kondisiOpts}</select></td>
             <td><select style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px" onchange="ownInvAlatField(${it.id},'peminjam',this.value)">${peminjamOpts}</select></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.masuk}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="ownInvAlatField(${it.id},'masuk',this.value)"></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.keluar}" style="width:65px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:center;font-size:12px" onchange="ownInvAlatField(${it.id},'keluar',this.value)"></td>
-            <td style="text-align:center"><input type="number" min="0" value="${it.stok}" style="width:70px;padding:6px 8px;border:1px solid ${stokBorder};border-radius:8px;text-align:center;font-size:12px;font-weight:700;background:${stokBg};color:${stokColor}" onchange="ownInvAlatField(${it.id},'stok',this.value)"></td>
+            <td style="text-align:center"><div style="font-weight:700;font-size:13px">+${it.masuk}</div><div style="font-size:9px;color:#8a8f98">masuk</div></td>
+            <td style="text-align:center"><div style="font-weight:700;font-size:13px">−${it.keluar}</div><div style="font-size:9px;color:#8a8f98">keluar</div></td>
+            <td style="text-align:center"><span title="Stok dikelola di Dashboard Toko" style="display:inline-block;min-width:56px;padding:7px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid ${stokBorder};background:${stokBg};color:${stokColor}">🔒 ${it.stok}</span></td>
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" placeholder="0" style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga)}</div></td>
-            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvAlatSave(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="ownInvAlatModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownInvAlatDel(${it.id})">🗑</button></div></td>
+            <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvAlatSave(${it.id})">💾 Simpan</button></div></td>
           </tr>`;
         }).join('');
       }

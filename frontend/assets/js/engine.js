@@ -410,6 +410,104 @@ async function kasOutSave(e){
     (window.showToast||alert)('Gagal simpan: '+(err.message||err));
   }
 }
+// ---------- Tutup Kas ritual (dashboard toko: banner + kartu compact di Kas Toko) ----------
+const TKS_MEDIA_LABEL = {kas_utama:'💵 Kas Utama (laci)', kas_kecil:'💰 Kas Kecil', bank:'🏦 Bank / Transfer', qris:'📱 QRIS'};
+const TKS_MEDIA_ORDER = ['kas_utama','kas_kecil','bank','qris'];
+function _tksIsTek(){
+  try{
+    if(window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi()) return true;
+  }catch(e){}
+  return String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+}
+async function kasBarToko(){
+  // Banner disiplin di dashboard: kasir/admin wajib tahu kalau kas hari ini belum ditutup.
+  // Teknisi tidak ditampilkan (bukan tugasnya; backend juga menolak).
+  const bar = document.getElementById('kasBarToko');
+  if(!bar || _tksIsTek()){ if(bar) bar.style.display = 'none'; return; }
+  try{
+    const j = await apiFetch('/finance/cash/close');
+    const t = j && j.tutup;
+    const btn = `<button class="btn btn-dark small" style="white-space:nowrap" onclick="event.stopPropagation();switchView('kas-saya')">Tutup Kas →</button>`;
+    const wrap = (inner)=>{ bar.innerHTML = `<div class="approval-banner-left"><div class="approval-banner-icon">🌙</div><div>${inner}</div></div>${btn}`; bar.style.display = ''; bar.style.cursor = 'pointer'; bar.onclick = ()=>{ try{ switchView('kas-saya'); }catch(e){} }; };
+    if(!t){
+      bar.style.background = '#fffbeb'; bar.style.borderColor = '#fde68a';
+      wrap(`<strong style="font-size:13px">Kas hari ini belum ditutup</strong><p style="font-size:12px;color:#92400e;margin-top:2px">Hitung uang fisik + cek bank/QRIS malam ini — klik untuk isi di Kas Toko</p>`);
+    } else if(Number(t.selisih || 0) !== 0){
+      bar.style.background = '#fef2f2'; bar.style.borderColor = '#fecaca';
+      wrap(`<strong style="font-size:13px">Kas hari ini selisih ${_rp(t.selisih)}</strong><p style="font-size:12px;color:#b91c1c;margin-top:2px">Sudah ditutup (${_esc(t.ditutup_oleh || '-')}) tapi fisik ≠ sistem — telusuri di Kas Toko</p>`);
+    } else {
+      bar.style.display = 'none';
+    }
+  }catch(e){ bar.style.display = 'none'; }
+}
+function _tksRecalc(){
+  // Hitung ulang selisih live tiap input fisik berubah.
+  try{
+    let sTot = 0, fTot = 0;
+    document.querySelectorAll('#tksBody tr[data-media]').forEach(tr=>{
+      const s = Number(tr.dataset.sistem || 0);
+      const inp = tr.querySelector('input[data-fisik]');
+      const f = Math.max(0, parseInt((inp && inp.value) || '0', 10) || 0);
+      sTot += s; fTot += f;
+      const sel = tr.querySelector('[data-selisih]');
+      if(sel){ const d = f - s; sel.textContent = _rp(d); sel.style.color = d === 0 ? '#059669' : '#dc2626'; }
+    });
+    const info = document.getElementById('tksInfo');
+    if(info && !info.dataset.locked) info.textContent = `Total sistem ${_rp(sTot)} • fisik ${_rp(fTot)} • selisih ${_rp(fTot - sTot)} (target Rp0)`;
+  }catch(e){}
+}
+async function kasTutupTokoLoad(){
+  // Kartu compact di Kas Toko: sistem otomatis + isi fisik + simpan. Kasir/admin/owner.
+  const card = document.getElementById('tksCard');
+  if(!card) return;
+  if(_tksIsTek()){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  const tb = document.getElementById('tksBody');
+  try{
+    const j = await apiFetch('/finance/cash/close');
+    const sist = (j && j.sistem) || {};
+    const t = j && j.tutup;
+    const fisikSaved = (t && t.fisik) || {};
+    try{ document.getElementById('tksDate').textContent = String((j && j.tanggal) || '').slice(0, 10) + ' • sistem vs fisik • selisih target Rp0'; }catch(e){}
+    tb.innerHTML = TKS_MEDIA_ORDER.map(m=>{
+      const s = Number(sist[m] || 0);
+      const f = fisikSaved[m] != null ? fisikSaved[m] : '';
+      return `<tr data-media="${m}" data-sistem="${s}"><td>${TKS_MEDIA_LABEL[m] || m}</td>`
+        + `<td style="text-align:right;font-weight:700">${_rp(s)}</td>`
+        + `<td style="text-align:right"><input data-fisik type="number" min="0" value="${f}" placeholder="0" style="width:130px;padding:7px 9px;border:1px solid #ececec;border-radius:9px;text-align:right;font-size:12px" oninput="_tksRecalc()"></td>`
+        + `<td style="text-align:right;font-weight:700" data-selisih>-</td></tr>`;
+    }).join('');
+    try{ document.getElementById('tksCatatan').value = (t && t.catatan) || ''; }catch(e){}
+    const info = document.getElementById('tksInfo');
+    if(info){
+      if(t){
+        info.dataset.locked = '1';
+        info.innerHTML = `✅ Sudah ditutup oleh <strong>${_esc(t.ditutup_oleh || '-')}</strong> • selisih <strong style="color:${Number(t.selisih || 0) === 0 ? '#059669' : '#dc2626'}">${_rp(t.selisih)}</strong> (isi ulang + simpan untuk koreksi)`;
+      } else {
+        delete info.dataset.locked;
+        info.textContent = 'Belum ditutup hari ini.';
+      }
+    }
+    _tksRecalc();
+  }catch(e){
+    tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0, 120)}</td></tr>`;
+  }
+}
+async function kasTutupTokoSave(){
+  if(_tksIsTek()){ (window.showToast || alert)('⛔ Hanya kasir/admin/owner yang boleh tutup kas'); return; }
+  const fisik = {};
+  document.querySelectorAll('#tksBody tr[data-media]').forEach(tr=>{
+    const inp = tr.querySelector('input[data-fisik]');
+    fisik[tr.dataset.media] = Math.max(0, parseInt((inp && inp.value) || '0', 10) || 0);
+  });
+  const catatan = (document.getElementById('tksCatatan')?.value || '').trim();
+  try{
+    const r = await apiFetch('/finance/cash/close', {method: 'POST', body: JSON.stringify({fisik, catatan: catatan || undefined})});
+    (window.showToast || alert)(Number(r.selisih || 0) === 0 ? '✅ Tutup kas pas Rp0 — mantap!' : `🌙 Tersimpan, selisih ${_rp(r.selisih)} — cek lagi ya`);
+    await kasTutupTokoLoad();
+    try{ kasBarToko(); }catch(e){}
+  }catch(e){ (window.showToast || alert)('Gagal simpan tutup kas: ' + (e.message || e)); }
+}
 // hook ke switchView lama
 (function(){
   const orig = window.switchView;
@@ -426,8 +524,13 @@ async function kasOutSave(e){
             || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
           document.querySelectorAll('[data-kas="toko"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
           setKasTab(isTek ? 'saya' : (_kasTab || 'toko'));
+          if(!isTek){ try{ kasTutupTokoLoad(); }catch(e){} }
         }catch(e){ renderKasSaya(); }
       }
+      if(view==='dashboard'){ try{ kasBarToko(); }catch(e){} }
     }catch(e){}
   };
 })();
+// Banner kas langsung saat pertama buka (dashboard aktif by default tanpa switchView).
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} });
+else { try{ kasBarToko(); }catch(e){} }

@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css?v=black2">
+    <link rel="stylesheet" href="assets/css/ai-widget.css?v=multi1">
     <style>html.guard-lock body{visibility:hidden}</style>
     <script>
     // Guard dini anti-bocor: sembunyikan body sampai lolos auth.
@@ -200,6 +201,7 @@
                     </div>
                     <button class="btn btn-dark small" style="white-space:nowrap" onclick="event.stopPropagation(); switchView('approval-akun')">Lihat →</button>
                 </div>
+                <div id="kasBarToko" class="approval-banner" style="display:none"></div>
                 <div class="stats">
                     <div class="stat-card" onclick="statGoMasuk()" style="cursor:pointer" title="Lihat Semua Service →">
                         <div class="stat-head"><span>Service Masuk</span><span class="stat-icon blue">＋</span></div>
@@ -816,6 +818,19 @@
                 </div>
                 <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai) + penjualan kasir + <strong>pemasukan manual (modal/lain)</strong>. Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                <div class="card" id="tksCard" style="margin-top:12px">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>🌙 Tutup Kas Hari Ini</h3><span class="muted" id="tksDate">sistem vs fisik • selisih target Rp0</span></div>
+                        <div class="toolbar-right"><button class="btn btn-ghost small" onclick="kasTutupTokoLoad()">↻</button></div>
+                    </div>
+                    <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Hitung uang fisik di laci + cek mutasi bank/QRIS, isi kolom fisik, simpan malam ini juga.</p>
+                    <div class="table-wrap"><table class="table compact"><thead><tr><th>Media</th><th style="text-align:right">Sistem</th><th style="text-align:right">Fisik *</th><th style="text-align:right">Selisih</th></tr></thead><tbody id="tksBody"><tr><td colspan="4" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+                    <div class="form-grid" style="margin-top:10px">
+                        <div class="field"><label>Catatan (opsional)</label><input id="tksCatatan" placeholder="mis. kurang 50rb, cari besok"></div>
+                    </div>
+                    <div class="form-actions" style="margin-top:10px"><button class="btn btn-dark" onclick="kasTutupTokoSave()">🌙 Simpan Tutup Kas</button></div>
+                    <p style="font-size:11px;color:#8a8f98;margin-top:8px" id="tksInfo">-</p>
+                </div>
                 </div>
                 <div class="modal" id="kasInModal">
                     <div class="modal-box" style="max-width:480px">
@@ -872,7 +887,6 @@
                 </div>
                 <div id="kasSayaKuota" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
-                </div>
                 </div>
             </section>
             <section class="view" id="view-laporan-penjualan">
@@ -1275,5 +1289,6 @@
     <script src="assets/js/auth.js?v=role2"></script>
     <script src="assets/js/script.js?v=partdb3"></script>
     <script src="assets/js/engine.js?v=eng8"></script>
+    <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
 </html>
