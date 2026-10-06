@@ -86,12 +86,11 @@
     } catch (e) {}
   }
 
-  // Target landing per role (1 dashboard):
-  // app.html = SATU pintu (sidebar unified, view beda per role).
-  // index.html / owner.html tetap jalan sebagai konten di dalam iframe app.html.
-  // Kembalikan URL agar mudah di-test.
+  // Target landing per role:
+  // index.html = dashboard toko (pintu utama; Owner Space via menu untuk owner/admin).
+  // app.html tetap bisa dibuka manual sebagai shell unified (iframe index/owner).
   function landingFor(role) {
-    return 'app.html';
+    return 'index.html';
   }
 
   function redirectAfterLogin(data) {

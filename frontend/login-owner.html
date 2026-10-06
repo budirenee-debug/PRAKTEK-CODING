@@ -45,7 +45,7 @@
       <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="login.html">Login toko (kasir/teknisi)</a> • <a href="lacak.html">🔍 Lacak Service</a></div>
     </div>
   </div>
-  <script src="assets/js/auth.js?v=role2"></script>
+  <script src="assets/js/auth.js?v=idx1"></script>
   <script>
     const API = (window.BOSAuth ? window.BOSAuth.API : (() => {
       const stored = localStorage.getItem('API_BASE');
@@ -72,7 +72,7 @@
       alert.className = 'alert ' + kind; alert.textContent = msg; alert.style.display = 'block';
     }
 
-    // Sudah login owner tapi pencet Back → langsung ke app.html (1 dashboard).
+    // Sudah login owner tapi pencet Back → langsung ke index.html (dashboard toko).
     async function bounceIfOwner(){
       let token = null;
       try{ token = window.BOSAuth ? window.BOSAuth.getToken() : localStorage.getItem('access_token'); }catch(e){}
@@ -83,7 +83,7 @@
           const me = await res.json().catch(()=>null);
           try{ if(me && me.role) localStorage.setItem('role', String(me.role).toLowerCase()); }catch(e){}
           const role = window.BOSAuth ? window.BOSAuth.myActiveRole() : String((me && me.role) || '').toLowerCase();
-          if(['superadmin','owner','admin'].includes(role)) location.replace('app.html');
+          if(['superadmin','owner','admin'].includes(role)) location.replace('index.html');
           // teknisi/kasir: biarkan di halaman ini agar dapat pesan penolakan jelas saat login ulang
         }
         else if(res.status === 401){
@@ -121,8 +121,8 @@
           try{ if(window.BOSAuth) window.BOSAuth.logout(true); else localStorage.removeItem('access_token'); }catch(e){}
           throw new Error('⛔ Akun "' + u + '" (' + (role || 'tanpa peran') + ') bukan owner/admin. Pakai login toko untuk kasir/teknisi.');
         }
-        showMsg('ok', 'Berhasil! Membuka 1 Dashboard...');
-        setTimeout(()=> location.replace('app.html'), 600);
+        showMsg('ok', 'Berhasil! Membuka Dashboard Toko...');
+        setTimeout(()=> location.replace('index.html'), 600);
       }catch(err){
         showMsg('err', String(err.message || 'Gagal login'));
       }
