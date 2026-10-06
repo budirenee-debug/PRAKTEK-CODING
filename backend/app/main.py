@@ -5,7 +5,7 @@ Root + Models + SQLite
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
@@ -506,6 +506,23 @@ if os.path.exists(FRONTEND_DIR):
     # /root mount dihapus — duplikat root (index.html/style.css/script.js) adalah legacy,
     # akses canonical sekarang hanya via /frontend/* dan /assets/* (hindari drift)
     # legacy /index.html tetap di-serve via redirect di root() jika dibutuhkan
+
+# URL bersih tanpa /frontend (mis. /owner.html) — alias ke file yang sama.
+# /frontend/* tetap jalan (kompatibel run.bat/bookmark lama). Exact-path, tidak
+# menabrak /api/*, /health, /docs.
+_CLEAN_PAGES = ["index.html", "owner.html", "login.html", "login-owner.html",
+                "app.html", "lacak.html", "landing.html", "register.html", "dev.html"]
+if os.path.exists(FRONTEND_DIR):
+    def _clean_page(page: str):
+        def _serve():
+            fp = os.path.join(FRONTEND_DIR, page)
+            if not os.path.isfile(fp):
+                raise HTTPException(status_code=404, detail=f"Halaman {page} tidak ada")
+            return FileResponse(fp, media_type="text/html")
+        return _serve
+    for _p in _CLEAN_PAGES:
+        app.add_api_route(f"/{_p}", _clean_page(_p), methods=["GET"],
+                          tags=["Root"], include_in_schema=False)
 
 @app.get("/", tags=["Root"])
 def root(request: Request):
