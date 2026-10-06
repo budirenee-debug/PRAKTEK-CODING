@@ -3478,11 +3478,11 @@ function renderDashboard(){
       </tr>
     `).join('');
   }
-  // Performa Teknisi — sinkron dengan profil teknisi yang ada (TOLE/APUD/ANGDEDI)
+  // Performa Teknisi — hanya teknisi sungguhan dari backend (tanpa contoh).
   const techWrap=document.querySelector('.tech-list');
   if(techWrap){
     const techs = availableTechs.filter(t=>t.role==='teknisi' && t.is_active!==false);
-    const list = techs.length ? techs : [{username:'TOLE',role:'teknisi'},{username:'APUD',role:'teknisi'},{username:'ANGDEDI',role:'teknisi'}];
+    const list = techs;
     techWrap.innerHTML = list.map(t=>{
       const name=t.username;
       const handle=data.filter(d=>d.teknisi===name).length;
