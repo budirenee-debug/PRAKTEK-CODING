@@ -3539,7 +3539,7 @@ function renderPelanggan(){
   tbody.innerHTML = filtered.map(d=>{
   const kw = pelangganFilter || '';
   return `
-    <tr>
+    <tr style="${kw?'background:#f0fdf4':''}">
       <td><div class="avatar-cell"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}"><div><strong>${hl(d.nama, kw)}</strong><br><span style="color:#8a8f98;font-size:12px">${hl(d.wa, kw)}</span></div></div></td>
       <td>${hl(d.device, kw)}</td>
       <td><span style="background:#f3f4f6;padding:4px 8px;border-radius:20px;font-size:12px">1x</span></td>
@@ -3827,7 +3827,7 @@ function renderKanban(){
   wrap.innerHTML = filtered.map(d=>{
     const usedCount = (serviceSpareparts[d.id]||[]).length;
     return `
-    <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}">
+    <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}${kw?';background:#f0fdf4;border-color:#bbf7d0':''}">
       <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kw)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kw)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kw)} • ${hl(d.nama, kw)}</p></div><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}</span></div>
       ${klaimBannerHtml(d)}
       <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kw)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
@@ -3938,7 +3938,7 @@ function renderSemuaService(){
     const statusOptionsHtml = statusOpts.map(s=>`<option value="${escapeHtml(s)}" ${s===d.status?'selected':''}>${escapeHtml(s)}</option>`).join('');
     const statusStyle = (()=>{ const s=d.status; if(isKlaimGaransi(d)) return 'background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6'; if(s==='Antri') return 'background:#fffbeb;border-color:#fde68a;color:#92400e'; if(s==='Menunggu Konfirmasi') return 'background:#fef9c3;border-color:#fde68a;color:#854d0e'; if(s==='Dikerjakan') return 'background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8'; if(s==='Menunggu Sparepart') return 'background:#fef3c7;border-color:#fde68a;color:#92400e'; if(s==='Selesai'||s==='Service Sukses'||s==='Bisa Diambil') return 'background:#ecfdf5;border-color:#a7f3d0;color:#065f46'; if(s==='Sudah Diambil') return 'background:#f3f4f6;border-color:#e5e7eb;color:#374151'; if(s==='Service Failed') return 'background:#fef2f2;border-color:#fecaca;color:#991b1b'; if(s==='Garansi') return 'background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6'; if(s==='Dibatalkan') return 'background:#f3f4f6;border-color:#e5e7eb;color:#6b7280'; return 'background:#fff;border-color:#ececec'; })();
     return `
-    <tr data-invoice="${escapeHtml(d.id)}" style="${d.is_overdue?'background:#fffafa':''}">
+    <tr data-invoice="${escapeHtml(d.id)}" style="${q?'background:#f0fdf4':(d.is_overdue?'background:#fffafa':'')}">
       <td><strong style="font-size:11px">${hl(d.id, kwSemua)}</strong><br><span style="color:#8a8f98;font-size:10px">${escapeHtml(formatTanggal(d.date))}</span>${klaimBadgeHtml(d)}</td>
       <td><div class="avatar-cell" style="gap:6px"><img src="https://i.pravatar.cc/100?u=${escapeHtml(d.wa)}" style="width:26px;height:26px"><div><strong style="font-size:11px">${hl(d.nama, kwSemua)}</strong><br><span style="color:#8a8f98;font-size:10px">${hl(d.device, kwSemua)}</span></div></div></td>
       <td style="font-size:11px">${hl(d.keluhan, kwSemua)}<br><span style="font-size:10px">${deadlineBadge(d)} ${partRingkasHtml(d)}</span></td>
@@ -4214,7 +4214,7 @@ function renderStatusView(targetId, statusName){
     // editor masa garansi + tombol klaim (khusus tab Garansi)
     const garansiBox = isGaransiTab ? garansiBoxHtml(d) : '';
     return `
-    <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':''}">
+    <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':''}${kwStatus?';background:#f0fdf4;border-color:#bbf7d0':''}">
       <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kwStatus)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kwStatus)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kwStatus)} • ${hl(d.nama, kwStatus)}</p></div><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}</span></div>
       ${banner}
       ${garansiBadge}
