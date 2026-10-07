@@ -687,6 +687,7 @@
             </div>
             <div id="outKatRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keperluan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Metode</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyKeluar"><tr><td colspan="7" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div id="outPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
           </div>
           <div class="card" style="margin-top:12px">
             <div class="card-head toolbar">
@@ -2970,10 +2971,13 @@
       try{ await ownFetch('/finance/incomes/' + id, {method: 'DELETE'}); try{ ownLedInvalidate(); }catch(_){} await ownInList(); await ownKeluar(); }
       catch(e){ ownAlert('err', 'Gagal hapus: ' + e.message); }
     }
+    const OUT_PER_PAGE = 10;
+    let _outRows = [], _outPage = 1, _outKat = null;
     async function ownKeluar(){
       const tb = document.getElementById('tbodyKeluar');
       const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
       const kat = document.getElementById('outFilterKat')?.value || '';
+      if(kat !== _outKat){ _outKat = kat; _outPage = 1; }
       try{
         const qs = kat ? '?kategori=' + encodeURIComponent(kat) : '';
         const [rows, ring] = await Promise.all([
@@ -2993,13 +2997,46 @@
             .map(([k, v]) => `<span style="font-size:11.5px;background:#f9fafb;border:1px solid #ececec;border-radius:99px;padding:4px 10px"><strong>${esc(expLbl(k))}</strong> ${rp(v)}</span>`).join('')
             || '<span style="font-size:11.5px;color:#8a8f98">Belum ada pengeluaran</span>';
         }catch(e){}
-        tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td style="font-size:11px">${esc(expLbl(r.kategori))}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
-          || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
+        _outRows = arr;
+        renderOutPage();
         await ownLaba();
         await ownInList();
       }catch(e){
         if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`;
       }
+    }
+    function renderOutPage(){
+      const tb = document.getElementById('tbodyKeluar');
+      const pg = document.getElementById('outPager');
+      const arr = _outRows || [];
+      const pages = Math.max(1, Math.ceil(arr.length / OUT_PER_PAGE));
+      if(_outPage > pages) _outPage = pages;
+      if(_outPage < 1) _outPage = 1;
+      if(!arr.length){
+        if(tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
+        if(pg) pg.innerHTML = '';
+        return;
+      }
+      const start = (_outPage - 1) * OUT_PER_PAGE;
+      const rows = arr.slice(start, start + OUT_PER_PAGE);
+      if(tb) tb.innerHTML = rows.map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td style="font-size:11px">${esc(expLbl(r.kategori))}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
+        + `<tr style="background:#f9fafb;font-size:11px;color:#8a8f98"><td colspan="7" style="text-align:center">Menampilkan ${start + 1}–${start + rows.length} dari ${arr.length} catatan</td></tr>`;
+      if(!pg) return;
+      if(pages <= 1){ pg.innerHTML = ''; return; }
+      const btn = (label, page, dis, active) => `<button class="btn ${active ? 'btn-dark' : 'btn-ghost'} small" style="padding:4px 10px;font-size:11.5px;min-width:30px${dis ? ';opacity:.4;pointer-events:none' : ''}" ${dis ? '' : `onclick="ownOutPage(${page})"`}>${label}</button>`;
+      let nums = [];
+      for(let p = 1; p <= pages; p++){
+        if(p === 1 || p === pages || Math.abs(p - _outPage) <= 1) nums.push(p);
+        else if(nums[nums.length - 1] !== '…') nums.push('…');
+      }
+      pg.innerHTML = btn('‹ Prev', _outPage - 1, _outPage <= 1)
+        + nums.map(p => p === '…' ? '<span style="color:#8a8f98">…</span>' : btn(p, p, false, p === _outPage)).join('')
+        + btn('Next ›', _outPage + 1, _outPage >= pages);
+    }
+    function ownOutPage(n){
+      const pages = Math.max(1, Math.ceil((_outRows || []).length / OUT_PER_PAGE));
+      _outPage = Math.min(Math.max(1, n), pages);
+      renderOutPage();
     }
     async function ownLaba(){
       // SATU rumus mentor via ownArus (sama dgn Ringkasan): komisi teknisi = HPP.
