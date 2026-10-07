@@ -16,15 +16,43 @@ from . import models
 
 
 def default_store(db: Session) -> Optional[models.Store]:
-    s = db.query(models.Store).filter(
+    """Toko default: BGJ jika AKTIF dipakai (ada data). Jika BGJ kosong tapi ada
+    toko aktif lain yang berisi data (mis. kode diganti / cabang baru), pakai
+    yang paling banyak aktivitasnya — agar superadmin & anonim tidak nyasar ke
+    toko kosong dan mengira data hilang."""
+    bgj = db.query(models.Store).filter(
         models.Store.kode == "BGJ",
         models.Store.is_active == True,
     ).first()
-    if not s:
-        s = db.query(models.Store).filter(
-            models.Store.is_active == True,
-        ).order_by(models.Store.id).first()
-    return s
+    if bgj and _store_isi(db, bgj.id) > 0:
+        return bgj
+    actives = db.query(models.Store).filter(
+        models.Store.is_active == True).order_by(models.Store.id).all()
+    if not actives:
+        return None
+    if len(actives) == 1:
+        return actives[0]
+    best, best_n = None, -1
+    for s in actives:
+        n = _store_isi(db, s.id)
+        if n > best_n:
+            best, best_n = s, n
+    if best is not None and best_n > 0:
+        return best
+    return bgj or actives[0]
+
+
+def _store_isi(db: Session, store_id: int) -> int:
+    """Jumlah baris data milik toko (skor aktivitas, murah di SQLite kecil)."""
+    try:
+        return (
+            db.query(models.Service).filter(models.Service.store_id == store_id).count()
+            + db.query(models.Sparepart).filter(models.Sparepart.store_id == store_id).count()
+            + db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store_id).count()
+            + db.query(models.Sale).filter(models.Sale.store_id == store_id).count()
+        )
+    except Exception:
+        return 0
 
 
 def resolve_store(db: Session, current, store_id: Optional[int]) -> Optional[models.Store]:
