@@ -410,6 +410,7 @@
                 <div class="stat-card" onclick="ownHppSub('B3')" style="cursor:pointer;border-left:4px solid #f59e0b"><div class="stat-head"><span>📱 Unit</span></div><h3 id="hppTotB3">-</h3><p class="trend" id="hppCntB3">-</p></div>
               </div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyHpp"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="hppPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
             <div id="hubHppKomisi"></div>
             <div class="card" style="margin-top:12px"><div class="card-head"><h3>🛠 Insiden Kerja (beban)</h3><span class="muted">beban toko = HPP • beban teknisi = hutang</span></div><div id="hubHppCelaka"></div></div>
@@ -2430,7 +2431,10 @@
       _hppCache = {rows, techCount}; _hppAt = Date.now();
       return _hppCache;
     }
+    const HPP_PER_PAGE = 10;
+    let _hppPage = 1, _hppView = [], _hppSub = 'all';
     function ownHppSub(k){
+      _hppPage = 1;
       document.querySelectorAll('[data-subg="hpp"]').forEach(b => b.classList.toggle('active', b.dataset.subk === k));
       try{ ownHpp(); }catch(e){}
     }
@@ -2460,18 +2464,51 @@
           }
         }catch(e){}
         const fr = rows.filter(r => sub === 'all' || r.kat === sub);
-        const tot = fr.filter(r => r.kat === 'komisi' || r.laba !== false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        const totPers = fr.filter(r => r.kat !== 'komisi' && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        const emptyB3 = sub === 'B3' && !fr.length;
-        tb.innerHTML = fr.slice(0, 200).map(r =>
-          `<tr><td style="white-space:nowrap">${esc(r.tanggal || '')}</td><td><strong>${esc(r.ket || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.src || '')}${r.kat !== 'komisi' && r.laba === false ? ' • 📦 <strong>Persediaan (belum HPP)</strong>' : ''}</span></td>`
-          + `<td style="font-size:11.5px;font-weight:600">${esc(r.katLbl || r.kat || '')}</td>`
-          + `<td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td>`
-          + `<td style="font-size:11px">${esc(r.media || '-')}</td></tr>`).join('')
-          + (fr.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">HPP terbentuk (${fr.filter(r => r.kat === 'komisi' || r.laba !== false).length} baris)${totPers ? ` • 📦 Persediaan ${rp(totPers)}` : ''}</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>` : '')
-          || `<tr><td colspan="5" style="text-align:center;color:#8a8f98">${emptyB3 ? 'Belum ada HPP unit — modul menyusul, bisa Catat Manual di Buku Besar' : 'Belum ada data HPP'}</td></tr>`;
+        _hppView = fr; _hppSub = sub;
+        renderHppPage();
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
       try{ await Promise.allSettled([ownKasAll(), ownPotongan(), ownAccidents()]); }catch(e){}
+    }
+    function renderHppPage(){
+      const tb = document.getElementById('tbodyHpp');
+      const pg = document.getElementById('hppPager');
+      const fr = _hppView || [];
+      const pages = Math.max(1, Math.ceil(fr.length / HPP_PER_PAGE));
+      if(_hppPage > pages) _hppPage = pages;
+      if(_hppPage < 1) _hppPage = 1;
+      const emptyB3 = fr.length === 0;
+      if(!tb) return;
+      if(!fr.length){
+        tb.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#8a8f98">${_hppSub === 'B3' ? 'Belum ada HPP unit — modul menyusul, bisa Catat Manual di Buku Besar' : 'Belum ada data HPP'}</td></tr>`;
+        if(pg) pg.innerHTML = '';
+        return;
+      }
+      const start = (_hppPage - 1) * HPP_PER_PAGE;
+      const view = fr.slice(start, start + HPP_PER_PAGE);
+      const tot = fr.filter(r => r.kat === 'komisi' || r.laba !== false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+      const totPers = fr.filter(r => r.kat !== 'komisi' && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
+      tb.innerHTML = view.map(r =>
+        `<tr><td style="white-space:nowrap">${esc(r.tanggal || '')}</td><td><strong>${esc(r.ket || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.src || '')}${r.kat !== 'komisi' && r.laba === false ? ' • 📦 <strong>Persediaan (belum HPP)</strong>' : ''}</span></td>`
+        + `<td style="font-size:11.5px;font-weight:600">${esc(r.katLbl || r.kat || '')}</td>`
+        + `<td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td>`
+        + `<td style="font-size:11px">${esc(r.media || '-')}</td></tr>`).join('')
+        + `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">HPP terbentuk (${fr.filter(r => r.kat === 'komisi' || r.laba !== false).length} baris)${totPers ? ` • 📦 Persediaan ${rp(totPers)}` : ''} • hal ${_hppPage}/${pages}</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>`;
+      if(!pg) return;
+      if(pages <= 1){ pg.innerHTML = ''; return; }
+      const btn = (label, page, dis, active) => `<button class="btn ${active ? 'btn-dark' : 'btn-ghost'} small" style="padding:4px 10px;font-size:11.5px;min-width:30px${dis ? ';opacity:.4;pointer-events:none' : ''}" ${dis ? '' : `onclick="ownHppPage(${page})"`}>${label}</button>`;
+      let nums = [];
+      for(let p = 1; p <= pages; p++){
+        if(p === 1 || p === pages || Math.abs(p - _hppPage) <= 1) nums.push(p);
+        else if(nums[nums.length - 1] !== '…') nums.push('…');
+      }
+      pg.innerHTML = btn('‹ Prev', _hppPage - 1, _hppPage <= 1)
+        + nums.map(p => p === '…' ? '<span style="color:#8a8f98">…</span>' : btn(p, p, false, p === _hppPage)).join('')
+        + btn('Next ›', _hppPage + 1, _hppPage >= pages);
+    }
+    function ownHppPage(n){
+      const pages = Math.max(1, Math.ceil((_hppView || []).length / HPP_PER_PAGE));
+      _hppPage = Math.min(Math.max(1, n), pages);
+      renderHppPage();
     }
     // ---------- 3. OPERASIONAL: C1-C6 buku besar + panel pengeluaran ----------
     function ownOpsSub(k){ ownSubSet('ops', k, () => ownOperasional()); }
