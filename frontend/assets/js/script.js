@@ -2624,7 +2624,8 @@ function renderSparepart(){
   if(warnEl) warnEl.textContent= lowCount ? `⚠ ${lowCount} stok tipis` : '';
   if(sumEl){
     const totalVal=base.reduce((s,i)=> s + (i.stok * i.harga),0);
-    sumEl.textContent= `${base.length} item • Total nilai stok: ${formatRupiah(totalVal)} • Menampilkan ${filtered.length}`;
+    const modalNempel=base.reduce((s,i)=> s + ((i.stok||0) * (i.harga_beli||0)),0);
+    sumEl.textContent= `${base.length} item • Total nilai stok: ${formatRupiah(totalVal)} • 💰 Modal nempel: ${formatRupiah(modalNempel)} • Menampilkan ${filtered.length}`;
   }
 }
 // ---------- Asesories: view pisah, data sama (filter kategori Aksesoris) ----------
@@ -2653,7 +2654,8 @@ function renderAsesoris(){
   if(warnEl){ warnEl.style.display=low?'inline-block':'none'; warnEl.textContent=low?`⚠ ${low} stok tipis`:''; }
   if(sumEl){
     const total=list.reduce((s,i)=>s+(i.stok||0)*(i.harga||0),0);
-    sumEl.textContent=`${list.length} item • Total nilai stok: ${formatRupiah(total)}`;
+    const modalNempel=list.reduce((s,i)=>s+((i.stok||0)*(i.harga_beli||0)),0);
+    sumEl.textContent=`${list.length} item • Total nilai stok: ${formatRupiah(total)} • 💰 Modal nempel: ${formatRupiah(modalNempel)}`;
   }
   const addBtn=document.getElementById('btnTambahAsesoris');
   if(addBtn) addBtn.style.display=isTek?'none':'';

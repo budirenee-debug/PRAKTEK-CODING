@@ -755,6 +755,7 @@
               <div class="stat-card" style="border-left:4px solid #7c3aed"><div class="stat-head"><span>Laba Kotor</span></div><h3 id="bbKotor">-</h3><p class="trend">omzet − HPP</p></div>
               <div class="stat-card" style="border-left:4px solid #04074a"><div class="stat-head"><span>Laba Bersih</span></div><h3 id="bbBersih">-</h3><p class="trend">kotor − operasional</p></div>
             </div>
+            <div class="stat-card" style="border-left:4px solid #059669;background:#f0fdf4;margin-bottom:10px;cursor:pointer" onclick="ownShowKeu('hpp')" title="Lihat rincian di tab HPP"><div class="stat-head"><span>💰 Modal nempel di barang (Persediaan)</span></div><h3 id="bbPersediaan" style="color:#047857">-</h3><p class="trend" id="bbPersediaanSub">uang yang sudah jadi barang • klik → rincian HPP</p></div>
             <p style="font-size:11px;color:#8a8f98;margin:0 0 10px" id="bbNote">Memuat...</p>
             <div class="toolbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
               <select id="bbJenis" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Jenis</option><option value="masuk">Masuk</option><option value="keluar">Keluar</option><option value="transfer">Transfer</option></select>
@@ -3063,6 +3064,13 @@
         try{ document.getElementById('bbKotor').style.color = col(g.laba_kotor || 0); }catch(e){}
         set('bbBersih', rp(g.laba_bersih || 0));
         try{ document.getElementById('bbBersih').style.color = col(g.laba_bersih || 0); }catch(e){}
+        set('bbPersediaan', rp(g.persediaan || 0));
+        try{
+          const pp = g.persediaan_per_kat || {};
+          const parts = [['B1', 'Sparepart'], ['B2', 'Accessories'], ['B3', 'Unit']]
+            .filter(([k]) => (pp[k] || 0) > 0).map(([k, nm]) => `${nm} ${rp(pp[k])}`);
+          set('bbPersediaanSub', parts.length ? parts.join(' • ') + ' • klik → rincian HPP' : 'belum ada belanja barang • klik → rincian HPP');
+        }catch(e){}
         set('bbNote', `${g.count || 0} baris • manual + auto • belanja barang = persediaan (belum HPP) • HPP terbentuk saat terjual/terpakai • transfer tidak masuk omzet`);
       }catch(e){ set('bbNote', 'Gagal ringkasan: ' + e.message); }
       try{
@@ -3663,7 +3671,7 @@
       if(countEl) countEl.textContent = filtered.length + ' item';
       const lowCount = baseSp.filter(i => i.stok <= 2).length;
       if(warnEl){ warnEl.style.display = lowCount ? 'inline-block' : 'none'; warnEl.textContent = lowCount ? `⚠ ${lowCount} stok tipis` : ''; }
-      if(sumEl) sumEl.textContent = `${baseSp.length} item • Total nilai stok (jual): ${rp(baseSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Menampilkan ${filtered.length} (tanpa Aksesoris)`;
+      if(sumEl) sumEl.textContent = `${baseSp.length} item • Total nilai stok (jual): ${rp(baseSp.reduce((s, i) => s + i.stok * i.harga, 0))} • 💰 Modal nempel: ${rp(baseSp.reduce((s, i) => s + (i.stok || 0) * (i.harga_beli || 0), 0))} • Menampilkan ${filtered.length} (tanpa Aksesoris)`;
     }
     async function ownInvSpField(id, field, val){
       // Stok / Masuk / Keluar dikunci: stok = Masuk − Keluar (otomatis dari database).
@@ -3687,7 +3695,7 @@
       catch(e){ ownAlert('err', 'Gagal simpan: ' + e.message); await ownInvLoad(); return; }
       try{ ownInvRenderSp(); }catch(e){}
       const sumEl = document.getElementById('sparepartSummary');
-      if(sumEl) sumEl.textContent = `${ownInvSp.length} item • Total nilai stok (jual): ${rp(ownInvSp.reduce((s, i) => s + i.stok * i.harga, 0))} • Tersimpan ✅`;
+      if(sumEl) sumEl.textContent = `${ownInvSp.length} item • Total nilai stok (jual): ${rp(ownInvSp.reduce((s, i) => s + i.stok * i.harga, 0))} • 💰 Modal nempel: ${rp(ownInvSp.reduce((s, i) => s + (i.stok || 0) * (i.harga_beli || 0), 0))} • Tersimpan ✅`;
     }
     // ----- Asesories owner: read-only (kelola di Dashboard Toko) -----
     function ownInvRenderAcc(){
@@ -3703,7 +3711,7 @@
       if(countEl) countEl.textContent = list.length + ' item';
       const low = list.filter(i => i.stok <= 2).length;
       if(warnEl){ warnEl.style.display = low ? 'inline-block' : 'none'; warnEl.textContent = low ? `⚠ ${low} stok tipis` : ''; }
-      if(sumEl) sumEl.textContent = `${list.length} item • Total nilai stok: ${rp(list.reduce((s, i) => s + (i.stok || 0) * (i.harga || 0), 0))}`;
+      if(sumEl) sumEl.textContent = `${list.length} item • Total nilai stok: ${rp(list.reduce((s, i) => s + (i.stok || 0) * (i.harga || 0), 0))} • 💰 Modal nempel: ${rp(list.reduce((s, i) => s + (i.stok || 0) * (i.harga_beli || 0), 0))}`;
     }
     async function ownInvSpMasuk(id){
       const it = ownInvSp.find(x => x.id === id);

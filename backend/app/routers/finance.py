@@ -740,7 +740,8 @@ def ringkasan_ledger(store_id: Optional[int] = Query(None),
     rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id).all()
     g = {"omzet": 0, "hpp": 0, "operasional": 0, "aset": 0,
          "modal": 0, "prive": 0, "non_masuk": 0, "non_keluar": 0,
-         "total_masuk": 0, "total_keluar": 0, "persediaan": 0}
+         "total_masuk": 0, "total_keluar": 0, "persediaan": 0,
+         "persediaan_per_kat": {"B1": 0, "B2": 0, "B3": 0}}
     for e in rows:
         n = int(e.nominal or 0)
         kel = lm.kelompok_of(e.kategori or "")
@@ -764,6 +765,8 @@ def ringkasan_ledger(store_id: Optional[int] = Query(None),
                 g["total_keluar"] += n
             if kel == "hpp" and not laba:
                 g["persediaan"] += n  # beli barang: kas keluar, stok bertambah, BELUM HPP
+                if (e.kategori or "") in g["persediaan_per_kat"]:
+                    g["persediaan_per_kat"][e.kategori] += n
                 continue
             if not laba:
                 continue
