@@ -322,7 +322,11 @@ class SparepartBase(BaseModel):
         return str(v).upper().strip()[:40]
 
 class SparepartCreate(SparepartBase):
-    pass
+    # Auto-modal: tiap input sparepart = modal yg tersimpan di barang.
+    # True -> backend bikin Expense B1 + ledger persediaan (harga_beli x masuk).
+    # False -> cuma master (stok awal/pendataan, tanpa gerak kas).
+    catat_modal: bool = True
+    metode: str = Field(default="Tunai", max_length=20)  # Tunai/Transfer/QRIS
 
 class SparepartUpdate(BaseModel):
     nama: Optional[str] = None

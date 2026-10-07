@@ -593,6 +593,7 @@
                         <div class="field"><label>Harga Jual (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="130.000" oninput="this.dataset.auto=''"><span style="font-size:11px;color:#8a8f98">Otomatis dari Beli (margin ikut Owner)</span><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
                         <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"><span style="font-size:11px;color:#8a8f98">Terpakai / terjual — default 0</span></div>
                         <div class="field"><label>Stok Akhir (auto)</label><input id="sp-stok" type="number" min="0" placeholder="auto = Masuk - Keluar"><span style="font-size:11px;color:#059669">Kosongkan = otomatis Masuk - Keluar</span></div>
+                        <div class="field full" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sp-modal" checked style="width:16px;height:16px"> Catat sebagai modal (masuk Keuangan)</label><span style="font-size:11px;color:#047857">Modal = Beli × Masuk → Expense B1 + persediaan. Uncentang untuk stok awal/pendataan tanpa gerak kas.</span><div style="display:flex;gap:8px;margin-top:8px;align-items:center"><label style="font-size:11px;color:#4b5563">Bayar via</label><select id="sp-metode" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div></div>
                     </div>
                     <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="batalTambahSparepart()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Sparepart →</button></div>
                 </form></div>
@@ -1287,7 +1288,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx1"></script>
-    <script src="assets/js/script.js?v=nodummy1"></script>
+    <script src="assets/js/script.js?v=modal1"></script>
     <script src="assets/js/engine.js?v=eng9"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>

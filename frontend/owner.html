@@ -911,6 +911,7 @@
                   <div class="field"><label>Harga Jual (Rp) *</label><input id="sp-harga" type="text" inputmode="numeric" required placeholder="550.000" oninput="oRpLive('sp-harga','sp-harga-preview');this.dataset.auto=''"><span id="sp-harga-preview" style="font-size:11px;color:#059669;margin-top:4px;display:none">Rp 0</span></div>
                   <div class="field"><label>Barang Keluar (opsional)</label><input id="sp-keluar" type="number" min="0" placeholder="0"></div>
                   <div class="field"><label>Stok Akhir (auto)</label><input id="sp-stok" type="number" min="0" placeholder="auto = Masuk - Keluar"></div>
+                  <div class="field full" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sp-modal" checked style="width:16px;height:16px"> Catat sebagai modal (masuk Keuangan)</label><span style="font-size:11px;color:#047857">Modal = Beli × Masuk → Expense B1 + persediaan. Uncentang untuk stok awal/pendataan.</span><div style="display:flex;gap:8px;margin-top:8px;align-items:center"><label style="font-size:11px;color:#4b5563">Bayar via</label><select id="sp-metode" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div></div>
                 </div>
                 <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownInvToggleAdd()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Sparepart →</button></div>
               </form>
@@ -3712,11 +3713,20 @@
       const qty = parseInt(qtyRaw) || 0;
       if(qty <= 0) return ownAlert('err', 'Jumlah harus >= 1');
       const ref = prompt('No. nota supplier / PO (opsional):', '') || '';
+      let catatModal = true, metode = 'Tunai';
+      if((it.harga_beli || 0) > 0){
+        catatModal = confirm(`Catat modal restock?\n\n${it.nama} x${qty} × ${rp(it.harga_beli)} = ${rp(qty * (it.harga_beli || 0))}\n\nOK = catat ke Keuangan (B1) • Batal = stok saja`);
+        if(catatModal){
+          const m = prompt('Bayar via (Tunai / Transfer / QRIS):', 'Tunai') || 'Tunai';
+          metode = ['Tunai', 'Transfer', 'QRIS'].includes(m.trim()) ? m.trim() : 'Tunai';
+        }
+      }
       try{
-        const q = `?qty=${encodeURIComponent(qty)}` + (ref.trim() ? `&ref=${encodeURIComponent(ref.trim())}` : '');
+        const q = `?qty=${encodeURIComponent(qty)}` + (ref.trim() ? `&ref=${encodeURIComponent(ref.trim())}` : '') + `&catat_modal=${catatModal ? 'true' : 'false'}&metode=${encodeURIComponent(metode)}`;
         const updated = await ownFetch(`/inventory/spareparts/${id}/masuk${q}`, {method: 'POST'});
         await ownInvLoad();
-        ownAlert('ok', `✅ Masuk +${qty} — "${updated.nama || it.nama}" stok ${updated.stok} (DB)`);
+        const modalTxt = (catatModal && (it.harga_beli || 0) > 0) ? ` + modal ${rp(qty * (it.harga_beli || 0))} (B1)` : '';
+        ownAlert('ok', `✅ Masuk +${qty} — "${updated.nama || it.nama}" stok ${updated.stok} (DB)${modalTxt}`);
       }catch(e){ ownAlert('err', 'Gagal catat masuk: ' + e.message); }
     }
     async function ownInvSpRiwayat(id){
@@ -3773,12 +3783,16 @@
       let stok = stokRaw === '' ? (masuk - keluar) : parseInt(stokRaw) || 0;
       if(stok < 0) stok = 0;
       if(ownInvSp.some(i => i.nama.toLowerCase() === nama.toLowerCase())) return ownAlert('err', 'Nama part sudah ada — pakai Edit');
+      const catatModal = document.getElementById('sp-modal') ? document.getElementById('sp-modal').checked : true;
+      const metode = document.getElementById('sp-metode') ? document.getElementById('sp-metode').value : 'Tunai';
       try{
-        const created = await ownFetch('/inventory/spareparts', {method: 'POST', body: JSON.stringify({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli, tgl: oToday()})});
+        const created = await ownFetch('/inventory/spareparts', {method: 'POST', body: JSON.stringify({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli, tgl: oToday(), catat_modal: catatModal, metode})});
         e.target.reset();
+        const mc = document.getElementById('sp-modal'); if(mc) mc.checked = true;
         ownInvToggleAdd(false);
         await ownInvLoad();
-        ownAlert('ok', `✅ ${created.nama} ditambahkan — Stok ${created.stok}`);
+        const modalTxt = (catatModal && harga_beli > 0 && masuk > 0) ? ` + modal ${rp(harga_beli * masuk)} (B1)` : '';
+        ownAlert('ok', `✅ ${created.nama} ditambahkan — Stok ${created.stok}${modalTxt}`);
       }catch(err){ ownAlert('err', 'Gagal tambah: ' + err.message); }
     }
     function ownInvSpModal(id){

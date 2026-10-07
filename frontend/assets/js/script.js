@@ -142,10 +142,11 @@ async function apiInventoryPakai(id, qty, invoice){
   const q = invoice ? `?qty=${qty}&invoice=${encodeURIComponent(invoice)}` : `?qty=${qty}`;
   return await apiFetch(`/inventory/spareparts/${id}/pakai${q}`, {method:'POST'});
 }
-async function apiInventoryMasuk(id, qty, ref){
+async function apiInventoryMasuk(id, qty, ref, catatModal=true, metode='Tunai'){
   if(!USE_API) throw new Error('offline — tidak bisa catat masuk, hubungkan backend dulu');
   let q = `?qty=${encodeURIComponent(qty)}`;
   if(ref) q += `&ref=${encodeURIComponent(ref)}`;
+  q += `&catat_modal=${catatModal ? 'true' : 'false'}&metode=${encodeURIComponent(metode || 'Tunai')}`;
   return await apiFetch(`/inventory/spareparts/${id}/masuk${q}`, {method:'POST'});
 }
 async function apiInventoryRiwayat(id, limit){
@@ -2710,12 +2711,22 @@ async function terimaBarangMasuk(id){
   if(qty<=0){ showToast('Jumlah harus >= 1'); return; }
   const ref = prompt('No. nota supplier / PO (opsional, Enter untuk skip):', '') || '';
   if(!USE_API){ showToast('⛔ Offline — hubungkan backend dulu agar masuk tercatat di database'); return; }
+  // Restock = modal tersimpan di barang (B1). Tanya dulu biar koreksi/stok awal bisa skip.
+  let catatModal = true, metode = 'Tunai';
+  if((it.harga_beli || 0) > 0){
+    catatModal = confirm(`Catat modal restock?\n\n${it.nama} x${qty} × ${formatRupiah(it.harga_beli)} = ${formatRupiah(qty * (it.harga_beli || 0))}\n\nOK = catat ke Keuangan (B1) • Batal = stok saja`);
+    if(catatModal){
+      const m = prompt('Bayar via (Tunai / Transfer / QRIS):', 'Tunai') || 'Tunai';
+      metode = ['Tunai', 'Transfer', 'QRIS'].includes(m.trim()) ? m.trim() : 'Tunai';
+    }
+  }
   try{
-    const updated = await apiInventoryMasuk(id, qty, ref.trim()||undefined);
+    const updated = await apiInventoryMasuk(id, qty, ref.trim()||undefined, catatModal, metode);
     await loadInventory();
     renderSparepart();
     try{ renderAsesoris(); }catch(e){}
-    showToast(`✅ Masuk +${qty} — "${updated.nama||it.nama}" stok ${updated.stok} (DB)`);
+    const modalTxt = (catatModal && (it.harga_beli || 0) > 0) ? ` + modal ${formatRupiah(qty * (it.harga_beli || 0))} (B1)` : '';
+    showToast(`✅ Masuk +${qty} — "${updated.nama||it.nama}" stok ${updated.stok} (DB)${modalTxt}`);
   }catch(e){ showToast('Gagal catat masuk: '+e.message); }
 }
 async function saveSparepartRow(id){
@@ -2775,11 +2786,16 @@ async function handleSparepartAdd(e){
   if(stok<0) stok=0;
   // cek duplikat nama
   if(inventory.some(i=>i.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama part sudah ada — pakai Edit');
+  // Auto-modal: input sparepart = modal tersimpan di barang (B1). Uncentang = stok awal/pendataan.
+  const catatModal = document.getElementById('sp-modal') ? document.getElementById('sp-modal').checked : true;
+  const metode = document.getElementById('sp-metode') ? document.getElementById('sp-metode').value : 'Tunai';
   if(USE_API){
     try{
-      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO()});
-      showToast(`✅ ${created.nama} ditambahkan — Stok ${created.stok} (sync multi-PC)`);
+      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO(), catat_modal: catatModal, metode});
+      const modalTxt = (catatModal && beli > 0 && masuk > 0) ? ` + modal ${formatRupiah(beli * masuk)} (B1)` : '';
+      showToast(`✅ ${created.nama} ditambahkan — Stok ${created.stok} (sync multi-PC)${modalTxt}`);
       e.target.reset();
+      const mc = document.getElementById('sp-modal'); if(mc) mc.checked = true;
       // reset preview
       const prev=document.getElementById('sp-harga-preview'); if(prev) prev.style.display='none';
       await loadInventory();

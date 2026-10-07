@@ -41,6 +41,40 @@ def _need_store(db: Session, store):
         store = default_store(db)
     return store
 
+def _post_modal(db: Session, store, nama: str, qty: int, nominal: int, metode: str,
+                tanggal=None, keterangan: str = None, actor=None, fallback_store_id=None):
+    """Catat modal belanja sparepart: Expense B1 + ledger persediaan.
+
+    Prinsip mentor: beli = PERSEDIAAN (masuk_laba=False, belum HPP) + kas keluar beneran.
+    HPP baru terbentuk saat part dipakai (pakai) / terjual (kasir).
+    store boleh None (superadmin tanpa store eksplisit) -> pakai fallback_store_id
+    (store milik barang) agar baris tetap masuk scope toko & kebaca Keuangan.
+    Return nominal yg dicatat (0 jika skip karena nominal <= 0).
+    """
+    import datetime as _dt
+    nominal = int(nominal or 0)
+    if nominal <= 0:
+        return 0
+    from .. import ledger_meta as lm
+    from .finance import _ledger_add
+    sid = (store.id if store is not None else None) or fallback_store_id
+    tgl = tanggal or _dt.date.today()
+    exp = crud.models.Expense(
+        store_id=sid, tanggal=tgl, kategori="B1",
+        keperluan=f"Belanja {nama} x{qty}", nominal=nominal, metode=metode,
+        keterangan=keterangan,
+        dibuat_oleh=(getattr(actor, "username", None) or (actor if isinstance(actor, str) else None)))
+    db.add(exp)
+    db.flush()
+    _ledger_add(db, sid, tgl, "keluar", "B1",
+                f"Belanja Sparepart: {nama} x{qty}", nominal,
+                lm.METODE_KE_MEDIA.get(metode, "kas_utama"),
+                ref_type="expense", ref_id=exp.id,
+                oleh=(getattr(actor, "username", None) or (actor if isinstance(actor, str) else None)),
+                masuk_laba=False, pengaruh_kas=True)
+    db.commit()
+    return nominal
+
 @router.get("/spareparts", response_model=List[schemas.SparepartOut])
 def list_spareparts(
     search: Optional[str] = None,
@@ -72,8 +106,21 @@ def create_sparepart(
     if existing:
         raise HTTPException(status_code=400, detail="Nama part sudah ada di toko ini — pakai Edit")
     sp = crud.create_sparepart(db, payload, store_id=store.id if store else None)
+    # Auto-modal: input sparepart = modal tersimpan di barang.
+    # Bikin Expense B1 + ledger persediaan (masuk_laba=False) sebesar harga_beli x masuk.
+    # Skip jika catat_modal=False (stok awal/pendataan) atau beli/masuk nol.
+    modal_info = ""
+    if bool(getattr(payload, "catat_modal", False)) and int(sp.harga_beli or 0) > 0 and int(sp.masuk or 0) > 0:
+        metode = (getattr(payload, "metode", None) or "Tunai").strip() or "Tunai"
+        if metode not in ("Tunai", "Transfer", "QRIS"):
+            metode = "Tunai"
+        nominal = int(sp.harga_beli) * int(sp.masuk)
+        _post_modal(db, store, sp.nama, sp.masuk, nominal, metode,
+                    tanggal=sp.tgl, keterangan=f"auto-modal SP-{sp.id}",
+                    actor=current, fallback_store_id=sp.store_id)
+        modal_info = f" • modal Rp{nominal} (B1)"
     log_action(db, "stok.create", target=sp.nama,
-               detail=f"Masuk {sp.masuk} • stok {sp.stok} • beli {sp.harga_beli} • jual {sp.harga} • {sp.merk}/{sp.kategori}",
+               detail=f"Masuk {sp.masuk} • stok {sp.stok} • beli {sp.harga_beli} • jual {sp.harga} • {sp.merk}/{sp.kategori}{modal_info}",
                actor=current, store_id=store.id if store else None)
     return sp
 
@@ -264,11 +311,15 @@ def terima_barang(
     sp_id: int,
     qty: int = Query(..., ge=1, description="Jumlah barang masuk"),
     ref: Optional[str] = Query(None, description="No. nota supplier / PO (opsional)"),
+    catat_modal: bool = Query(True, description="True = restock ikut catat modal B1 (harga_beli x qty)"),
+    metode: str = Query("Tunai", description="Tunai/Transfer/QRIS (dipakai jika catat_modal)"),
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current = Depends(get_current_user),
 ):
-    """Terima barang: `masuk` & `stok` naik. Dipakai daripada mengetik angka di kolom Masuk."""
+    """Terima barang: `masuk` & `stok` naik. Dipakai daripada mengetik angka di kolom Masuk.
+    Restock = modal: otomatis bikin Expense B1 + ledger persediaan (harga_beli x qty)
+    kecuali catat_modal=false (koreksi/stok awal tanpa gerak kas)."""
     if not current:
         raise HTTPException(status_code=401, detail="Belum login")
     store = resolve_store(db, current, store_id)
@@ -280,8 +331,19 @@ def terima_barang(
     sp, err = crud.masuk_part(db, sp, qty, actor=current, ref=ref)
     if err:
         raise HTTPException(status_code=400, detail=err)
+    modal_info = ""
+    if catat_modal and int(sp.harga_beli or 0) > 0:
+        metode = (metode or "Tunai").strip() or "Tunai"
+        if metode not in ("Tunai", "Transfer", "QRIS"):
+            metode = "Tunai"
+        nominal = int(sp.harga_beli) * int(qty)
+        _post_modal(db, store, sp.nama, qty, nominal, metode,
+                    keterangan=f"restock SP-{sp.id}{(' ' + ref) if ref else ''}",
+                    actor=current, fallback_store_id=sp.store_id)
+        db.refresh(sp)
+        modal_info = f" • modal Rp{nominal} (B1)"
     log_action(db, "stok.masuk", target=sp.nama,
-               detail=f"terima {qty} • stok {sp.stok}{(' • ' + ref) if ref else ''}",
+               detail=f"terima {qty} • stok {sp.stok}{(' • ' + ref) if ref else ''}{modal_info}",
                actor=current, store_id=_sid(store))
     return sp
 
