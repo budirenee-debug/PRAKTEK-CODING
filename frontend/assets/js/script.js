@@ -2598,7 +2598,7 @@ function renderSparepart(){
       const stokColor = it.stok<=2 ? '#fef2f2;color:#dc2626;border-color:#fecaca' : it.stok<=5 ? '#fffbeb;color:#b45309;border-color:#fde68a' : '#ecfdf5;color:#059669;border-color:#a7f3d0';
       const stokBg = it.stok<=2 ? '#fef2f2' : it.stok<=5 ? '#fffbeb' : '#ecfdf5';
       return `
-      <tr>
+      <tr style="${(q||fCat||fMerk)?'background:#f0fdf4':''}">
         <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar} → akhir ${it.stok}</span></div></td>
         <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${merkBadgeStyle(merkNorm)}">${escapeHtml(merkNorm)}</span></td>
         <td><span class="badge-status" style="background:#f3f4f6;border:1px solid #ececec;font-size:11px">${escapeHtml(it.kategori)}</span></td>
@@ -2641,7 +2641,7 @@ function renderAsesoris(){
   if(q) list=list.filter(i=> (i.nama+(i.merk||'')).toLowerCase().includes(q));
   list.sort((a,b)=>a.stok-b.stok);
   const stokBadge=(s)=> s<=0 ? '<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">HABIS</span>' : s<=2 ? `<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s} tipis</span>` : `<span style="background:#ecfdf5;color:#059669;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s}</span>`;
-  tbody.innerHTML=list.map(it=>`<tr>
+  tbody.innerHTML=list.map(it=>`<tr style="${q?'background:#f0fdf4':''}>
     <td><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar}</span></td>
     <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${merkBadgeStyle(normalizeMerk(it.merk))}">${escapeHtml(normalizeMerk(it.merk))}</span></td>
     <td style="text-align:center">${stokBadge(it.stok)}</td>
@@ -3267,7 +3267,7 @@ function renderAlat(){
       const peminjamOpts=[...new Set(peminjamOptions)].map(n=>`<option value="${escapeHtml(n)}" ${n===it.peminjam?'selected':''}>${escapeHtml(n)}</option>`).join('');
       const kondisiStyle=kondisiBadge(it.kondisi);
       return `
-      <tr>
+      <tr style="${(q||fK)?'background:#f0fdf4':''}">
         <td><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><div style="font-size:10px;color:#8a8f98">#${it.id}</div></td>
         <td><select id="alat-kondisi-${it.id}" ${disAl} style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${kondisiStyle}" onchange="updateAlatField(${it.id},'kondisi',this.value)">${kondisiOpts}</select></td>
         <td><select id="alat-peminjam-${it.id}" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px" onchange="updateAlatField(${it.id},'peminjam',this.value)">${peminjamOpts}</select></td>
@@ -4249,7 +4249,7 @@ function kasirRenderBarang(){
   const list = _kasirBarang.filter(b => !q || String(b.nama||'').toLowerCase().includes(q) || String(b.kategori||'').toLowerCase().includes(q)).slice(0, 60);
   tb.innerHTML = list.map(b=>{
     const stok = Number(b.stok)||0;
-    return `<tr><td><strong>${escapeHtml(b.nama||'-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${escapeHtml(b.kategori||'')} • ${escapeHtml(b.merk||'')}</span></td><td style="text-align:center;${stok<=0?'color:#dc2626;font-weight:700':''}">${stok}</td><td style="text-align:right">${_kasirRp(b.harga)}</td><td style="text-align:center"><button class="btn btn-dark small" style="padding:4px 10px" ${stok<=0?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="kasirAddBarang(${b.id})">+</button></td></tr>`;
+    return `<tr style="${q?'background:#f0fdf4':''}"><td><strong>${escapeHtml(b.nama||'-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${escapeHtml(b.kategori||'')} • ${escapeHtml(b.merk||'')}</span></td><td style="text-align:center;${stok<=0?'color:#dc2626;font-weight:700':''}">${stok}</td><td style="text-align:right">${_kasirRp(b.harga)}</td><td style="text-align:center"><button class="btn btn-dark small" style="padding:4px 10px" ${stok<=0?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="kasirAddBarang(${b.id})">+</button></td></tr>`;
   }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Tidak ada barang — tambah di Sparepart dulu</td></tr>';
 }
 function kasirAddBarang(id){

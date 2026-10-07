@@ -3728,7 +3728,7 @@
           const stokColor = it.stok <= 2 ? '#fef2f2;color:#dc2626;border-color:#fecaca' : it.stok <= 5 ? '#fffbeb;color:#b45309;border-color:#fde68a' : '#ecfdf5;color:#059669;border-color:#a7f3d0';
           const stokBg = it.stok <= 2 ? '#fef2f2' : it.stok <= 5 ? '#fffbeb' : '#ecfdf5';
           return `
-          <tr>
+          <tr style="${(q||fCat||fMerk)?'background:#f0fdf4':''}">
             <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${esc(it.nama)}</strong><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar} → akhir ${it.stok}</span></div></td>
             <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${oMerkBadge(merkNorm)}">${esc(merkNorm)}</span></td>
             <td><span class="badge-status" style="background:#f3f4f6;border:1px solid #ececec;font-size:11px">${esc(it.kategori)}</span></td>
@@ -3940,7 +3940,7 @@
           const kondisiOpts = ['Baik','Perlu Kalibrasi','Rusak','Dipinjam'].map(k => `<option ${k === it.kondisi ? 'selected' : ''}>${k}</option>`).join('');
           const peminjamOpts = [...new Set(peminjamOptions)].map(n => `<option value="${esc(n)}" ${n === it.peminjam ? 'selected' : ''}>${esc(n)}</option>`).join('');
           return `
-          <tr>
+          <tr style="${(q||fK)?'background:#f0fdf4':''}">
             <td><strong style="font-size:12px">${esc(it.nama)}</strong><div style="font-size:10px;color:#8a8f98">#${it.id}</div></td>
             <td><select style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px;font-weight:600;${oKondisiBadge(it.kondisi)}" onchange="ownInvAlatField(${it.id},'kondisi',this.value)">${kondisiOpts}</select></td>
             <td><select style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:11px" onchange="ownInvAlatField(${it.id},'peminjam',this.value)">${peminjamOpts}</select></td>
