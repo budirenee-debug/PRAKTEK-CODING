@@ -77,13 +77,16 @@ class AttendanceOut(BaseModel):
 # ---------- Customer ----------
 class CustomerBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=120)
-    wa: str = Field(..., min_length=9, max_length=20)
+    # WA boleh kosong (pelanggan tanpa nomor) — hanya divalidasi jika diisi
+    wa: str = Field(default="", max_length=20)
 
     @field_validator('wa')
     @classmethod
     def wa_must_numeric(cls, v):
+        if v is None or str(v).strip() == "" or str(v).strip() == "-":
+            return ""
         # hapus spasi dan cek numeric
-        cleaned = v.replace(" ", "").replace("-", "").replace("+", "")
+        cleaned = str(v).replace(" ", "").replace("-", "").replace("+", "")
         if not cleaned.isdigit():
             raise ValueError('No WA harus angka')
         return v
@@ -102,7 +105,8 @@ class CustomerOut(CustomerBase):
 # ---------- Service ----------
 class ServiceBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=120)
-    wa: str = Field(..., min_length=9, max_length=20)
+    # WA boleh kosong (pelanggan tanpa nomor) — hanya divalidasi jika diisi
+    wa: str = Field(default="", max_length=20)
     device: str = Field(..., min_length=2, max_length=120)
     imei: Optional[str] = Field(None, max_length=30)
     keluhan: str = Field(..., min_length=5)
@@ -130,6 +134,17 @@ class ServiceBase(BaseModel):
         allowed = ["Tunai", "Transfer", "QRIS"]
         if v not in allowed:
             raise ValueError(f'metode_bayar harus salah satu: {allowed}')
+        return v
+
+    @field_validator('wa')
+    @classmethod
+    def validate_wa_optional(cls, v):
+        # WA boleh kosong — hanya validasi jika diisi
+        if v is None or str(v).strip() == "" or str(v).strip() == "-":
+            return ""
+        cleaned = str(v).replace(" ", "").replace("-", "").replace("+", "")
+        if not cleaned.isdigit():
+            raise ValueError('No WA harus angka')
         return v
 
     @field_validator('hasil')

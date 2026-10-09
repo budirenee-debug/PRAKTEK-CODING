@@ -123,7 +123,7 @@ async function renderKasToko(force){
     const SUKSES = ['Service Sukses','Sudah Diambil','Selesai'];
     const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0,10);
     let services = [];
-    try{ services = await apiFetch('/services?limit=500'); }catch(e){ services = []; }
+    try{ services = await apiFetch('/services?limit=200'); }catch(e){ services = []; }
     const cair = (Array.isArray(services)?services:[]).filter(d=>SUKSES.includes(d.status));
     let masukTotal = cair.reduce((s,d)=>s+(Number(d.biaya)||0),0);
     const rows = cair.map(d=>({t: actDate(d), ref: d.invoice||'-', tipe: '💰 Pendapatan cair', masuk: Number(d.biaya)||0, keluar: 0, ket: `${d.device||''} • ${d.teknisi||''} • ${d.metode_bayar||'Belum bayar'}`}));

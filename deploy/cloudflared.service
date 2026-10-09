@@ -1,15 +1,21 @@
 [Unit]
 Description=Cloudflare Tunnel - b-gadget
 After=network-online.target b-gadget.service
-Wants=network-online.target
-Requires=b-gadget.service
+Wants=network-online.target b-gadget.service
+# CATATAN PENTING: pakai Wants=, bukan Requires=
+# Kalau pakai Requires= b-gadget.service, maka setiap `systemctl restart b-gadget`
+# ikut MATIKAN cloudflared -> service.reneepsl.my.id jadi 502 beberapa detik tiap
+# deploy. Dengan Wants=, tunnel tetap hidup dan cloudflared otomatis retry
+# origin begitu app nyala lagi.
+Requires=network-online.target
 
 [Service]
 Type=simple
 User=root
-# Path aktual server: /home/budirn/PRAKTEK
+# Config tunnel ada di dalam repo, tapi di-mark skip-worktree di index git
+# supaya tidak pernah tertimpa saat `git pull` (file ini yang sedang hidup,
+# berisi credentials-file + ingress ssh.reneepsl.my.id).
 ExecStart=/usr/local/bin/cloudflared tunnel --config /home/budirn/PRAKTEK/.cloudflared/config.yml run b-gadget
-# Alternatif /opt: ExecStart=/usr/local/bin/cloudflared tunnel --config /opt/PRAKTEK/.cloudflared/config.yml run b-gadget
 Restart=always
 RestartSec=5
 StandardOutput=journal

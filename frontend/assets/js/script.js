@@ -717,6 +717,159 @@ function updateDeadlinePreview(){
 
 function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
+// ---------- OFFLINE OUTBOX (service saja, last-write-win) ----------
+// Tiap tulis saat offline masuk antrean lokal, flush otomatis saat online.
+// PC offline maupun server gangguan internet = sama dari sisi browser: API tidak bisa di-reach.
+const OUTBOX_KEY = 'b_gadget_outbox_v1';
+let _flushingOutbox = false;
+function loadOutbox(){
+  try{
+    const raw = localStorage.getItem(OUTBOX_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  }catch{ return []; }
+}
+function saveOutbox(q){
+  try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(q)); }catch{}
+  try{ updateOutboxBadge(); }catch{}
+}
+function updateOutboxBadge(){
+  const q = loadOutbox();
+  const el = document.querySelector('.store-info span:first-child');
+  if(!el) return;
+  const base = USE_API ? '● Sistem Online (API)' : '● Offline (localStorage)';
+  if(q.length){
+    el.textContent = base + ` • ⏳ ${q.length} antre sync`;
+    el.style.color = '#b45309';
+  } else {
+    // jangan timpa warna online/offline yang diatur loadData
+    if(el.textContent.includes('antre')){ el.textContent = base; }
+  }
+}
+function makeTmpId(){
+  return 'TMP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,7).toUpperCase();
+}
+function isNetErr(e){
+  const m = String((e && e.message) || e || '').toLowerCase();
+  return m.includes('failed to fetch') || m.includes('networkerror') || m.includes('load failed')
+    || m.includes('network request failed') || m.includes('fetch failed') || m.includes('offline');
+}
+function enqueueOutbox(entry){
+  // entry: {op:'create'|'patch'|'status', clientTmp?, invoice?, payload?, status?}
+  const q = loadOutbox();
+  entry.qid = entry.qid || ('Q' + Date.now().toString(36) + Math.random().toString(36).slice(2,7));
+  entry.ts = entry.ts || new Date().toISOString();
+  const target = entry.invoice || entry.clientTmp;
+  if(entry.op === 'patch' || entry.op === 'status'){
+    // last-write-win: jika masih ada create pending untuk invoice ini, gabung ke create
+    const ci = q.findIndex(x => x.op === 'create' && x.clientTmp === target);
+    if(ci >= 0){
+      if(entry.op === 'patch') q[ci].payload = {...(q[ci].payload||{}), ...(entry.payload||{})};
+      else q[ci].payload = {...(q[ci].payload||{}), status: entry.status};
+      saveOutbox(q);
+      return entry;
+    }
+    if(entry.op === 'patch'){
+      const pi = q.findIndex(x => x.op === 'patch' && x.invoice === target);
+      if(pi >= 0){ q[pi].payload = {...(q[pi].payload||{}), ...(entry.payload||{})}; q[pi].ts = entry.ts; saveOutbox(q); return q[pi]; }
+    } else {
+      const si = q.findIndex(x => x.op === 'status' && x.invoice === target);
+      if(si >= 0){ q[si].status = entry.status; q[si].ts = entry.ts; saveOutbox(q); return q[si]; }
+    }
+  }
+  q.push(entry);
+  saveOutbox(q);
+  return entry;
+}
+function dropOutboxByIds(qids){
+  const set = new Set(qids);
+  saveOutbox(loadOutbox().filter(x => !set.has(x.qid)));
+}
+function rekeyOutboxInvoice(oldId, newId){
+  if(!oldId || !newId || oldId === newId) return;
+  const q = loadOutbox();
+  let changed = false;
+  q.forEach(x => {
+    if(x.invoice === oldId){ x.invoice = newId; changed = true; }
+  });
+  if(changed) saveOutbox(q);
+}
+function keepPendingRows(mapped){
+  // jangan hilangkan baris TMP yang belum sync saat loadData sukses
+  try{
+    const pend = data.filter(d => d && (d._pending || String(d.id||'').startsWith('TMP-')));
+    if(!pend.length) return mapped;
+    const ids = new Set(mapped.map(m => m.id));
+    return [...pend.filter(p => !ids.has(p.id)), ...mapped];
+  }catch{ return mapped; }
+}
+async function flushOutbox(){
+  if(_flushingOutbox) return;
+  const q0 = loadOutbox();
+  if(!q0.length) return;
+  _flushingOutbox = true;
+  try{
+    // coba kirim satu per satu, urutan FIFO = last-write-win alami
+    let q = loadOutbox();
+    const done = [];
+    for(const entry of [...q]){
+      try{
+        if(entry.op === 'create'){
+          const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(entry.payload||{})});
+          const real = normalize(created);
+          const idx = data.findIndex(d => d && (d.id === entry.clientTmp));
+          if(idx >= 0) data[idx] = real;
+          else data.unshift(real);
+          rekeyOutboxInvoice(entry.clientTmp, real.id);
+          done.push(entry.qid);
+        } else if(entry.op === 'patch'){
+          await apiFetch(`/services/${entry.invoice}`, {method:'PATCH', body: JSON.stringify(entry.payload||{})});
+          done.push(entry.qid);
+        } else if(entry.op === 'status'){
+          await apiFetch(`/services/${entry.invoice}/status?status=${encodeURIComponent(entry.status)}`, {method:'PUT'});
+          done.push(entry.qid);
+        } else {
+          done.push(entry.qid);
+        }
+        saveLocal();
+      }catch(e){
+        if(isNetErr(e)){
+          USE_API = false;
+          const el = document.querySelector('.store-info span:first-child');
+          if(el){ el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
+          break; // berhenti, coba lagi nanti
+        }
+        const msg = String((e && e.message) || '');
+        if(/404|tidak ditemukan|422|validasi/i.test(msg)){
+          // entry basi/validasi gagal — buang agar tidak macet, tampilkan info
+          done.push(entry.qid);
+          console.warn('outbox drop entry:', entry, msg.slice(0,200));
+          try{ showToast('⚠ 1 antrean dibuang: ' + msg.slice(0,120)); }catch{}
+          continue;
+        }
+        break; // error lain (mis. 401/500) — berhenti, coba lagi nanti
+      }
+    }
+    if(done.length) dropOutboxByIds(done);
+    saveLocal();
+    try{ await loadData(true); }catch{}
+    try{ renderAll(); renderSemuaService(); }catch{}
+    const left = loadOutbox().length;
+    if(done.length && !left){ try{ showToast(`✅ Sync selesai (${done.length} antrean naik)`); }catch{} USE_API = true; }
+    else if(done.length){ try{ showToast(`🔄 Sync ${done.length} naik, sisa ${left} antre`); }catch{} }
+  }finally{
+    _flushingOutbox = false;
+    try{ updateOutboxBadge(); }catch{}
+  }
+}
+if(typeof window !== 'undefined'){
+  try{
+    window.addEventListener('online', ()=>{ USE_API = true; flushOutbox(); });
+    window.addEventListener('offline', ()=>{ USE_API = false; updateOutboxBadge(); });
+    setInterval(()=>{ if(loadOutbox().length && !document.hidden) flushOutbox(); }, 15000);
+  }catch{}
+}
+
 // ---------- BOS multi-toko: konteks toko aktif ----------
 // Semua request data lewat apiFetch otomatis bawa ?store_id=<aktif>,
 // kecuali endpoint platform (/auth, /stores, /invites, /seed).
@@ -942,22 +1095,25 @@ async function loadData(silent){
     return;
   }
   try{
-    // fetch semua (limit 200) lalu filter client-side — jangan pakai search param agar data tidak jadi 0 setelah search (fix 88->0)
+    // fetch semua (limit 200 = max backend lawas le=200) lalu filter client-side
     const rows = await apiFetch(`/services?limit=200`);
     const mapped = rows.map(normalize);
     // jangan saveLocal jika hasil 0 tapi DB sebenarnya ada isinya (cegah corrupt localStorage)
     if(mapped.length===0 && !silent){
       console.warn('API return 0 rows — cek DB, tidak saveLocal agar tidak jadi 0 permanen');
     } else {
-      data = mapped;
+      data = keepPendingRows(mapped);
       saveLocal();
     }
-    if(mapped.length) data = mapped;
+    if(mapped.length) data = keepPendingRows(mapped);
     data = filterTeknisiView(data);
     const el = document.querySelector('.store-info span:first-child');
     if(el) el.textContent = '● Sistem Online (API)';
     if(el) el.style.color = '#10b981';
     _offlineToastShown = false;
+    try{ updateOutboxBadge(); }catch{}
+    // jika ada antrean, flush di background (tanpa blokir render)
+    try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 500); }catch{}
   }catch(e){
     // hanya warn di console, toast sekali saja (hindari spam tiap 8 detik)
     if(!_offlineToastShown && !silent) {
@@ -976,9 +1132,12 @@ async function loadData(silent){
 
 async function apiCreateService(payload){
   if(!USE_API){
-    const newId='INV-2026-'+String(100+data.length+1).padStart(4,'0');
-    const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO()};
-    data.unshift(obj); saveLocal(); return obj;
+    const newId = makeTmpId();
+    const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
+    data.unshift(obj); saveLocal();
+    enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
+    try{ showToast(`⚠ Offline — tersimpan sementara (${loadOutbox().length} antre, auto-sync saat online)`); }catch{}
+    return obj;
   }
   try{
     const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(payload)});
@@ -988,12 +1147,23 @@ async function apiCreateService(payload){
     // jika API 422 (validasi) jangan fallback diam-diam, lempar jelas
     if(msg.includes('422') || msg.toLowerCase().includes('field required')){
       showToast('Gagal validasi API: '+ msg.slice(0,200));
+    } else if(isNetErr(e)){
+      // offline / server gangguan — simpan sementara + antre sync
+      console.warn('apiCreateService offline, antrekan:', msg);
+      const newId = makeTmpId();
+      const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
+      data.unshift(obj); saveLocal();
+      enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
+      USE_API = false;
+      showToast(`⚠ Server offline — tersimpan sementara (${loadOutbox().length} antre)`);
+      return obj;
     } else {
       // coba fallback lokal agar input tetap masuk meski API down sementara
       console.warn('apiCreateService fallback lokal:', msg);
-      const newId='INV-2026-'+String(100+data.length+1).padStart(4,'0');
-      const obj={id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO()};
+      const newId = makeTmpId();
+      const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
       data.unshift(obj); saveLocal();
+      enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
       showToast('⚠ API gagal, disimpan lokal (akan sync saat online)');
       return obj;
     }
@@ -1001,17 +1171,44 @@ async function apiCreateService(payload){
   }
 }
 
+async function patchServiceQueued(invoice, payload){
+  // optimistik lokal dulu (last-write-win), lalu coba kirim / antrekan
+  const item = data.find(d=>d.id===invoice);
+  if(item){ Object.assign(item, payload); saveLocal(); }
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || (item && item._pending)){
+    enqueueOutbox({op:'patch', invoice, payload});
+    return;
+  }
+  try{
+    await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify(payload)});
+  }catch(e){
+    if(isNetErr(e)){
+      USE_API = false;
+      enqueueOutbox({op:'patch', invoice, payload});
+      try{ showToast(`⚠ Offline — perubahan ${invoice} diantrekan`); }catch{}
+    } else { throw e; }
+  }
+}
+
 async function apiUpdateStatus(invoice, newStatus){
-  if(!USE_API){
-    const item=data.find(d=>d.id===invoice);
-    if(item){ item.status=newStatus; saveLocal(); }
+  const item = data.find(d=>d.id===invoice);
+  if(item){ item.status = newStatus; saveLocal(); }
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || (item && item._pending)){
+    enqueueOutbox({op:'status', invoice, status:newStatus});
+    try{ showToast(`⚠ Offline — status ${invoice} diantrekan`); }catch{}
     return;
   }
   try{
     await apiFetch(`/services/${invoice}/status?status=${encodeURIComponent(newStatus)}`, {method:'PUT'});
   }catch(e){
-    showToast('Gagal update status: '+ e.message);
-    throw e;
+    if(isNetErr(e)){
+      USE_API = false;
+      enqueueOutbox({op:'status', invoice, status:newStatus});
+      showToast('⚠ Offline — status diantrekan, auto-sync saat online');
+    } else {
+      showToast('Gagal update status: '+ e.message);
+      throw e;
+    }
   }
 }
 
@@ -1095,19 +1292,25 @@ async function assignTeknisi(invoice, newTeknisi){
   if(!invoice || !newTeknisi) return;
   const prev = data.find(d=>d.id===invoice)?.teknisi;
   if(prev===newTeknisi) return;
+  const item = data.find(d=>d.id===invoice);
+  if(item){ item.teknisi = newTeknisi; saveLocal(); }
+  renderAll(); renderSemuaService();
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || (item && item._pending)){
+    enqueueOutbox({op:'patch', invoice, payload:{teknisi:newTeknisi}});
+    showToast(`👨‍🔧 ${invoice} → teknisi: ${newTeknisi} (⏳ antre sync)`);
+    return;
+  }
   try{
-    if(USE_API){
-      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({teknisi: newTeknisi})});
-      await loadData();
-    } else {
-      const item=data.find(d=>d.id===invoice);
-      if(item){ item.teknisi=newTeknisi; saveLocal(); }
-    }
-    renderAll();
-    renderSemuaService();
+    await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({teknisi: newTeknisi})});
+    await loadData();
+    renderAll(); renderSemuaService();
     showToast(`👨‍🔧 ${invoice} → teknisi: ${newTeknisi}`);
   }catch(e){
-    showToast('Gagal assign teknisi: '+e.message);
+    if(isNetErr(e)){
+      USE_API = false;
+      enqueueOutbox({op:'patch', invoice, payload:{teknisi:newTeknisi}});
+      showToast(`👨‍🔧 ${invoice} tersimpan sementara (⏳ antre sync)`);
+    } else showToast('Gagal assign teknisi: '+e.message);
   }
 }
 
@@ -1121,7 +1324,8 @@ const PROSES_STATUSES = ['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sp
 let availableTechs = []; // cache akun terdaftar (teknisi/admin) + Technician legacy untuk assign di Semua Service
 let currentPageProses = 1;
 let currentPageSemua = 1;
-const pageSize = 20;
+const pageSize = 10;
+let _semuaFilterKey = '';
 
 function setDeadlineFilter(v){
   deadlineFilter = v;
@@ -3913,6 +4117,13 @@ function renderSemuaService(){
   }
   filtered=filtered.filter(passesDeadlineFilter);
   filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiSemua'));
+  // pagination 10/halaman: reset ke hal 1 jika filter/search berubah
+  const _fkey = q + '|' + f + '|' + techFilterVal('filterTeknisiSemua') + '|' + deadlineFilter + '|' + filtered.length;
+  if(_fkey !== _semuaFilterKey){ _semuaFilterKey = _fkey; currentPageSemua = 1; }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if(currentPageSemua > totalPages) currentPageSemua = totalPages;
+  const _start = (currentPageSemua - 1) * pageSize;
+  const pageRows = filtered.slice(_start, _start + pageSize);
   // mode teknisi: opsi assign terbatas ke diri sendiri (backend juga menolak yg lain)
   const canAssignAll = !isTeknisiMode();
   const assignBase = canAssignAll
@@ -3920,7 +4131,7 @@ function renderSemuaService(){
     : ['Menunggu Teknisi', ...myTechNames()];
   // update blok menunggu teknisi (selalu dari data full, bukan filtered, agar warning tetap)
   renderMenungguTeknisiBlock();
-  tbody.innerHTML = filtered.map(d=>{
+  tbody.innerHTML = pageRows.map(d=>{
     const isMenunggu = d.teknisi==='Menunggu Teknisi' || !d.teknisi || d.teknisi==='-';
     const baseOpts = [...assignBase];
     if(d.teknisi && !baseOpts.includes(d.teknisi)) baseOpts.push(d.teknisi);
@@ -3975,6 +4186,40 @@ function renderSemuaService(){
   `;
   }).join('') || `<tr><td colspan="9" style="text-align:center;padding:14px;color:#8a8f98;font-size:11px">Tidak ada data</td></tr>`;
   const el=document.getElementById('semuaCount'); if(el) el.textContent = filtered.length + ' service';
+  renderSemuaPagination(filtered.length, totalPages);
+}
+function renderSemuaPagination(total, totalPages){
+  window._semuaTotal = total; window._semuaPages = totalPages;
+  const info = document.getElementById('semuaPaginationInfo');
+  if(info){
+    const _s = (currentPageSemua - 1) * pageSize + 1;
+    const _e = Math.min(total, currentPageSemua * pageSize);
+    info.textContent = total ? `Menampilkan ${_s}-${_e} dari ${total}` : 'Tidak ada data';
+  }
+  const wrap = document.getElementById('semuaPaginationBtns');
+  if(!wrap) return;
+  const btn = (label, page, opts={}) => {
+    const dis = opts.disabled ? 'disabled' : '';
+    const act = opts.active ? ' active' : '';
+    return `<button class="page-btn${act}" ${dis} onclick="setSemuaPage(${page})">${label}</button>`;
+  };
+  let nums = '';
+  const win = 2;
+  let lo = Math.max(1, currentPageSemua - win), hi = Math.min(totalPages, currentPageSemua + win);
+  if(currentPageSemua <= win + 1) hi = Math.min(totalPages, 1 + win * 2);
+  if(currentPageSemua >= totalPages - win) lo = Math.max(1, totalPages - win * 2);
+  for(let p = lo; p <= hi; p++) nums += btn(p, p, {active: p === currentPageSemua});
+  wrap.innerHTML = btn('‹', currentPageSemua - 1, {disabled: currentPageSemua <= 1})
+    + (lo > 1 ? btn(1, 1) + (lo > 2 ? '<span style="padding:0 4px;color:#8a8f98">…</span>' : '') : '')
+    + nums
+    + (hi < totalPages ? (hi < totalPages - 1 ? '<span style="padding:0 4px;color:#8a8f98">…</span>' : '') + btn(totalPages, totalPages) : '')
+    + btn('›', currentPageSemua + 1, {disabled: currentPageSemua >= totalPages});
+}
+function setSemuaPage(p){
+  const totalPages = Math.max(1, Math.ceil((window._semuaTotal || 0) / pageSize)) || 1;
+  if(p < 1 || p > totalPages) return;
+  currentPageSemua = p;
+  renderSemuaService();
 }
 function toggleInlineDetail(invoice){
   const existing = document.getElementById(`inline-detail-${invoice}`);
@@ -4754,9 +4999,10 @@ async function handleCustomerSubmit(e){
   const nama=document.getElementById('c-nama').value.trim();
   const wa=document.getElementById('c-wa').value.trim();
   const note=document.getElementById('c-note').value.trim();
-  if(!nama||!wa) return showToast('Nama & WA wajib!');
+  if(!nama) return showToast('Nama wajib!');
+  if(wa && !/^[0-9+\- ]+$/.test(wa)) return showToast('No WA harus angka');
   if(USE_API){
-    try{ await apiFetch('/customers', {method:'POST', body: JSON.stringify({nama, wa})}); showToast('Pelanggan ditambahkan ✓'); e.target.reset(); await loadData(); renderPelanggan(); switchView('pelanggan'); }catch(err){ showToast('Gagal: '+err.message); }
+    try{ await apiFetch('/customers', {method:'POST', body: JSON.stringify({nama, wa: wa || ""})}); showToast('Pelanggan ditambahkan ✓'); e.target.reset(); await loadData(); renderPelanggan(); switchView('pelanggan'); }catch(err){ showToast('Gagal: '+err.message); }
   } else { showToast('Pelanggan ditambahkan (lokal) ✓'); e.target.reset(); switchView('pelanggan'); }
 }
 
@@ -4965,7 +5211,22 @@ async function updateStatus(id, newStatus){
     updateStats(); renderSemuaService(); renderKanban(); refreshStatusViews();
   }
   try{
-    if(!USE_API){ saveLocal(); }
+    const isTmpOffline = !USE_API || String(id||'').startsWith('TMP-') || (item && item._pending);
+    if(isTmpOffline){
+      saveLocal();
+      const prePatch={};
+      if(resetHasil) prePatch.hasil=hasil;
+      if(ketPatch!==null) prePatch.keterangan=ketPatch;
+      if(biayaPatch!==null) prePatch.biaya=biayaPatch;
+      if(dealBiayaPatch!==undefined) prePatch.biaya=dealBiayaPatch;
+      if(diambilOlehPatch!==undefined) prePatch.diambil_oleh=diambilOlehPatch;
+      if(garansiPatch!==undefined && garansiPatch!==null) prePatch.garansi_hari=garansiPatch;
+      if(sampaiPatch!==undefined) prePatch.garansi_sampai=sampaiPatch;
+      if(bayarPatch!==undefined) prePatch.metode_bayar=bayarPatch;
+      if(diambilAtPatch!==undefined) prePatch.diambil_at=diambilAtPatch;
+      if(Object.keys(prePatch).length) enqueueOutbox({op:'patch', invoice:id, payload:prePatch});
+      enqueueOutbox({op:'status', invoice:id, status:newStatus});
+    }
     else {
       // Deal harga + pengambil + garansi disimpan DULU selagi status masih Bisa Diambil
       // (backend mengunci biaya setelah status jadi Sukses/Diambil).
@@ -5056,14 +5317,16 @@ async function handleServiceSubmit(e){
   const teknisi=document.getElementById('f-teknisi').value;
   const estimasi=document.getElementById('f-estimasi').value || null;
   const penerima=document.getElementById('f-penerima')?.value || null;
-  if(!nama||!wa||!device||!keluhan) return showToast('Lengkapi field wajib!');
+  if(!nama||!device||!keluhan) return showToast('Lengkapi field wajib!');
+  if(wa && !/^[0-9+\- ]+$/.test(wa)) return showToast('No. WA harus angka');
+  // WA boleh kosong — pelanggan tanpa nomor tetap bisa disimpan
   if(imei && imei.length<4) return showToast('IMEI minimal 4 digit — akan muncul di setiap kartu');
   if(!estimasi) return showToast('Estimasi Selesai wajib diisi — deadline mengikuti estimasi');
   if(!penerima) return showToast('Penerima wajib dipilih');
 
   const kategori = document.getElementById('f-kategori')?.value || null;
   const payload = {
-    nama, wa,
+    nama, wa: wa || "",
     device: device,
     imei: imei || null,
     keluhan,
@@ -5163,13 +5426,18 @@ function openDetail(id, opts){
         </div>
       </div>` : `
       <div style="display:grid;gap:10px;padding:12px;background:#f9fafb;border:1px solid #ececec;border-radius:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;font-weight:600">Nama Pelanggan *</label><input id="modalNama" value="${escapeHtml(d.nama||'')}" placeholder="Nama pelanggan" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px"></div>
+          <div><label style="font-size:11px;font-weight:600">No. HP / WA <span style="color:#8a8f98;font-weight:400">(boleh kosong)</span></label><input id="modalWa" value="${escapeHtml(d.wa||'')}" placeholder="08xxxxxxxxxx — kosongkan jika tidak ada" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px"></div>
+        </div>
+        <div><label style="font-size:11px;font-weight:600">Tipe HP / Device *</label><input id="modalDevice" value="${escapeHtml(d.device||'')}" placeholder="iPhone 11 / Samsung A54" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px"></div>
         <div><label style="font-size:11px;font-weight:600">Keluhan / Kerusakan *</label><textarea id="modalKeluhan" style="width:100%;min-height:60px;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px">${escapeHtml(d.keluhan)}</textarea></div>
         <div><label style="font-size:11px;font-weight:600">Keterangan</label><textarea id="modalKeterangan" placeholder="Isi keterangan pengerjaan, diagnosis, tindakan..." style="width:100%;min-height:60px;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px">${escapeHtml(d.keterangan||'')}</textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div><label style="font-size:11px;font-weight:600">IMEI / Serial</label><input id="modalImei" value="${escapeHtml(d.imei||'')}" placeholder="35xxxxxxxxxxxx" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px"></div>
           <div><label style="font-size:11px;font-weight:600">Harga</label><input id="modalHarga" inputmode="numeric" value="${Number(d.biaya).toLocaleString('id-ID')}" style="width:100%;padding:8px;border:1px solid #ececec;border-radius:8px;font-size:12px;text-align:right" oninput="this.value=formatAngka(parseRupiah(this.value))"></div>
         </div>
-        <button class="btn btn-dark small" style="padding:8px 12px;font-size:12px" onclick="saveDetailEdits('${escapeHtml(d.id)}')">💾 Simpan Keluhan/Keterangan/IMEI/Harga</button>
+        <button class="btn btn-dark small" style="padding:8px 12px;font-size:12px" onclick="saveDetailEdits('${escapeHtml(d.id)}')">💾 Simpan Nama/WA/Tipe HP/Keluhan/IMEI/Harga</button>
       </div>`}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>Teknisi:</strong> <span class="meta-pill">${escapeHtml(d.teknisi)}</span>
         ${ro ? '' : `<select id="modalTeknisi" style="padding:6px 8px;border-radius:8px;border:1px solid #ececec;font-size:12px;min-width:160px">${teknisiOptions}</select>
@@ -5210,38 +5478,64 @@ function assignPenerimaFromModal(invoice){
 }
 async function assignPenerima(invoice, newPenerima){
   if(!invoice || !newPenerima) return;
+  const item0 = data.find(d=>d.id===invoice);
+  if(item0){ item0.penerima = newPenerima; saveLocal(); }
+  renderAll(); renderSemuaService();
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || (item0 && item0._pending)){
+    enqueueOutbox({op:'patch', invoice, payload:{penerima:newPenerima}});
+    showToast(`📥 ${invoice} → penerima: ${newPenerima} (⏳ antre sync)`);
+    return;
+  }
   try{
-    if(USE_API){
-      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({penerima: newPenerima})});
-      await loadData();
-    } else {
-      const item=data.find(d=>d.id===invoice);
-      if(item){ item.penerima=newPenerima; saveLocal(); }
-    }
+    await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({penerima: newPenerima})});
+    await loadData();
     renderAll(); renderSemuaService(); showToast(`📥 ${invoice} → penerima: ${newPenerima}`);
-  }catch(e){ showToast('Gagal assign penerima: '+e.message); }
+  }catch(e){
+    if(isNetErr(e)){ USE_API = false; enqueueOutbox({op:'patch', invoice, payload:{penerima:newPenerima}}); showToast(`📥 ${invoice} tersimpan sementara (⏳ antre sync)`); }
+    else showToast('Gagal assign penerima: '+e.message);
+  }
 }
 async function updateEstimasi(invoice){
   const inp = document.getElementById('modalEstimasi');
   if(!inp || !inp.value) return showToast('Pilih tanggal estimasi');
   const newDate = inp.value;
+  const item0 = data.find(d=>d.id===invoice);
+  const applyLocalEstimasi = (it)=>{
+    if(!it) return;
+    it.estimasi_selesai = newDate; it.deadline = newDate;
+    try{ it.deadline_type = (new Date(newDate)-new Date(it.date))/(86400000) <=3 ? 'harian':'mingguan'; }catch{}
+    try{ it.sisa_hari = computeSisa(newDate); }catch{}
+    saveLocal();
+  };
+  applyLocalEstimasi(item0);
+  renderAll(); renderSemuaService();
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || (item0 && item0._pending)){
+    enqueueOutbox({op:'patch', invoice, payload:{estimasi_selesai:newDate}});
+    closeModal(); showToast(`📅 ${invoice} estimasi → ${newDate} (⏳ antre sync)`);
+    try{ updateDeadlinePreview(); }catch{}
+    return;
+  }
   try{
-    if(USE_API){
-      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({estimasi_selesai: newDate})});
-      await loadData();
-    } else {
-      const item=data.find(d=>d.id===invoice);
-      if(item){ item.estimasi_selesai=newDate; item.deadline=newDate; item.deadline_type = (new Date(newDate)-new Date(item.date))/(86400000) <=3 ? 'harian':'mingguan'; item.sisa_hari=computeSisa(newDate); saveLocal(); }
-    }
+    await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({estimasi_selesai: newDate})});
+    await loadData();
     renderAll(); renderSemuaService(); closeModal(); showToast(`📅 ${invoice} estimasi → ${newDate} (deadline mengikuti)`); updateDeadlinePreview();
-  }catch(e){ showToast('Gagal ubah estimasi: '+e.message); }
+  }catch(e){
+    if(isNetErr(e)){ USE_API = false; enqueueOutbox({op:'patch', invoice, payload:{estimasi_selesai:newDate}}); closeModal(); showToast(`📅 ${invoice} tersimpan sementara (⏳ antre sync)`); }
+    else showToast('Gagal ubah estimasi: '+e.message);
+  }
 }
 async function saveDetailEdits(invoice){
+  const nama=document.getElementById('modalNama')?.value.trim()||'';
+  const wa=document.getElementById('modalWa')?.value.trim()||'';
+  const device=document.getElementById('modalDevice')?.value.trim()||'';
   const keluhan=document.getElementById('modalKeluhan')?.value.trim()||'';
   const keterangan=document.getElementById('modalKeterangan')?.value.trim()||'';
   const imei=document.getElementById('modalImei')?.value.trim()||'';
   const hargaVal=document.getElementById('modalHarga')?.value||'';
   const biaya=parseRupiah(hargaVal);
+  if(!nama || nama.length<2) return showToast('Nama minimal 2 karakter');
+  if(!device || device.length<2) return showToast('Tipe HP minimal 2 karakter');
+  if(wa && !/^[0-9+\- ]+$/.test(wa)) return showToast('No. HP/WA harus angka');
   if(!keluhan || keluhan.length<5) return showToast('Keluhan minimal 5 karakter');
   if(biaya<0) return showToast('Harga tidak valid');
   const item=data.find(d=>d.id===invoice);
@@ -5250,19 +5544,31 @@ async function saveDetailEdits(invoice){
   if(['Sudah Diambil','Service Sukses','Selesai'].includes(item.status) && biaya!==Number(item.biaya||0)){
     return showToast('🔒 Harga sudah fix — service sudah diambil');
   }
-  const old={keluhan:item.keluhan, keterangan:item.keterangan||'', imei:item.imei||'', biaya:item.biaya};
-  item.keluhan=keluhan; item.keterangan=keterangan; item.imei=imei; item.biaya=biaya;
+  const old={nama:item.nama, wa:item.wa||'', device:item.device, keluhan:item.keluhan, keterangan:item.keterangan||'', imei:item.imei||'', biaya:item.biaya};
+  item.nama=nama; item.wa=wa; item.device=device; item.keluhan=keluhan; item.keterangan=keterangan; item.imei=imei; item.biaya=biaya;
   renderAll(); renderKanban(); renderSemuaService();
+  const payloadDetail = {nama, wa, device, keluhan, keterangan, imei, biaya};
+  if(!USE_API || String(invoice||'').startsWith('TMP-') || item._pending){
+    enqueueOutbox({op:'patch', invoice, payload:payloadDetail});
+    closeModal(); openDetail(invoice);
+    showToast(`✅ ${invoice} tersimpan sementara (⏳ antre sync)`);
+    return;
+  }
   try{
-    if(USE_API){
-      await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify({keluhan, keterangan, imei, biaya})});
-      await loadData();
-    } else { saveLocal(); }
+    await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify(payloadDetail)});
+    await loadData();
     renderAll(); renderKanban(); renderSemuaService(); closeModal(); openDetail(invoice);
     showToast(`✅ ${invoice} detail disimpan`);
   }catch(e){
-    item.keluhan=old.keluhan; item.keterangan=old.keterangan; item.imei=old.imei; item.biaya=old.biaya;
-    renderAll(); renderKanban();
+    if(isNetErr(e)){
+      USE_API = false;
+      enqueueOutbox({op:'patch', invoice, payload:payloadDetail});
+      closeModal(); openDetail(invoice);
+      showToast(`✅ ${invoice} tersimpan sementara (⏳ antre sync)`);
+      return;
+    }
+    item.nama=old.nama; item.wa=old.wa; item.device=old.device; item.keluhan=old.keluhan; item.keterangan=old.keterangan; item.imei=old.imei; item.biaya=old.biaya;
+    renderAll(); renderKanban(); renderSemuaService();
     showToast('Gagal simpan detail: '+e.message);
   }
 }
@@ -5287,7 +5593,7 @@ function clearCacheAndReload(){
 // expose for inline onclick
 window.clearCacheAndReload=clearCacheAndReload;
 window.switchView=switchView; window.handleServiceSubmit=handleServiceSubmit; window.resetForm=resetForm;
-window.openDetail=openDetail; window.toggleInlineDetail=toggleInlineDetail; window.closeModal=closeModal; window.updateStatus=updateStatus;
+window.openDetail=openDetail; window.toggleInlineDetail=toggleInlineDetail; window.closeModal=closeModal; window.updateStatus=updateStatus; window.saveDetailEdits=saveDetailEdits;
 window.handleLogout=handleLogout; window.handleCustomerSubmit=handleCustomerSubmit;
 window.renderSemuaService=renderSemuaService; window.renderStatusView=renderStatusView;
 window.garansiBoxHtml=garansiBoxHtml; window.updateGaransi=updateGaransi; window.openKlaimGaransi=openKlaimGaransi; window.closeKlaimModal=closeKlaimModal; window.submitKlaimGaransi=submitKlaimGaransi; window.askGaransi=askGaransi; window.confirmGaransiModal=confirmGaransiModal; window.closeGaransiModal=closeGaransiModal; window.fmtDiambil=fmtDiambil;
@@ -5297,6 +5603,7 @@ window.openEditUserModal=openEditUserModal; window.closeUserModal=closeUserModal
 window.toggleFreezeUser=toggleFreezeUser; window.deleteUser=deleteUser; window.filterAllUsers=filterAllUsers; window.renderAllUsers=renderAllUsers;
 window.loadAvailableTechs=loadAvailableTechs; window.populateTeknisiSelect=populateTeknisiSelect; window.assignTeknisi=assignTeknisi; window.assignTeknisiFromModal=assignTeknisiFromModal;
 window.assignPenerima=assignPenerima; window.assignPenerimaFromModal=assignPenerimaFromModal; window.updateEstimasi=updateEstimasi;
+window.flushOutbox=flushOutbox; window.loadOutbox=loadOutbox; window.patchServiceQueued=patchServiceQueued;
 window.setDeadlineFilter=setDeadlineFilter; window.updateDeadline=updateDeadline; window.updateDeadlinePreview=updateDeadlinePreview;
 window.hitungLama=hitungLama; window.formatTanggalImage=formatTanggalImage; window.cleanWA=cleanWA; window.openWhatsApp=openWhatsApp;
 window.API_BASE=API_BASE;
