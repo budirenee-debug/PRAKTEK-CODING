@@ -4647,8 +4647,42 @@ function cetakStruk(){
 let bayarFilter='all';
 function setBayarFilter(f){
   bayarFilter=f;
+  _bayarPage=1;
   document.querySelectorAll('[data-bayar-tab]').forEach(b=> b.classList.toggle('active', b.dataset.bayarTab===f));
   renderTransaksiPembayaran();
+}
+// pagination Pembayaran: 10 baris per halaman + pager bernomor
+const BAYAR_PER=10;
+let _bayarRows=[], _bayarPage=1, _bayarEmpty='', _bayarKey='';
+function setBayarPage(p){
+  const max=Math.max(1, Math.ceil(_bayarRows.length/BAYAR_PER));
+  if(p<1||p>max) return;
+  _bayarPage=p;
+  drawBayar();
+}
+function drawBayar(){
+  const tbody=document.getElementById('tbodyBayar');
+  const info=document.getElementById('bayarPaginationInfo');
+  const wrap=document.getElementById('bayarPaginationBtns');
+  const max=Math.max(1, Math.ceil(_bayarRows.length/BAYAR_PER));
+  if(_bayarPage>max) _bayarPage=max;
+  const slice=_bayarRows.slice((_bayarPage-1)*BAYAR_PER,_bayarPage*BAYAR_PER);
+  if(tbody) tbody.innerHTML=slice.join('')||`<tr><td colspan="7" style="text-align:center;padding:24px;color:#8a8f98">${_bayarEmpty||'Belum ada data'}</td></tr>`;
+  if(info) info.textContent=_bayarRows.length?`Menampilkan ${(_bayarPage-1)*BAYAR_PER+1}-${Math.min(_bayarRows.length,_bayarPage*BAYAR_PER)} dari ${_bayarRows.length}`:'Tidak ada data';
+  if(!wrap) return;
+  if(max<=1){ wrap.innerHTML=''; return; }
+  const btn=(label,page,opts={})=>`<button class="page-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} onclick="setBayarPage(${page})">${label}</button>`;
+  const win=2;
+  let lo=Math.max(1,_bayarPage-win), hi=Math.min(max,_bayarPage+win);
+  if(_bayarPage<=win+1) hi=Math.min(max,1+win*2);
+  if(_bayarPage>=max-win) lo=Math.max(1,max-win*2);
+  let nums='';
+  for(let p=lo;p<=hi;p++) nums+=btn(p,p,{active:p===_bayarPage});
+  wrap.innerHTML=btn('‹',_bayarPage-1,{disabled:_bayarPage<=1})
+    +(lo>1?btn(1,1)+(lo>2?'<span style="padding:0 4px;color:#8a8f98">…</span>':''):'')
+    +nums
+    +(hi<max?(hi<max-1?'<span style="padding:0 4px;color:#8a8f98">…</span>':'')+btn(max,max):'')
+    +btn('›',_bayarPage+1,{disabled:_bayarPage>=max});
 }
 function renderTransaksiPembayaran(){
   const tbody=document.getElementById('tbodyBayar');
@@ -4677,11 +4711,14 @@ function renderTransaksiPembayaran(){
   else if(bayarFilter!=='all') filtered=filtered.filter(d=> (d.metode_bayar||'')===bayarFilter);
   if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.teknisi).toLowerCase().includes(q));
   filtered.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')));
+  const _bkey = bayarFilter+'|'+q;
+  if(_bkey!==_bayarKey){ _bayarKey=_bkey; _bayarPage=1; }
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:24px;color:#8a8f98">Belum ada data${bayarFilter!=='all'?' untuk filter '+escapeHtml(bayarFilter):''} — pilih metode di popup Sukses</td></tr>`;
+    _bayarRows=[]; _bayarEmpty=`Belum ada data${bayarFilter!=='all'?' untuk filter '+escapeHtml(bayarFilter):''} — pilih metode di popup Sukses`;
+    drawBayar();
     return;
   }
-  tbody.innerHTML=filtered.map(d=>`
+  _bayarRows=filtered.map(d=>`
     <tr>
       <td><strong style="font-size:11px">${escapeHtml(d.id)}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(formatTanggal(d.date))}</span></td>
       <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(d.nama)}</strong><span style="font-size:11px;color:#4b5563">${escapeHtml(d.device)}</span><span style="font-size:10px;color:#8a8f98">${escapeHtml(d.wa)}</span></div></td>
@@ -4690,7 +4727,9 @@ function renderTransaksiPembayaran(){
       <td style="text-align:right;font-weight:700;color:#059669">${formatRupiah(d.biaya)}</td>
       <td style="font-size:11px">${escapeHtml(formatTanggal(d.estimasi_selesai||d.date))}</td>
       <td><button class="btn btn-ghost small" style="padding:4px 6px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}', {readonly:true})">Detail</button></td>
-    </tr>`).join('');
+    </tr>`);
+  _bayarEmpty='';
+  drawBayar();
 }
 // pagination generik tabel rekap (10 baris terbaru per halaman)
 const REKAP_PER=10;

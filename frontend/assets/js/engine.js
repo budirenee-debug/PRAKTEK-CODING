@@ -1,6 +1,29 @@
 // Business Engine UI: settings, kas saya, buku kas, kuota, oper garansi
 function _rp(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
 function _esc(s){ try{ return escapeHtml(String(s??'')); }catch(e){ return String(s??''); } }
+// pager generik tabel keuangan: 10 baris per halaman + nomor 1,2,3 Prev-Next
+const KAS_PER=10;
+function _kasPagerDraw(infoId, btnsId, total, page, goFn){
+  const info=document.getElementById(infoId), wrap=document.getElementById(btnsId);
+  const max=Math.max(1, Math.ceil(total/KAS_PER));
+  page=Math.min(max, Math.max(1, page));
+  if(info) info.textContent=total?`Menampilkan ${(page-1)*KAS_PER+1}-${Math.min(total,page*KAS_PER)} dari ${total}`:'Tidak ada data';
+  if(!wrap) return page;
+  if(max<=1){ wrap.innerHTML=''; return page; }
+  const btn=(label,p,opts={})=>`<button class="page-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} onclick="${goFn}(${p})">${label}</button>`;
+  const win=2;
+  let lo=Math.max(1,page-win), hi=Math.min(max,page+win);
+  if(page<=win+1) hi=Math.min(max,1+win*2);
+  if(page>=max-win) lo=Math.max(1,max-win*2);
+  let nums='';
+  for(let p=lo;p<=hi;p++) nums+=btn(p,p,{active:p===page});
+  wrap.innerHTML=btn('‹',page-1,{disabled:page<=1})
+    +(lo>1?btn(1,1)+(lo>2?'<span style="padding:0 4px;color:#8a8f98">…</span>':''):'')
+    +nums
+    +(hi<max?(hi<max-1?'<span style="padding:0 4px;color:#8a8f98">…</span>':'')+btn(max,max):'')
+    +btn('›',page+1,{disabled:page>=max});
+  return page;
+}
 
 async function loadEngineSettings(){
   const card = document.getElementById('engineSettingsCard');
@@ -212,12 +235,26 @@ async function renderKasToko(force){
     set('kasTokoKeluar', _rp(keluarTotal)); set('kasTokoKeluarSub', `teknisi ${_rp(techKeluar)} • refund ${_rp(refundKeluar)} • toko ${_rp(celakaKeluar)} • keluar ${_rp(outKeluar)}`);
     set('kasTokoSisa', _rp(masukTotal - keluarTotal));
     rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
-    if(tbody){
-      tbody.innerHTML = rows.slice(0,120).map(r=>_kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket)).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
-      tbody.dataset.filled = '1';
-    }
+    _kasTokoRows=rows; _kasTokoPage=1;
+    drawKasToko();
   }catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
+  }
+}
+let _kasTokoRows=[], _kasTokoPage=1;
+function kasTokoGo(p){
+  const max=Math.max(1, Math.ceil(_kasTokoRows.length/KAS_PER));
+  if(p<1||p>max) return;
+  _kasTokoPage=p;
+  drawKasToko();
+}
+function drawKasToko(){
+  const tbody=document.getElementById('tbodyKasToko');
+  _kasTokoPage=_kasPagerDraw('kasTokoPaginationInfo','kasTokoPaginationBtns',_kasTokoRows.length,_kasTokoPage,'kasTokoGo');
+  const slice=_kasTokoRows.slice((_kasTokoPage-1)*KAS_PER,_kasTokoPage*KAS_PER);
+  if(tbody){
+    tbody.innerHTML = slice.map(r=>_kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket)).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
+    tbody.dataset.filled = '1';
   }
 }
 async function renderKasSaya(){
@@ -236,7 +273,8 @@ async function renderKasSaya(){
     document.getElementById('kasSayaBulan').textContent = _rp(bulan);
     document.getElementById('kasSayaHutang').textContent = _rp(j.sisa_hutang);
     document.getElementById('kasSayaPending').textContent = `${j.pending_count} pending • allowance ${_rp(j.allowance)}`;
-    tbody.innerHTML = (j.riwayat||[]).map(kasRowHtml).join('') || '<tr><td colspan="6" style="text-align:center">Belum ada riwayat — selesaikan service & check-in tepat waktu</td></tr>';
+    _kasSayaRows=(j.riwayat||[]); _kasSayaPage=1;
+    drawKasSaya();
     // kuota
     try{
       const q = await apiFetch('/engine/kuota/me');
@@ -249,6 +287,19 @@ async function renderKasSaya(){
   }catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
+}
+let _kasSayaRows=[], _kasSayaPage=1;
+function kasSayaGo(p){
+  const max=Math.max(1, Math.ceil(_kasSayaRows.length/KAS_PER));
+  if(p<1||p>max) return;
+  _kasSayaPage=p;
+  drawKasSaya();
+}
+function drawKasSaya(){
+  const tbody=document.getElementById('tbodyKasSaya');
+  _kasSayaPage=_kasPagerDraw('kasSayaPaginationInfo','kasSayaPaginationBtns',_kasSayaRows.length,_kasSayaPage,'kasSayaGo');
+  const slice=_kasSayaRows.slice((_kasSayaPage-1)*KAS_PER,_kasSayaPage*KAS_PER);
+  if(tbody) tbody.innerHTML = slice.map(kasRowHtml).join('') || '<tr><td colspan="6" style="text-align:center">Belum ada riwayat — selesaikan service & check-in tepat waktu</td></tr>';
 }
 async function refreshKuotaInfo(){
   const el = document.getElementById('kuotaInfo');

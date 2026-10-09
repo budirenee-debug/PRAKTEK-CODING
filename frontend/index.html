@@ -666,6 +666,7 @@
                         <button class="tab" data-bayar-tab="Belum" onclick="setBayarFilter('Belum')">⏳ Belum Bayar</button>
                     </div>
                     <div class="table-wrap"><table class="table compact" id="tableBayar"><thead><tr><th>Invoice</th><th>Pelanggan / Device</th><th>Teknisi</th><th>Metode</th><th style="text-align:right">Biaya</th><th>Tgl</th><th></th></tr></thead><tbody id="tbodyBayar"><tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div class="pagination"><span id="bayarPaginationInfo"></span><div id="bayarPaginationBtns"></div></div>
                 </div>
             </section>
             <!-- TRANSAKSI: PENDAPATAN SUKSES (Service Sukses saja) -->
@@ -820,6 +821,7 @@
                 </div>
                 <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai) + penjualan kasir + <strong>pemasukan manual (modal/lain)</strong>. Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                <div class="pagination"><span id="kasTokoPaginationInfo"></span><div id="kasTokoPaginationBtns"></div></div>
                 <div class="card" id="tksCard" style="margin-top:12px">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>🌙 Tutup Kas Hari Ini</h3><span class="muted" id="tksDate">sistem vs fisik • selisih target Rp0</span></div>
@@ -889,6 +891,7 @@
                 </div>
                 <div id="kasSayaKuota" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                <div class="pagination"><span id="kasSayaPaginationInfo"></span><div id="kasSayaPaginationBtns"></div></div>
                 </div>
             </section>
             <section class="view" id="view-laporan-penjualan">
@@ -1294,8 +1297,8 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx1"></script>
-    <script src="assets/js/script.js?v=offline2"></script>
-    <script src="assets/js/engine.js?v=eng10"></script>
+    <script src="assets/js/script.js?v=page4"></script>
+    <script src="assets/js/engine.js?v=eng11"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
 </html>
