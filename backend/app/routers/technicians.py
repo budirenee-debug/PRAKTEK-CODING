@@ -71,6 +71,34 @@ def update_technician(
     return tech
 
 
+@router.delete("/{tech_id}")
+def delete_technician(
+    tech_id: int,
+    store_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current = Depends(get_current_user),
+):
+    """Hapus teknisi (owner/admin only). Ditolak jika masih ada sisa hutang."""
+    from .. import models
+    from ..store_ctx import store_role
+    store = resolve_store(db, current, store_id)
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh hapus teknisi")
+    tech = db.query(models.Technician).filter(models.Technician.id == tech_id).first()
+    if not tech:
+        raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan")
+    ensure_in_store(tech, store, "Teknisi")
+    hutang = db.query(models.TechDebt).filter(
+        models.TechDebt.technician_id == tech_id,
+        models.TechDebt.status == "belum").first()
+    if hutang:
+        raise HTTPException(status_code=400, detail="Tidak bisa hapus: teknisi masih ada sisa hutang. Selesaikan cicilan dulu.")
+    db.delete(tech)
+    db.commit()
+    return {"ok": True, "id": tech_id}
+
+
 @router.get("/{tech_id}/stats")
 def technician_stats(
     tech_id: int,

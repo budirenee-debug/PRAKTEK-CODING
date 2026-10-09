@@ -1898,6 +1898,7 @@ async function loadTeamData(){
     if(tbodyM) tbodyM.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;color:#dc2626">Gagal: ${escapeHtml(msg)}${String(msg).includes('403')?' — hanya owner/admin toko':''}</td></tr>`;
     if(tbodyI) tbodyI.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">Gagal load kode</td></tr>`;
   }
+  try{ loadTechList(); }catch(e){}
 }
 async function changeTechLevel(username, newLevel){
   const sid = getActiveStoreId();
@@ -1917,6 +1918,67 @@ async function changeTechLevel(username, newLevel){
     showToast(`✅ ${username} → ${newLevel} (${newLevel==='senior'?'50%':'35%'})`);
     await loadTeamData();
   }catch(e){ showToast('Gagal ubah level: '+e.message); loadTeamData(); }
+}
+async function loadTechList(){
+  const tbody = document.getElementById('tbodyTechList');
+  const sid = getActiveStoreId();
+  if(!tbody) return;
+  if(!sid){ tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">Belum ada toko aktif</td></tr>`; return; }
+  tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat teknisi...</td></tr>`;
+  try{
+    const techs = await apiFetch(`/technicians?store_id=${sid}`);
+    const list = Array.isArray(techs) ? techs : [];
+    // hitung service per nama teknisi dari data yg sudah dimuat (tanpa request tambahan)
+    const cntByName = {};
+    try{ (Array.isArray(data)?data:[]).forEach(d=>{ const k=String(d.teknisi||'').toLowerCase(); if(k) cntByName[k]=(cntByName[k]||0)+1; }); }catch(e){}
+    tbody.innerHTML = list.length ? list.map(t=>{
+      const lvl = t.level || 'junior';
+      const cnt = cntByName[String(t.nama||'').toLowerCase()] || 0;
+      return `<tr>
+        <td><strong>${escapeHtml(t.nama||'-')}</strong></td>
+        <td><select onchange="changeTechLevelById(${t.id}, this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
+              <option value="junior" ${lvl==='junior'?'selected':''}>junior 35%</option>
+              <option value="senior" ${lvl==='senior'?'selected':''}>senior 50%</option>
+            </select></td>
+        <td>${cnt} service</td>
+        <td style="text-align:center"><button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="removeTechnician(${t.id}, '${escapeHtml(t.nama||'')}')">🗑 Hapus</button></td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Belum ada teknisi — tambah manual di atas</td></tr>`;
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#dc2626">Gagal: ${escapeHtml((e.message||'').slice(0,120))}</td></tr>`;
+  }
+}
+async function changeTechLevelById(id, newLevel){
+  const sid = getActiveStoreId();
+  if(!confirm(`Ubah level teknisi jadi "${newLevel}"? (senior 50% / junior 35%)`)) { loadTechList(); return; }
+  try{
+    await apiFetch(`/technicians/${id}?store_id=${sid}`, {method:'PATCH', body: JSON.stringify({level: newLevel})});
+    showToast(`✅ level → ${newLevel} (${newLevel==='senior'?'50%':'35%'})`);
+  }catch(e){ showToast('Gagal ubah level: '+e.message); }
+  loadTechList(); loadTeamData();
+}
+async function addTechnician(){
+  const sid = getActiveStoreId();
+  if(!sid) return showToast('Belum ada toko aktif');
+  const namaEl = document.getElementById('techAddNama');
+  const lvlEl = document.getElementById('techAddLevel');
+  const nama = (namaEl?.value || '').trim();
+  if(!nama) return showToast('Isi nama teknisi dulu');
+  try{
+    await apiFetch(`/technicians?store_id=${sid}`, {method:'POST', body: JSON.stringify({nama, level: lvlEl?.value || 'junior'})});
+    showToast(`✅ Teknisi ${nama} ditambahkan`);
+    if(namaEl) namaEl.value = '';
+  }catch(e){ showToast('Gagal tambah: '+e.message); }
+  loadTechList(); loadTeamData();
+}
+async function removeTechnician(id, nama){
+  const sid = getActiveStoreId();
+  if(!confirm(`Hapus teknisi ${nama}? (service yang sudah mencatat nama ini TIDAK ikut terhapus, tapi komisi berikutnya tidak terhitung)`)) return;
+  try{
+    await apiFetch(`/technicians/${id}?store_id=${sid}`, {method:'DELETE'});
+    showToast(`🗑 Teknisi ${nama} dihapus`);
+  }catch(e){ showToast('Gagal hapus: '+e.message); }
+  loadTechList(); loadTeamData();
 }
 async function createTeamInvite(){
   const sid = getActiveStoreId();

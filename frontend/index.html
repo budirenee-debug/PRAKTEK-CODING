@@ -1019,6 +1019,18 @@
                             <tbody id="tbodyTeamMembers"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
                         </table>
                     </div>
+                    <div class="card-head" style="margin:16px 0 10px"><h3>🔧 Data Teknisi</h3><span class="muted">Nama harus sama persis dengan nama teknisi di service — komisi dihitung dari sini (senior 50% / junior 35%). Teknisi tanpa akun login tetap bisa dicatat manual.</span></div>
+                    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                        <input id="techAddNama" placeholder="Nama teknisi (mis. apud)" style="flex:2;min-width:160px;padding:10px 12px;border-radius:12px;border:1px solid #ececec;font-size:13px">
+                        <select id="techAddLevel" style="flex:1;min-width:130px;padding:10px 12px;border-radius:12px;border:1px solid #ececec;font-size:13px"><option value="junior">junior 35%</option><option value="senior">senior 50%</option></select>
+                        <button class="btn btn-dark small" style="padding:10px 16px" onclick="addTechnician()">+ Tambah</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table compact" id="tableTechList">
+                            <thead><tr><th>Teknisi</th><th>Level (komisi)</th><th>Service ditangani</th><th style="text-align:center">Aksi</th></tr></thead>
+                            <tbody id="tbodyTechList"><tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
