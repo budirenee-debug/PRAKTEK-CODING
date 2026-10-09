@@ -766,6 +766,7 @@
               <input id="bbSince" type="date" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
             </div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th><th>Sumber</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyLedger"><tr><td colspan="8" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;font-size:12px;color:#8a8f98"><span id="bbPageInfo"></span><div id="bbPageBtns" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div></div>
           </div>
           <div class="modal" id="ledModal">
             <div class="modal-box" style="max-width:520px">
@@ -3160,19 +3161,58 @@
         const rows = await ownFetch('/finance/ledger' + (q.length ? '?' + q.join('&') : ''));
         const arr = Array.isArray(rows) ? rows : [];
         const jpill = jn => jn === 'masuk' ? '<span class="pill ok">masuk</span>' : jn === 'keluar' ? '<span class="pill warn">keluar</span>' : '<span class="pill">transfer</span>';
-        tb.innerHTML = arr.slice(0, 200).map(r => {
-          const neg = r.jenis !== 'masuk';
-          const src = !r.ref_type || r.ref_type === 'manual' ? 'Manual' : r.ref_type === 'expense' ? '🧾 #' + r.ref_id : r.ref_type === 'income' ? '📥 #' + r.ref_id : esc(r.ref_type);
-          const canDel = !r.ref_type || r.ref_type === 'manual';
-          return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
-            + `<td><strong>${esc(r.keterangan || r.kategori_nama || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.dibuat_oleh || '')}</span></td>`
-            + `<td>${jpill(r.jenis)}</td><td style="font-size:11.5px;font-weight:600">${esc(r.subkategori || r.kategori_nama || r.kategori || '')}</td>`
-            + `<td style="text-align:right;font-weight:700;color:${neg ? '#dc2626' : '#059669'}">${neg ? '−' : '+'}${rp(r.nominal || 0)}</td>`
-            + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td>`
-            + `<td style="font-size:11px">${src}</td>`
-            + `<td style="text-align:center">${canDel ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownLedDel(${r.id})">🗑</button>` : '<span title="Baris auto — hapus dari modul sumbernya">🔒</span>'}</td></tr>`;
-        }).join('') || '<tr><td colspan="8" style="text-align:center;color:#8a8f98">Belum ada transaksi — klik + Catat Manual</td></tr>';
+        // paginasi 10/halaman — reset ke hal 1 jika filter berubah
+        const _bbKey = [j, k, m, s].join('|') + '#' + arr.length;
+        if(_bbKey !== window._bbKey){ window._bbKey = _bbKey; window._bbPage = 1; }
+        window._bbRows = arr;
+        drawBuku();
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="8" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    const BB_PER = 10;
+    function bbGo(p){
+      const n = (window._bbRows || []).length;
+      const max = Math.max(1, Math.ceil(n / BB_PER));
+      if(p < 1 || p > max) return;
+      window._bbPage = p;
+      drawBuku();
+    }
+    function drawBuku(){
+      const tb = document.getElementById('tbodyLedger');
+      const info = document.getElementById('bbPageInfo');
+      const wrap = document.getElementById('bbPageBtns');
+      const arr = window._bbRows || [];
+      const max = Math.max(1, Math.ceil(arr.length / BB_PER));
+      if(!window._bbPage || window._bbPage > max) window._bbPage = 1;
+      const page = window._bbPage;
+      const jpill = jn => jn === 'masuk' ? '<span class="pill ok">masuk</span>' : jn === 'keluar' ? '<span class="pill warn">keluar</span>' : '<span class="pill">transfer</span>';
+      const slice = arr.slice((page - 1) * BB_PER, page * BB_PER);
+      if(tb) tb.innerHTML = slice.map(r => {
+        const neg = r.jenis !== 'masuk';
+        const src = !r.ref_type || r.ref_type === 'manual' ? 'Manual' : r.ref_type === 'expense' ? '🧾 #' + r.ref_id : r.ref_type === 'income' ? '📥 #' + r.ref_id : esc(r.ref_type);
+        const canDel = !r.ref_type || r.ref_type === 'manual';
+        return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
+          + `<td><strong>${esc(r.keterangan || r.kategori_nama || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.dibuat_oleh || '')}</span></td>`
+          + `<td>${jpill(r.jenis)}</td><td style="font-size:11.5px;font-weight:600">${esc(r.subkategori || r.kategori_nama || r.kategori || '')}</td>`
+          + `<td style="text-align:right;font-weight:700;color:${neg ? '#dc2626' : '#059669'}">${neg ? '−' : '+'}${rp(r.nominal || 0)}</td>`
+          + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td>`
+          + `<td style="font-size:11px">${src}</td>`
+          + `<td style="text-align:center">${canDel ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownLedDel(${r.id})">🗑</button>` : '<span title="Baris auto — hapus dari modul sumbernya">🔒</span>'}</td></tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:#8a8f98">Belum ada transaksi — klik + Catat Manual</td></tr>';
+      if(info) info.textContent = arr.length ? `Menampilkan ${(page - 1) * BB_PER + 1}-${Math.min(arr.length, page * BB_PER)} dari ${arr.length}` : 'Tidak ada data';
+      if(!wrap) return;
+      if(max <= 1){ wrap.innerHTML = ''; return; }
+      const b = (label, p, act, dis) => `<button class="btn btn-ghost small" style="padding:4px 10px;min-width:30px${act ? ';background:#111827;color:#fff;border-color:#111827' : ''}" ${dis ? 'disabled style="opacity:.4;padding:4px 10px;min-width:30px"' : ''} onclick="bbGo(${p})">${label}</button>`;
+      const win = 2;
+      let lo = Math.max(1, page - win), hi = Math.min(max, page + win);
+      if(page <= win + 1) hi = Math.min(max, 1 + win * 2);
+      if(page >= max - win) lo = Math.max(1, max - win * 2);
+      let nums = '';
+      for(let p = lo; p <= hi; p++) nums += b(p, p, p === page, false);
+      wrap.innerHTML = b('‹', page - 1, false, page <= 1)
+        + (lo > 1 ? b(1, 1, false, false) + (lo > 2 ? '<span style="color:#8a8f98">…</span>' : '') : '')
+        + nums
+        + (hi < max ? (hi < max - 1 ? '<span style="color:#8a8f98">…</span>' : '') + b(max, max, false, false) : '')
+        + b('›', page + 1, false, page >= max);
     }
     function ownLedOpen(){
       try{

@@ -2823,6 +2823,41 @@ function merkBadgeStyle(m){
   const s={IPHONE:'background:#04074a;color:#fff;border-color:#04074a', SAMSUNG:'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe', XIAOMI:'background:#fff7ed;color:#c2410c;border-color:#fed7aa', OPPO:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', VIVO:'background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe', INFINIX:'background:#fffbeb;color:#b45309;border-color:#fde68a', ROBOT:'background:#fff7ed;color:#9a3412;border-color:#fed7aa', OLIKE:'background:#ecfdf5;color:#047857;border-color:#a7f3d0', BASEUS:'background:#eff6ff;color:#1e40af;border-color:#bfdbfe', ANKER:'background:#111827;color:#f9fafb;border-color:#111827', UNEED:'background:#f5f3ff;color:#5b21b6;border-color:#ddd6fe', KAKU:'background:#fffbeb;color:#92400e;border-color:#fde68a', HIPPO:'background:#fdf2f8;color:#be185d;border-color:#fbcfe8', ORIGINAL:'background:#ecfdf5;color:#065f46;border-color:#6ee7b7', GENERIC:'background:#f3f4f6;color:#374151;border-color:#d1d5db', LAIN:'background:#f3f4f6;color:#4b5563;border-color:#e5e7eb'};
   return s[m]||s['LAIN'];
 }
+// pager inventori: 10 baris per halaman + nomor 1,2,3 Prev-Next
+const INV_PER=10;
+const _invPage={sp:1,as:1,al:1}, _invKey={sp:'',as:'',al:''};
+function invSetPage(k,p,total){
+  const max=Math.max(1,Math.ceil(total/INV_PER));
+  if(p<1||p>max) return;
+  _invPage[k]=p;
+  ({sp:renderSparepart,as:renderAsesoris,al:renderAlat})[k]();
+}
+function invDraw(k,tbodyId,infoId,btnsId,rowsHtml,emptyHtml,colspan){
+  const total=rowsHtml.length;
+  const max=Math.max(1,Math.ceil(total/INV_PER));
+  if(_invPage[k]>max) _invPage[k]=max;
+  const page=_invPage[k];
+  const slice=rowsHtml.slice((page-1)*INV_PER,page*INV_PER);
+  const tbody=document.getElementById(tbodyId);
+  if(tbody) tbody.innerHTML=slice.join('')||`<tr><td colspan="${colspan}" style="text-align:center;padding:18px;color:#8a8f98">${emptyHtml}</td></tr>`;
+  const info=document.getElementById(infoId);
+  if(info) info.textContent=total?`Menampilkan ${(page-1)*INV_PER+1}-${Math.min(total,page*INV_PER)} dari ${total}`:'Tidak ada data';
+  const wrap=document.getElementById(btnsId);
+  if(!wrap) return;
+  if(max<=1){ wrap.innerHTML=''; return; }
+  const btn=(label,p,opts={})=>`<button class="page-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} onclick="invSetPage('${k}',${p},${total})">${label}</button>`;
+  const win=2;
+  let lo=Math.max(1,page-win), hi=Math.min(max,page+win);
+  if(page<=win+1) hi=Math.min(max,1+win*2);
+  if(page>=max-win) lo=Math.max(1,max-win*2);
+  let nums='';
+  for(let p=lo;p<=hi;p++) nums+=btn(p,p,{active:p===page});
+  wrap.innerHTML=btn('‹',page-1,{disabled:page<=1})
+    +(lo>1?btn(1,1)+(lo>2?'<span style="padding:0 4px;color:#8a8f98">…</span>':''):'')
+    +nums
+    +(hi<max?(hi<max-1?'<span style="padding:0 4px;color:#8a8f98">…</span>':'')+btn(max,max):'')
+    +btn('›',page+1,{disabled:page>=max});
+}
 function renderSparepart(){
   const tbody=document.getElementById('tbodySparepart');
   const countEl=document.getElementById('sparepartCount');
@@ -2846,10 +2881,12 @@ function renderSparepart(){
   filtered.sort((a,b)=> (merkOrder[normalizeMerk(a.merk)]??6) - (merkOrder[normalizeMerk(b.merk)]??6) || a.stok - b.stok);
   const isTekSp=isTeknisiMode();
   const disSp=isTekSp?'disabled':'';
+  const _spKey=[q,fCat,fMerk].join('|');
+  if(_spKey!==_invKey.sp){ _invKey.sp=_spKey; _invPage.sp=1; }
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q||fCat||fMerk?' sesuai filter':''}${isTekSp?'':' — <a href="#" onclick="switchView(\'inventory-tambah\');return false">Tambah item</a>'}</td></tr>`;
+    invDraw('sp','tbodySparepart','spPaginationInfo','spPaginationBtns',[],`Tidak ada sparepart${q||fCat||fMerk?' sesuai filter':''}${isTekSp?'':' — <a href="#" onclick="switchView(\'inventory-tambah\');return false">Tambah item</a>'}`,9);
   } else {
-    tbody.innerHTML=filtered.map(it=>{
+    invDraw('sp','tbodySparepart','spPaginationInfo','spPaginationBtns',filtered.map(it=>{
       const merkNorm=normalizeMerk(it.merk);
       const stokColor = it.stok<=2 ? '#fef2f2;color:#dc2626;border-color:#fecaca' : it.stok<=5 ? '#fffbeb;color:#b45309;border-color:#fde68a' : '#ecfdf5;color:#059669;border-color:#a7f3d0';
       const stokBg = it.stok<=2 ? '#fef2f2' : it.stok<=5 ? '#fffbeb' : '#ecfdf5';
@@ -2872,7 +2909,7 @@ function renderSparepart(){
           </div>`}
         </td>
       </tr>`;
-    }).join('');
+    }),`Tidak ada sparepart${q||fCat||fMerk?' sesuai filter':''}`,9);
   }
   if(countEl) countEl.textContent=filtered.length+' item';
   const lowCount=base.filter(i=>i.stok<=2).length;
@@ -2897,14 +2934,16 @@ function renderAsesoris(){
   if(q) list=list.filter(i=> (i.nama+(i.merk||'')).toLowerCase().includes(q));
   list.sort((a,b)=>a.stok-b.stok);
   const stokBadge=(s)=> s<=0 ? '<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">HABIS</span>' : s<=2 ? `<span style="background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s} tipis</span>` : `<span style="background:#ecfdf5;color:#059669;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700">${s}</span>`;
-  tbody.innerHTML=list.map(it=>`<tr style="${q?'background:#f0fdf4':''}>
+  if(q!==_invKey.as){ _invKey.as=q; _invPage.as=1; }
+  const _asRows=list.map(it=>`<tr style="${q?'background:#f0fdf4':''}>
     <td><strong style="font-size:12px">${escapeHtml(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id} • Masuk ${it.masuk} → Keluar ${it.keluar}</span></td>
     <td><span style="padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;display:inline-block;${merkBadgeStyle(normalizeMerk(it.merk))}">${escapeHtml(normalizeMerk(it.merk))}</span></td>
     <td style="text-align:center">${stokBadge(it.stok)}</td>
     <td style="text-align:right;font-weight:700">${formatRupiah(it.harga)}</td>
     <td style="text-align:right;color:#4b5563">${formatRupiah((it.stok||0)*(it.harga||0))}</td>
     <td style="text-align:center">${isTek ? '<span style="font-size:11px;color:#8a8f98">read-only</span>' : `<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" ${it.stok<=0?'disabled style="opacity:.45;padding:5px 8px;font-size:11px"':''} onclick="jualAsesoris(${it.id})">🛒 Jual</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openSpEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteSparepart(${it.id})">🗑</button></div>`}</td>
-  </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:18px;color:#8a8f98">Belum ada asesories — <a href="#" onclick="tambahAsesoris();return false">+ Tambah Asesories</a></td></tr>`;
+  </tr>`);
+  invDraw('as','tbodyAsesoris','asPaginationInfo','asPaginationBtns',_asRows, `Belum ada asesories — <a href="#" onclick="tambahAsesoris();return false">+ Tambah Asesories</a>`,6);
   if(countEl) countEl.textContent=list.length+' item';
   const low=list.filter(i=>i.stok<=2).length;
   if(warnEl){ warnEl.style.display=low?'inline-block':'none'; warnEl.textContent=low?`⚠ ${low} stok tipis`:''; }
@@ -3511,11 +3550,13 @@ function renderAlat(){
   filtered.sort((a,b)=> (order[a.kondisi]??9)-(order[b.kondisi]??9) || a.stok-b.stok);
   const isTekAl=isTeknisiMode();
   const disAl=isTekAl?'disabled':'';
+  const _alKey=[q,fK].join('|');
+  if(_alKey!==_invKey.al){ _invKey.al=_alKey; _invPage.al=1; }
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q||fK?' sesuai filter':''}${isTekAl?'':' — <a href="#" onclick="openAlatAddModal();return false">Tambah alat</a>'}</td></tr>`;
+    invDraw('al','tbodyAlat','alPaginationInfo','alPaginationBtns',[],`Tidak ada alat${q||fK?' sesuai filter':''}${isTekAl?'':' — <a href="#" onclick="openAlatAddModal();return false">Tambah alat</a>'}`,8);
   } else {
     const peminjamOptions=['-', ...availableTechs.map(t=>t.username)];
-    tbody.innerHTML=filtered.map(it=>{
+    invDraw('al','tbodyAlat','alPaginationInfo','alPaginationBtns',filtered.map(it=>{
       const stokBg= it.stok<=1 ? '#fef2f2' : it.stok===0 ? '#fef2f2' : '#ecfdf5';
       const stokColor= it.stok<=1 ? '#dc2626' : '#059669';
       const stokBorder= it.stok<=1 ? '#fecaca' : '#ececec';
@@ -3533,7 +3574,7 @@ function renderAlat(){
         <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="alat-harga-${it.id}" placeholder="0" ${disAl} style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
         <td style="text-align:center">${isTekAl?`<button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">📌 Pinjam</button>`:`<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveAlatRow(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" onclick="openAlatEditModal(${it.id})">✎ Edit</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="deleteAlat(${it.id})">🗑</button></div>`}</td>
       </tr>`;
-    }).join('');
+    }),`Tidak ada alat${q||fK?' sesuai filter':''}`,8);
   }
   if(countEl) countEl.textContent=filtered.length+' alat';
   const needCount=alatInventory.filter(a=> a.kondisi!=='Baik' || a.stok<=1).length;
