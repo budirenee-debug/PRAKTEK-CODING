@@ -27,7 +27,7 @@ TERMINAL_STATUS = {"Bisa Diambil", "Sudah Diambil", "Service Sukses", "Selesai",
 @router.get("", response_model=List[schemas.ServiceOut])
 def list_services(
     skip: int = 0,
-    limit: int = Query(100, le=200),
+    limit: int = Query(100, le=5000),
     status: Optional[str] = None,
     search: Optional[str] = None,
     device: Optional[str] = None,
