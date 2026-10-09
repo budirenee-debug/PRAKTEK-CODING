@@ -390,6 +390,7 @@
                 <div class="stat-card" onclick="ownPendSub('A4')" style="cursor:pointer;border-left:4px solid #f59e0b"><div class="stat-head"><span>➕ Lain</span></div><h3 id="pendTotA4">-</h3><p class="trend" id="pendCntA4">-</p></div>
               </div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyPend"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="pendPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
             <div id="hubPendapatan"></div>
           </div>
@@ -428,6 +429,7 @@
             <div class="card">
               <div class="card-head toolbar"><div class="toolbar-left"><h3>🏪 Biaya Operasional</h3><span class="muted" id="opsSub">buku besar + uang hadir</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOperasional(true)">↻</button></div></div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyOps"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="opsPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
             <div id="hubOperasional"></div>
           </div>
@@ -440,6 +442,7 @@
             <div class="card">
               <div class="card-head toolbar"><div class="toolbar-left"><h3>🏗 Aset / Investasi (D)</h3><span class="muted">tidak langsung mengecilkan laba • isi via Buku Besar → Catat Manual</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownAset(true)">↻</button></div></div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyAset"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="asetPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
           </div>
           <div id="hubPanel-owner" style="display:none">
@@ -451,6 +454,7 @@
             <div class="card">
               <div class="card-head toolbar"><div class="toolbar-left"><h3>👑 Transaksi Owner</h3><span class="muted">modal/prive BUKAN omzet & bukan biaya • isi via Buku Besar → Catat Manual</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOwnerTab(true)">↻</button></div></div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyOwner"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="ownTPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
           </div>
           <div id="hubPanel-non" style="display:none">
@@ -463,6 +467,7 @@
             <div class="card">
               <div class="card-head toolbar">              <div class="toolbar-left"><h3>🔁 Non-Pendapatan / Non-Biaya</h3><span class="muted" id="nonHint">bergerak tapi bukan omzet & bukan biaya</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownNonTab(true)">↻</button></div></div>
               <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th></tr></thead><tbody id="tbodyNon"><tr><td colspan="5" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+              <div id="nonPager" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap"></div>
             </div>
           </div>
           <div id="hubPanel-kas" style="display:none">
@@ -927,6 +932,7 @@
               </table>
             </div>
             <div style="margin-top:10px;font-size:11px;color:#8a8f98"><span id="sparepartSummary">0 item • Total nilai stok: Rp 0</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;font-size:12px;color:#8a8f98"><span id="oSpPageInfo"></span><div id="oSpPageBtns" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div></div>
           </div>
           <div class="modal" id="spEditModal">
             <div class="modal-box" style="max-width:460px">
@@ -964,6 +970,7 @@
               <tbody id="tbodyAsesorisOwn"><tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Memuat...</td></tr></tbody></table>
             </div>
             <div style="margin-top:10px;font-size:11px;color:#8a8f98"><span id="asesorisOwnSummary">0 item</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;font-size:12px;color:#8a8f98"><span id="oAsPageInfo"></span><div id="oAsPageBtns" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div></div>
           </div>
           <div class="card">
             <div class="card-head toolbar">
@@ -982,6 +989,7 @@
               </table>
             </div>
             <div style="margin-top:10px;font-size:11px;color:#8a8f98"><span id="alatSummary">0 alat • Total nilai: Rp 0</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;font-size:12px;color:#8a8f98"><span id="oAlPageInfo"></span><div id="oAlPageBtns" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div></div>
           </div>
           <div class="modal" id="alatEditModal">
             <div class="modal-box" style="max-width:480px">
@@ -2366,6 +2374,41 @@
       return rows;
     }
     function ownPendSub(k){ ownSubSet('pend', k, () => ownPendapatan()); }
+    // pager generik tab Laba-Rugi: 10 baris per halaman (gaya hppPager)
+    const OLR_PER = 10;
+    const _olrPg = {pend: 1, ops: 1, aset: 1, own: 1, non: 1};
+    const _olrKey = {pend: '', ops: '', aset: '', own: '', non: ''};
+    function oLrGo(k, p){
+      _olrPg[k] = p;
+      ({pend: ownPendapatan, ops: ownOperasional, aset: ownAset, own: ownOwnerTab, non: ownNonTab})[k]();
+    }
+    function oLrPager(pagerId, k, subKey, total){
+      const key = k + '|' + subKey;
+      if(key !== _olrKey[k]){ _olrKey[k] = key; _olrPg[k] = 1; }
+      const pages = Math.max(1, Math.ceil(total / OLR_PER));
+      if(_olrPg[k] > pages) _olrPg[k] = pages;
+      if(_olrPg[k] < 1) _olrPg[k] = 1;
+      const pg = document.getElementById(pagerId);
+      if(pg){
+        if(pages <= 1){ pg.innerHTML = ''; }
+        else {
+          const btn = (label, page, dis, active) => `<button class="btn ${active ? 'btn-dark' : 'btn-ghost'} small" style="padding:4px 10px;font-size:11.5px;min-width:30px${dis ? ';opacity:.4;pointer-events:none' : ''}" ${dis ? '' : `onclick="oLrGo('${k}',${page})"`}>${label}</button>`;
+          let nums = [];
+          for(let p = 1; p <= pages; p++){
+            if(p === 1 || p === pages || Math.abs(p - _olrPg[k]) <= 1) nums.push(p);
+            else if(nums[nums.length - 1] !== '…') nums.push('…');
+          }
+          pg.innerHTML = btn('‹ Prev', _olrPg[k] - 1, _olrPg[k] <= 1)
+            + nums.map(p => p === '…' ? '<span style="color:#8a8f98">…</span>' : btn(p, p, false, p === _olrPg[k])).join('')
+            + btn('Next ›', _olrPg[k] + 1, _olrPg[k] >= pages);
+        }
+      }
+      return {page: _olrPg[k], pages};
+    }
+    function oLrSlice(arr, k){
+      const start = (_olrPg[k] - 1) * OLR_PER;
+      return arr.slice(start, start + OLR_PER);
+    }
     async function ownPendapatan(force){
       const tb = document.getElementById('tbodyPend');
       const sub = ownSubGet('pend');
@@ -2386,12 +2429,13 @@
         const fr = rows.filter(r => sub === 'all' || r.kat === sub);
         const tot = fr.filter(r => r.kat === 'komisi' || r.laba !== false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
         const totPers = fr.filter(r => r.kat !== 'komisi' && r.laba === false).reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        tb.innerHTML = fr.slice(0, 200).map(r =>
+        const _ppg = oLrPager('pendPager', 'pend', sub, fr.length);
+        tb.innerHTML = oLrSlice(fr, 'pend').map(r =>
           `<tr><td style="white-space:nowrap">${esc(r.tanggal || '')}</td><td><strong>${esc(r.ket || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.src || '')}</span></td>`
           + `<td style="font-size:11.5px;font-weight:600">${esc((r.katLbl || r.kat || '').replace(/^[A-Z]\d*\s*·\s*/, ''))}</td>`
           + `<td style="text-align:right;font-weight:700;color:${r.nominal < 0 ? '#dc2626' : '#059669'}">${rp(r.nominal || 0)}</td>`
           + `<td style="font-size:11px">${esc(r.media || '-')}</td></tr>`).join('')
-          + (fr.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${fr.length} baris)</td><td style="text-align:right;color:${tot < 0 ? '#dc2626' : '#059669'}">${rp(tot)}</td><td></td></tr>` : '')
+          + (fr.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${fr.length} baris) • hal ${_ppg.page}/${_ppg.pages}</td><td style="text-align:right;color:${tot < 0 ? '#dc2626' : '#059669'}">${rp(tot)}</td><td></td></tr>` : '')
           || `<tr><td colspan="5" style="text-align:center;color:#8a8f98">${sub === 'A3' ? 'Belum ada penjualan unit — modul menyusul, bisa Catat Manual A3 di Buku Besar' : 'Belum ada data'}</td></tr>`;
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
     }
@@ -2521,8 +2565,9 @@
       try{
         const led = (await ownLedCached(force)).filter(r => r.kelompok === 'operasional' && (sub === 'all' || r.kategori === sub));
         const tot = led.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori_nama)).join('')
-          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris, belum termasuk uang hadir)</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>` : '')
+        const _opg = oLrPager('opsPager', 'ops', sub, led.length);
+        tb.innerHTML = oLrSlice(led, 'ops').map(r => ownLedRow5(r, r.kategori_nama)).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris, belum termasuk uang hadir) • hal ${_opg.page}/${_opg.pages}</td><td style="text-align:right;color:#dc2626">${rp(tot)}</td><td></td></tr>` : '')
           || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data operasional</td></tr>';
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
       try{ await ownKeluar(); }catch(e){}
@@ -2535,8 +2580,9 @@
       try{
         const led = (await ownLedCached(force)).filter(r => r.kategori === 'D' && (sub === 'all' || r.subkategori === sub));
         const tot = led.reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.subkategori || 'D')).join('')
-          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris)</td><td style="text-align:right">${rp(tot)}</td><td></td></tr>` : '')
+        const _apg = oLrPager('asetPager', 'aset', sub, led.length);
+        tb.innerHTML = oLrSlice(led, 'aset').map(r => ownLedRow5(r, r.subkategori || 'D')).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris) • hal ${_apg.page}/${_apg.pages}</td><td style="text-align:right">${rp(tot)}</td><td></td></tr>` : '')
           || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada aset — catat via Buku Besar → + Catat Manual → D</td></tr>';
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
     }
@@ -2549,8 +2595,9 @@
         const led = (await ownLedCached(force)).filter(r => r.kelompok === 'owner' && (sub === 'all' || r.kategori === sub));
         const tin = led.filter(r => r.kategori === 'E1').reduce((s, r) => s + (Number(r.nominal) || 0), 0);
         const tout = led.filter(r => r.kategori === 'E2').reduce((s, r) => s + (Number(r.nominal) || 0), 0);
-        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori === 'E1' ? 'Modal Owner' : 'Prive Owner')).join('')
-          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Modal ${rp(tin)} − Prive ${rp(tout)}</td><td style="text-align:right;color:${(tin - tout) < 0 ? '#dc2626' : '#059669'}">${rp(tin - tout)}</td><td></td></tr>` : '')
+        const _opg2 = oLrPager('ownTPager', 'own', sub, led.length);
+        tb.innerHTML = oLrSlice(led, 'own').map(r => ownLedRow5(r, r.kategori === 'E1' ? 'Modal Owner' : 'Prive Owner')).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Modal ${rp(tin)} − Prive ${rp(tout)} • hal ${_opg2.page}/${_opg2.pages}</td><td style="text-align:right;color:${(tin - tout) < 0 ? '#dc2626' : '#059669'}">${rp(tin - tout)}</td><td></td></tr>` : '')
           || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada transaksi owner — catat via Buku Besar → + Catat Manual</td></tr>';
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
     }
@@ -2564,7 +2611,9 @@
       set('nonHint', hint[sub] || hint.all);
       try{
         const led = (await ownLedCached(force)).filter(r => r.kelompok === 'non' && (sub === 'all' || r.kategori === sub));
-        tb.innerHTML = led.slice(0, 200).map(r => ownLedRow5(r, r.kategori_nama)).join('')
+        const _npg = oLrPager('nonPager', 'non', sub, led.length);
+        tb.innerHTML = oLrSlice(led, 'non').map(r => ownLedRow5(r, r.kategori_nama)).join('')
+          + (led.length ? `<tr style="background:#f9fafb;font-weight:800"><td colspan="3">Total (${led.length} baris) • hal ${_npg.page}/${_npg.pages}</td><td style="text-align:right"></td><td></td></tr>` : '')
           || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data — catat via Buku Besar → + Catat Manual (transfer/hutang/DP)</td></tr>';
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
     }
@@ -3744,6 +3793,43 @@
       }catch(e){}
     }
     // ----- Sparepart (persis toko + kolom Beli) -----
+    // pager inventori owner: 10 baris per halaman + nomor 1,2,3 Prev-Next
+    const OINV_PER = 10;
+    window._oInvPg = window._oInvPg || {sp: 1, as: 1, al: 1};
+    window._oInvKey = window._oInvKey || {sp: '', as: '', al: ''};
+    function oInvGo(k, p){
+      const rows = window._oInvRows ? (window._oInvRows[k] || []) : [];
+      const max = Math.max(1, Math.ceil(rows.length / OINV_PER));
+      if(p < 1 || p > max) return;
+      window._oInvPg[k] = p;
+      ({sp: ownInvRenderSp, as: ownInvRenderAcc, al: ownInvRenderAlat})[k]();
+    }
+    function oInvDraw(k, tbodyId, infoId, btnsId, rowsHtml, emptyHtml, colspan){
+      const total = rowsHtml.length;
+      const max = Math.max(1, Math.ceil(total / OINV_PER));
+      if(!window._oInvPg[k] || window._oInvPg[k] > max) window._oInvPg[k] = 1;
+      const page = window._oInvPg[k];
+      const slice = rowsHtml.slice((page - 1) * OINV_PER, page * OINV_PER);
+      const tb = document.getElementById(tbodyId);
+      if(tb) tb.innerHTML = slice.join('') || `<tr><td colspan="${colspan}" style="text-align:center;padding:18px;color:#8a8f98">${emptyHtml}</td></tr>`;
+      const info = document.getElementById(infoId);
+      if(info) info.textContent = total ? `Menampilkan ${(page - 1) * OINV_PER + 1}-${Math.min(total, page * OINV_PER)} dari ${total}` : 'Tidak ada data';
+      const wrap = document.getElementById(btnsId);
+      if(!wrap) return;
+      if(max <= 1){ wrap.innerHTML = ''; return; }
+      const b = (label, p, act, dis) => `<button class="btn btn-ghost small" style="padding:4px 10px;min-width:30px${act ? ';background:#111827;color:#fff;border-color:#111827' : ''}" ${dis ? 'disabled style="opacity:.4;padding:4px 10px;min-width:30px"' : ''} onclick="oInvGo('${k}',${p})">${label}</button>`;
+      const win = 2;
+      let lo = Math.max(1, page - win), hi = Math.min(max, page + win);
+      if(page <= win + 1) hi = Math.min(max, 1 + win * 2);
+      if(page >= max - win) lo = Math.max(1, max - win * 2);
+      let nums = '';
+      for(let p = lo; p <= hi; p++) nums += b(p, p, p === page, false);
+      wrap.innerHTML = b('‹', page - 1, false, page <= 1)
+        + (lo > 1 ? b(1, 1, false, false) + (lo > 2 ? '<span style="color:#8a8f98">…</span>' : '') : '')
+        + nums
+        + (hi < max ? (hi < max - 1 ? '<span style="color:#8a8f98">…</span>' : '') + b(max, max, false, false) : '')
+        + b('›', page + 1, false, page >= max);
+    }
     function ownInvRenderSp(){
       const tbody = document.getElementById('tbodySparepart');
       const countEl = document.getElementById('sparepartCount');
@@ -3760,10 +3846,12 @@
       if(fMerk) filtered = filtered.filter(i => oNormMerk(i.merk) === fMerk);
       const ord = {IPHONE:0,SAMSUNG:1,XIAOMI:2,OPPO:3,VIVO:4,INFINIX:5,LAIN:6};
       filtered.sort((a, b) => (ord[oNormMerk(a.merk)] ?? 6) - (ord[oNormMerk(b.merk)] ?? 6) || a.stok - b.stok);
+      const _spK = [q, fCat, fMerk].join('|');
+      if(_spK !== window._oInvKey.sp){ window._oInvKey.sp = _spK; window._oInvPg.sp = 1; }
       if(!filtered.length){
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada sparepart${q || fCat || fMerk ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Sparepart</td></tr>`;
+        oInvDraw('sp', 'tbodySparepart', 'oSpPageInfo', 'oSpPageBtns', [], `Tidak ada sparepart${q || fCat || fMerk ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Sparepart`, 10);
       } else {
-        tbody.innerHTML = filtered.map(it => {
+        oInvDraw('sp', 'tbodySparepart', 'oSpPageInfo', 'oSpPageBtns', filtered.map(it => {
           const merkNorm = oNormMerk(it.merk);
           const stokColor = it.stok <= 2 ? '#fef2f2;color:#dc2626;border-color:#fecaca' : it.stok <= 5 ? '#fffbeb;color:#b45309;border-color:#fde68a' : '#ecfdf5;color:#059669;border-color:#a7f3d0';
           const stokBg = it.stok <= 2 ? '#fef2f2' : it.stok <= 5 ? '#fffbeb' : '#ecfdf5';
@@ -3780,7 +3868,7 @@
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" placeholder="0" style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvSpField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga)}</div></td>
             <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvSpSave(${it.id})">💾 Simpan</button><button class="btn btn-ghost small" style="padding:5px 8px;font-size:11px" title="Hitung Jual = Beli + margin" onclick="ownInvSpMagic(${it.id})">⚡</button></div></td>
           </tr>`;
-        }).join('');
+        }), `Tidak ada sparepart${q || fCat || fMerk ? ' sesuai filter' : ''}`, 10);
       }
       if(countEl) countEl.textContent = filtered.length + ' item';
       const lowCount = baseSp.filter(i => i.stok <= 2).length;
@@ -3820,8 +3908,9 @@
       const sumEl = document.getElementById('asesorisOwnSummary');
       const list = (ownInvSp || []).filter(i => (i.kategori || '') === 'Aksesoris').sort((a, b) => a.stok - b.stok);
       const stokStyle = (v) => v <= 2 ? 'background:#fef2f2;color:#dc2626;border-color:#fecaca' : v <= 5 ? 'background:#fffbeb;color:#b45309;border-color:#fde68a' : 'background:#ecfdf5;color:#059669;border-color:#a7f3d0';
-      tbody.innerHTML = list.map(it => `<tr><td><strong style="font-size:12px">${esc(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id}</span></td><td>${esc(oNormMerk(it.merk))}</td><td style="text-align:center">+${it.masuk}</td><td style="text-align:center">−${it.keluar}</td><td style="text-align:center"><span style="display:inline-block;min-width:48px;padding:5px 10px;border-radius:10px;font-size:12px;font-weight:800;border:1px solid;${stokStyle(it.stok)}">🔒 ${it.stok}</span></td><td style="text-align:right;font-weight:700">${rp(it.harga)}</td><td style="text-align:right;color:#4b5563">${rp((it.stok || 0) * (it.harga || 0))}</td></tr>`).join('')
-        || '<tr><td colspan="7" style="text-align:center;padding:18px;color:#8a8f98">Belum ada asesories — tambah di Dashboard Toko → Asesories</td></tr>';
+      const _asK = 'n' + list.length;
+      if(_asK !== window._oInvKey.as){ window._oInvKey.as = _asK; window._oInvPg.as = 1; }
+      oInvDraw('as', 'tbodyAsesorisOwn', 'oAsPageInfo', 'oAsPageBtns', list.map(it => `<tr><td><strong style="font-size:12px">${esc(it.nama)}</strong><br><span style="font-size:10px;color:#8a8f98">#${it.id}</span></td><td>${esc(oNormMerk(it.merk))}</td><td style="text-align:center">+${it.masuk}</td><td style="text-align:center">−${it.keluar}</td><td style="text-align:center"><span style="display:inline-block;min-width:48px;padding:5px 10px;border-radius:10px;font-size:12px;font-weight:800;border:1px solid;${stokStyle(it.stok)}">🔒 ${it.stok}</span></td><td style="text-align:right;font-weight:700">${rp(it.harga)}</td><td style="text-align:right;color:#4b5563">${rp((it.stok || 0) * (it.harga || 0))}</td></tr>`), 'Belum ada asesories — tambah di Dashboard Toko → Asesories', 7);
       if(countEl) countEl.textContent = list.length + ' item';
       const low = list.filter(i => i.stok <= 2).length;
       if(warnEl){ warnEl.style.display = low ? 'inline-block' : 'none'; warnEl.textContent = low ? `⚠ ${low} stok tipis` : ''; }
@@ -3969,11 +4058,13 @@
       if(fK) filtered = filtered.filter(a => a.kondisi === fK);
       const order = {Rusak:0,'Perlu Kalibrasi':1,Dipinjam:2,Baik:3};
       filtered.sort((a, b) => (order[a.kondisi] ?? 9) - (order[b.kondisi] ?? 9) || a.stok - b.stok);
+      const _alK = [q, fK].join('|');
+      if(_alK !== window._oInvKey.al){ window._oInvKey.al = _alK; window._oInvPg.al = 1; }
       if(!filtered.length){
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:18px;color:#8a8f98">Tidak ada alat${q || fK ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Alat</td></tr>`;
+        oInvDraw('al', 'tbodyAlat', 'oAlPageInfo', 'oAlPageBtns', [], `Tidak ada alat${q || fK ? ' sesuai filter' : ''} — tambah di Dashboard Toko → Alat`, 8);
       } else {
         const peminjamOptions = ['-', ...ownInvTechs];
-        tbody.innerHTML = filtered.map(it => {
+        oInvDraw('al', 'tbodyAlat', 'oAlPageInfo', 'oAlPageBtns', filtered.map(it => {
           const stokBg = it.stok <= 1 ? '#fef2f2' : '#ecfdf5';
           const stokColor = it.stok <= 1 ? '#dc2626' : '#059669';
           const stokBorder = it.stok <= 1 ? '#fecaca' : '#ececec';
@@ -3990,7 +4081,7 @@
             <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" placeholder="0" style="width:105px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=oFmtAngka(oParseRp(this.value))" onchange="ownInvAlatField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${rp(it.harga)}</div></td>
             <td style="text-align:center"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="ownInvAlatSave(${it.id})">💾 Simpan</button></div></td>
           </tr>`;
-        }).join('');
+        }), `Tidak ada alat${q || fK ? ' sesuai filter' : ''}`, 8);
       }
       if(countEl) countEl.textContent = filtered.length + ' alat';
       const needCount = ownInvAlat.filter(a => a.kondisi !== 'Baik' || a.stok <= 1).length;
