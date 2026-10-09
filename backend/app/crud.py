@@ -373,13 +373,74 @@ def update_service(db: Session, invoice: str, payload: schemas.ServiceUpdate):
     db.refresh(svc)
     return enrich_service(svc)
 
-def delete_service(db: Session, invoice: str):
-    svc = get_service(db, invoice)
+def delete_service(db: Session, invoice: str, store_id=None, actor=None):
+    """Hapus service + SELURUH jejak keuangannya (anti yatim, simetris void sales).
+
+    - part terpakai -> kembalikan_part (stok balik + HPP servicepart batal + mutasi)
+    - ledger service/service_komisi invoice tsb -> hapus (exact-match, anti false-match LIKE)
+    - commission_ledgers invoice tsb -> hapus (TechDebt TIDAK diutak-atik, simetris refund)
+    - service_engine -> hapus
+    - service -> hapus
+    Diblokir jika sudah ada refund (bukunya timpang kalau omzet dihapus duluan).
+    Return dict {ok, reason, cleaned}.
+    """
+    svc = db.query(models.Service).filter(models.Service.invoice == invoice)
+    if store_id is not None:
+        svc = svc.filter(models.Service.store_id == store_id)
+    svc = svc.first()
     if not svc:
-        return False
+        return {"ok": False, "reason": "not_found", "cleaned": {}}
+    sid = svc.store_id
+    # Guard: refund sudah terbit -> jangan hapus (A1-keluar + refund_balik yatim)
+    ref = db.query(models.Refund).filter(models.Refund.invoice == invoice)
+    if sid is not None:
+        ref = ref.filter(models.Refund.store_id == sid)
+    ref = ref.first()
+    if ref:
+        return {"ok": False, "reason": "has_refund",
+                "refund_kode": getattr(ref, "kode", None), "cleaned": {}}
+    cleaned = {"parts": 0, "ledger": 0, "komisi": 0}
+    # 1. part terpakai: stok balik + HPP batal (pakai fungsi baku)
+    parts = db.query(models.ServicePart).filter(
+        models.ServicePart.invoice == invoice)
+    if sid is not None:
+        parts = parts.filter(models.ServicePart.store_id == sid)
+    for p in parts.all():
+        try:
+            kembalikan_part(db, p, actor=actor)
+            cleaned["parts"] += 1
+        except Exception as e:
+            print("ledger hapus-service part skip:", invoice, e)
+    # 2. ledger omzet (service) + HPP komisi (service_komisi): exact-match invoice
+    cands = db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.ref_type.in_(["service", "service_komisi"]))
+    if sid is not None:
+        cands = cands.filter(models.LedgerEntry.store_id == sid)
+    for le in cands.all():
+        ket = le.keterangan or ""
+        is_service = (le.ref_type == "service"
+                      and ket.startswith(f"Service {invoice}:"))
+        is_komisi = (le.ref_type == "service_komisi"
+                     and ket.startswith("Komisi ") and f" {invoice} (" in ket)
+        if is_service or is_komisi:
+            db.delete(le)
+            cleaned["ledger"] += 1
+    # 3. riwayat komisi teknisi utk invoice ini (hutang teknisi tidak disentuh)
+    qkom = db.query(models.CommissionLedger).filter(
+        models.CommissionLedger.invoice == invoice)
+    if sid is not None:
+        qkom = qkom.filter(models.CommissionLedger.store_id == sid)
+    cleaned["komisi"] = qkom.count()
+    qkom.delete(synchronize_session=False)
+    # 4. baris engine 1-to-1
+    eng = db.query(models.ServiceEngine).filter(
+        models.ServiceEngine.invoice == invoice).first()
+    if eng:
+        db.delete(eng)
+    # 5. service-nya
     db.delete(svc)
     db.commit()
-    return True
+    return {"ok": True, "reason": "deleted", "cleaned": cleaned}
 
 def get_stats(db: Session, store_id=None):
     sq = db.query(models.Service)

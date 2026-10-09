@@ -330,11 +330,20 @@ def delete_service(
     if not svc:
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
     ensure_in_store(svc, store, "Service")
-    ok = crud.delete_service(db, invoice)
-    if not ok:
+    res = crud.delete_service(db, invoice, store_id=_sid(store), actor=current)
+    if not res.get("ok"):
+        if res.get("reason") == "has_refund":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tidak bisa hapus: {invoice} sudah ada refund "
+                       f"({res.get('refund_kode') or '-'}). Hapus/batalkan refund dulu "
+                       f"agar buku besar tidak timpang.")
         raise HTTPException(status_code=404, detail="Service tidak ditemukan")
+    cl = res.get("cleaned", {})
     log_action(db, "service.hapus", target=invoice,
                detail=f"Hapus service {svc.device} • {svc.nama} • biaya {svc.biaya} • status {svc.status}"
-                      f" • teknisi {svc.teknisi or '-'}",
+                      f" • teknisi {svc.teknisi or '-'}"
+                      f" • bersih: {cl.get('ledger', 0)} ledger, {cl.get('parts', 0)} part balik stok,"
+                      f" {cl.get('komisi', 0)} riwayat komisi",
                actor=current, store_id=_sid(store))
-    return {"message": f"{invoice} dihapus"}
+    return {"message": f"{invoice} dihapus", "cleaned": cl}
