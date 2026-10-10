@@ -2239,6 +2239,24 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       renderSparepart();
       return;
     }
+    if(activeView==='view-inventory-asesoris'){
+      const s=document.getElementById('searchAsesoris');
+      if(s) s.value=e.target.value;
+      renderAsesoris();
+      return;
+    }
+    if(activeView==='view-transaksi-penjualan'){
+      const s=document.getElementById('kasirSearch');
+      if(s) s.value=e.target.value;
+      kasirRenderBarang();
+      return;
+    }
+    if(activeView==='view-transaksi-pembayaran'){
+      const s=document.getElementById('searchBayar');
+      if(s) s.value=e.target.value;
+      renderTransaksiPembayaran();
+      return;
+    }
     if(activeView==='view-inventory-alat'){
       const s=document.getElementById('searchAlat');
       if(s) s.value=e.target.value;
@@ -2251,10 +2269,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       renderTransaksiPendapatan();
       return;
     }
-    // fallback untuk view lain tetap ke pelanggan
-    pelangganFilter = q;
-    statusFilter = 'all';
-    switchView('pelanggan');
+    // Tab lain (dashboard, kas, gajian, pengaturan, ...): jangan ngapa-ngapain.
+    // Dulu fallback-nya nyulik pindah ke tab Pelanggan — mengganggu.
+    return;
     const sp = document.getElementById('searchPelanggan');
     if(sp) sp.value = q;
     if(USE_API){ loadData().then(renderPelanggan); } else renderPelanggan();
@@ -2424,6 +2441,7 @@ function switchView(view, clearSearch){
     'transaksi-pembayaran':['Pembayaran','Metode & status pembayaran'],
     'transaksi-pendapatan':['Pendapatan Sukses','Rekap harga tercatat Service Sukses saja'],
     'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],
+    'gajian':['Gajian Sabtu','Slip mingguan Senin–Sabtu per teknisi'],
     'profil':['Atur Profil','Kelola username & password akun Anda — avatar sinkron dengan sidebar'],
     'pengaturan':['Pengaturan Toko','Template pesan WhatsApp per status — owner/admin only'],
     'kelola-tim':['Kelola Tim','Undang kasir/teknisi/admin via kode invite toko — owner/admin only'],
@@ -2469,6 +2487,12 @@ function switchView(view, clearSearch){
     const showIn=['semua-service','service-masuk','proses'];
     btnBaru.style.display= showIn.includes(view) ? '' : 'none';
   }
+  // Search atas disembunyikan di tab inventori/transaksi/akun (tiap tab sudah punya search sendiri).
+  // Tetap tampil di dashboard, service & pelanggan.
+  const HIDE_TOPSEARCH=['inventory-sparepart','inventory-asesoris','inventory-alat','inventory-tambah','transaksi-penjualan','transaksi-pembayaran','transaksi-pendapatan','kas-saya','gajian','pengaturan','kelola-tim','profil','approval-akun','tambah-pelanggan'];
+  const hideTop=HIDE_TOPSEARCH.includes(view);
+  const tsb=document.getElementById('topSearchBox'); if(tsb) tsb.style.display=hideTop?'none':'';
+  if(hideTop){ const gs0=document.getElementById('globalSearch'); if(gs0) gs0.value=''; }
 }
 
 // Dashboard stat cards — klik → view masing-masing (simple)
@@ -4573,6 +4597,11 @@ function renderStatusView(targetId, statusName){
 }
 // ---------- Kasir Penjualan (barang potong stok + jasa, struk simple) ----------
 let _kasirBarang = [], _kasirCart = [], _kasirStruk = null;
+let _kasirTab = 'sparepart', _kasirPage = 1, _kasirQ = '';
+const KASIR_PER = 10;
+const KASIR_CAT_SP = ['Display','Baterai','Kamera','Mesin','Fleksibel','Konsumsi'];
+function _kasirCat(b){ const k=String((b&&b.kategori)||'').trim(); if(k==='Aksesoris') return 'asesoris'; if(KASIR_CAT_SP.includes(k)) return 'sparepart'; return 'lain'; }
+function setKasirTab(t){ _kasirTab=t; _kasirPage=1; try{ document.querySelectorAll('[data-kasirtab]').forEach(x=>x.classList.toggle('active', x.dataset.kasirtab===t)); }catch(e){} kasirRenderBarang(); }
 function _kasirRp(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
 async function kasirLoadBarang(){
   const tb = document.getElementById('tbodyKasirBarang');
@@ -4585,11 +4614,32 @@ async function kasirLoadBarang(){
 function kasirRenderBarang(){
   const tb = document.getElementById('tbodyKasirBarang'); if(!tb) return;
   const q = (document.getElementById('kasirSearch')?.value || '').toLowerCase();
-  const list = _kasirBarang.filter(b => !q || String(b.nama||'').toLowerCase().includes(q) || String(b.kategori||'').toLowerCase().includes(q)).slice(0, 60);
-  tb.innerHTML = list.map(b=>{
+  if(q!==_kasirQ){ _kasirQ=q; _kasirPage=1; }
+  const list = _kasirBarang.filter(b => _kasirCat(b)===_kasirTab && (!q || String(b.nama||'').toLowerCase().includes(q) || String(b.kategori||'').toLowerCase().includes(q) || String(b.merk||'').toLowerCase().includes(q)));
+  const totalPages = Math.max(1, Math.ceil(list.length / KASIR_PER));
+  if(_kasirPage > totalPages) _kasirPage = totalPages;
+  const rows = list.slice((_kasirPage-1)*KASIR_PER, _kasirPage*KASIR_PER);
+  tb.innerHTML = rows.map(b=>{
     const stok = Number(b.stok)||0;
     return `<tr style="${q?'background:#f0fdf4':''}"><td><strong>${escapeHtml(b.nama||'-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${escapeHtml(b.kategori||'')} • ${escapeHtml(b.merk||'')}</span></td><td style="text-align:center;${stok<=0?'color:#dc2626;font-weight:700':''}">${stok}</td><td style="text-align:right">${_kasirRp(b.harga)}</td><td style="text-align:center"><button class="btn btn-dark small" style="padding:4px 10px" ${stok<=0?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="kasirAddBarang(${b.id})">+</button></td></tr>`;
-  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Tidak ada barang — tambah di Sparepart dulu</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8a8f98">Tidak ada barang di tab ini — tambah di Sparepart dulu</td></tr>';
+  const info = document.getElementById('kasirBarangInfo');
+  if(info){ const s=list.length?((_kasirPage-1)*KASIR_PER+1):0; info.textContent = list.length?`Menampilkan ${s}-${Math.min(list.length,_kasirPage*KASIR_PER)} dari ${list.length}`:'Tidak ada barang'; }
+  const wrap = document.getElementById('kasirBarangBtns');
+  if(wrap){
+    if(totalPages<=1){ wrap.innerHTML=''; return; }
+    const btn=(label,p,opts={})=>`<button class="page-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} onclick="kasirBarangPage(${p})">${label}</button>`;
+    let nums='';
+    for(let p=1;p<=totalPages;p++) nums+=btn(p,p,{active:p===_kasirPage});
+    wrap.innerHTML=btn('‹',_kasirPage-1,{disabled:_kasirPage<=1})+nums+btn('›',_kasirPage+1,{disabled:_kasirPage>=totalPages});
+  }
+}
+function kasirBarangPage(p){
+  const q = (document.getElementById('kasirSearch')?.value || '').toLowerCase();
+  const n = _kasirBarang.filter(b => _kasirCat(b)===_kasirTab && (!q || String(b.nama||'').toLowerCase().includes(q))).length;
+  const totalPages = Math.max(1, Math.ceil(n / KASIR_PER));
+  if(p<1||p>totalPages) return;
+  _kasirPage=p; kasirRenderBarang();
 }
 function kasirAddBarang(id){
   const b = _kasirBarang.find(x=>x.id===id); if(!b) return;

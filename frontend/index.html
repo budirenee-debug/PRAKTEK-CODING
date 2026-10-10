@@ -119,6 +119,9 @@
                     <button class="menu-item" data-view="kas-saya">
                         <span class="mi">🏪</span> Kas Toko
                     </button>
+                    <button class="menu-item" data-view="gajian">
+                        <span class="mi">💰</span> Gajian Sabtu
+                    </button>
 
                     <div class="menu-category">AKUN</div>
                     <button class="menu-item" data-view="pengaturan">
@@ -169,7 +172,7 @@
                 </div>
                 <div class="topbar-right">
                     <div id="realtimeClock" style="font-size:11px;color:#4b5563;background:#fff;border:1px solid #ececec;padding:7px 10px;border-radius:10px;white-space:nowrap;font-weight:600">—</div>
-                    <div class="search-box">
+                    <div class="search-box" id="topSearchBox">
                         <span>⌕</span>
                         <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, IMEI, invoice...">
                     </div>
@@ -612,7 +615,13 @@
                         <div class="toolbar-right"><div class="search-box small"><span>⌕</span><input id="kasirSearch" placeholder="Cari barang..." oninput="kasirRenderBarang()"></div></div>
                     </div>
                     <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Klik <strong>+</strong> untuk masuk keranjang (stok otomatis berkurang saat simpan). Harga ikut master — siapkan di <strong>Sparepart</strong> (kategori Aksesoris untuk asesories).</p>
+                    <div class="tabs" style="margin-bottom:10px">
+                        <button class="tab active" data-kasirtab="sparepart" onclick="setKasirTab('sparepart')">🔧 Sparepart</button>
+                        <button class="tab" data-kasirtab="asesoris" onclick="setKasirTab('asesoris')">🎧 Asesories</button>
+                        <button class="tab" data-kasirtab="lain" onclick="setKasirTab('lain')">📦 Lainnya</button>
+                    </div>
                     <div class="table-wrap"><table class="table compact"><thead><tr><th>Barang</th><th style="text-align:center">Stok</th><th style="text-align:right">Harga</th><th style="text-align:center">+</th></tr></thead><tbody id="tbodyKasirBarang"><tr><td colspan="4" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div class="pagination"><span id="kasirBarangInfo"></span><div id="kasirBarangBtns"></div></div>
                     <div class="card form-card" style="box-shadow:none;border:1px solid #ececec;margin-top:12px">
                         <div class="card-head"><h3 style="font-size:13px">+ Jasa Langsung</h3><span class="muted">tanpa stok (mis. ongkos pasang)</span></div>
                         <div style="display:grid;grid-template-columns:1fr 110px auto;gap:8px">
@@ -817,12 +826,19 @@
                     <button class="tab" data-kas="saya" onclick="setKasTab('saya')">👤 Kas Saya</button>
                 </div>
                 <div id="kasPanel-toko">
+                <div class="tabs" style="margin-bottom:10px">
+                    <button class="tab active" data-kasf="today" onclick="setKasTokoFilter('today')">📅 Harian</button>
+                    <button class="tab" data-kasf="week" onclick="setKasTokoFilter('week')">🗓️ Mingguan (Senin–Sabtu)</button>
+                    <button class="tab" data-kasf="month" onclick="setKasTokoFilter('month')">📆 Bulanan</button>
+                    <span class="muted" id="kasTokoFilterInfo" style="margin-left:auto;font-size:11px"></span>
+                </div>
                 <div class="stats" style="margin-bottom:10px">
                     <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Total Masuk</span></div><h3 id="kasTokoMasuk" style="color:#059669">Rp 0</h3><p class="trend" id="kasTokoMasukSub">pendapatan cair bruto</p></div>
                     <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Keluar</span></div><h3 id="kasTokoKeluar" style="color:#dc2626">Rp 0</h3><p class="trend" id="kasTokoKeluarSub">komisi + hadir + refund + beban toko</p></div>
                     <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Sisa Kas</span></div><h3 id="kasTokoSisa">Rp 0</h3><p class="trend">masuk − keluar</p></div>
                 </div>
-                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Masuk = pendapatan cair bruto (Sukses + Sudah Diambil + Selesai) + penjualan kasir + <strong>pemasukan manual (modal/lain)</strong>. Keluar = komisi + uang hadir teknisi + refund nominal + beban toko kecelakaan + pengeluaran operasional.</p>
+                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Toko main <strong>harian / mingguan / bulanan</strong> aja. Masuk = pendapatan cair + penjualan kasir + pemasukan lain (di luar modal). Keluar = yang <strong>beneran keluar tunai</strong> (refund + beban tunai + operasional). <strong>Modal & jatah teknisi gak ngurangin sisa</strong> — adanya di Owner Space & Gajian Sabtu.</p>
+                <div id="kasTokoJatah" style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:10px">💰 Menghitung jatah teknisi...</div>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                 <div class="pagination"><span id="kasTokoPaginationInfo"></span><div id="kasTokoPaginationBtns"></div></div>
                 <div class="card" id="tksCard" style="margin-top:12px">
@@ -895,6 +911,16 @@
                 <div id="kasSayaKuota" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th></tr></thead><tbody id="tbodyKasSaya"><tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                 <div class="pagination"><span id="kasSayaPaginationInfo"></span><div id="kasSayaPaginationBtns"></div></div>
+                </div>
+            </section>
+            <!-- GAJIAN SABTU: slip mingguan Senin-Sabtu per teknisi (admin/kasir/owner) -->
+            <section class="view" id="view-gajian">
+                <div class="card"><div class="card-head toolbar">
+                    <div class="toolbar-left"><h3>💰 Gajian Sabtu</h3><span class="count-pill" id="gajiSummary">-</span></div>
+                    <div class="toolbar-right"><button class="btn btn-ghost small" onclick="gajiWeekShift(-7)">‹ Minggu lalu</button><strong id="gajiRange" style="font-size:12px;white-space:nowrap">-</strong><button class="btn btn-ghost small" onclick="gajiWeekShift(7)">Minggu depan ›</button><button class="btn btn-dark small" onclick="gajiWeekReset()">Minggu ini</button><button class="btn btn-ghost small" onclick="renderGajian()">↻</button></div>
+                </div>
+                <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Periode <strong>Senin–Sabtu</strong>, dibayar Sabtu malam. Komisi + uang hadir − potong refund = <strong>bersih</strong>. Tanda ✅ tersimpan di HP ini per minggu.</p>
+                <div id="gajiCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
                 </div>
             </section>
             <section class="view" id="view-laporan-penjualan">
@@ -1300,8 +1326,8 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx1"></script>
-    <script src="assets/js/script.js?v=page5"></script>
-    <script src="assets/js/engine.js?v=eng11"></script>
+    <script src="assets/js/script.js?v=page9"></script>
+    <script src="assets/js/engine.js?v=eng14"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
 </html>

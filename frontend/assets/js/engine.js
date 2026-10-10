@@ -114,8 +114,10 @@ async function renderKasTeknisi(){
   }
 }
 let _kasTab = 'toko';
+function _kasMyRole(){ try{ if(typeof myActiveRole==='function') return String(myActiveRole()||'').toLowerCase(); }catch(e){} return String(localStorage.getItem('role')||'').toLowerCase(); }
 function setKasTab(t){
-  // Arus Toko khusus owner/admin/superadmin — teknisi pakai Kas Saya
+  // Arus Toko khusus owner/admin/superadmin — teknisi pakai Kas Saya.
+  // Sebaliknya Kas Saya disembunyikan untuk admin/kasir (isinya selalu kosong, bikin bingung).
   try{
     const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
       || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
@@ -123,6 +125,12 @@ function setKasTab(t){
       t = 'saya';
       try{ showToast('⛔ Arus Toko khusus owner — kamu pakai Kas Saya'); }catch(e){}
     }
+    const rl = _kasMyRole();
+    if(t === 'saya' && (rl==='admin'||rl==='kasir')){
+      t = 'toko';
+      try{ showToast('Kas Saya khusus teknisi — admin/kasir pakai Arus Toko & Gajian Sabtu'); }catch(e){}
+    }
+    try{ document.querySelectorAll('.tab[data-kas="saya"]').forEach(b=>{ b.style.display = (rl==='admin'||rl==='kasir')?'none':''; }); }catch(e){}
   }catch(e){}
   _kasTab = t;
   document.querySelectorAll('[data-kas]').forEach(b=>b.classList.toggle('active', b.dataset.kas===t));
@@ -163,12 +171,15 @@ async function renderKasToko(force){
     try{
       const inc = await apiFetch('/finance/incomes');
       (Array.isArray(inc)?inc:[]).forEach(s=>{
-        const n = Number(s.nominal)||0; if(n<=0) return; inManual += n; masukTotal += n;
+        const n = Number(s.nominal)||0; if(n<=0) return;
+        if(/modal/i.test(String(s.kategori||''))) return; // Modal Awal/Tambahan = Owner Space, bukan kas harian toko
+        inManual += n; masukTotal += n;
         rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kategori||'Masuk', tipe: '📥 Pemasukan', masuk: n, keluar: 0, ket: `${s.sumber||''}${s.dibuat_oleh?' • '+s.dibuat_oleh:''}`});
       });
     }catch(e){}
-    // Keluar ke teknisi: komisi + hadir (dari buku kas masing-masing)
-    let techKeluar = 0;
+    // Jatah teknisi (komisi+hadir): TIDAK dikurangi dari kas — baru keluar tunai Sabtu malam.
+    // Disimpan untuk memo per periode; detail + bayar di Gajian Sabtu.
+    let _tj=[];
     try{
       const techs = await apiFetch('/technicians');
       const list = Array.isArray(techs)?techs:[];
@@ -176,13 +187,11 @@ async function renderKasToko(force){
         try{
           const j = await apiFetch(`/engine/kas/teknisi/${t.id}`);
           const nama = j.nama || t.nama || ('Teknisi '+t.id);
-          techKeluar += (Number(j.komisi_cair)||0) + (Number(j.allowance)||0);
-          (j.riwayat||[]).forEach(l=>{
-            if((Number(l.masuk)||0) > 0) rows.push({t: String(l.tanggal||'').slice(0,10), ref: l.invoice||'-', tipe: (l.tipe==='allowance'?'🕘 Hadir ':'💰 Komisi ') + nama, masuk: 0, keluar: Number(l.masuk)||0, ket: l.ket||''});
-          });
+          _tj.push({nama, riwayat: j.riwayat||[]});
         }catch(e){}
       }
     }catch(e){}
+    _kasTokoTechJatah=_tj;
     // Refund nominal = keluar (dari omzet + jadi pengeluaran)
     let refundKeluar = 0;
     const cairInv = new Set(cair.map(d=>d.invoice));
@@ -209,13 +218,16 @@ async function renderKasToko(force){
         }
       });
     }catch(e){}
-    // Kecelakaan kerja: beban toko = keluar
+    // Kecelakaan kerja: beban toko TUNAI saja = keluar (ambil persediaan = gerak stok, domain owner)
     let celakaKeluar = 0;
     try{
       const ac = await apiFetch('/finance/accidents');
       const alist = Array.isArray(ac)?ac:(ac.rows||[]);
       alist.forEach(a=>{
-        const n = Number(a.beban_toko)||0; if(n<=0) return; celakaKeluar += n;
+        const n = Number(a.beban_toko)||0; if(n<=0) return;
+        const sumber=String(a.sumber_pengganti||a.sumber||'').toLowerCase();
+        if(sumber==='persediaan') return;
+        celakaKeluar += n;
         rows.push({t: String(a.tanggal||'').slice(0,10), ref: a.invoice||'-', tipe: '🛠 Beban toko', masuk: 0, keluar: n, ket: `${a.teknisi||''} • ${a.kronologi||''}`});
       });
     }catch(e){}
@@ -230,13 +242,11 @@ async function renderKasToko(force){
         rows.push({t: String(r.tanggal||'').slice(0,10), ref: KL[r.kategori]||r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`});
       });
     }catch(e){}
-    const keluarTotal = techKeluar + refundKeluar + celakaKeluar + outKeluar;
-    set('kasTokoMasuk', _rp(masukTotal)); set('kasTokoMasukSub', cair.length + ' service cair + omzet barang + manual ' + _rp(inManual));
-    set('kasTokoKeluar', _rp(keluarTotal)); set('kasTokoKeluarSub', `teknisi ${_rp(techKeluar)} • refund ${_rp(refundKeluar)} • toko ${_rp(celakaKeluar)} • keluar ${_rp(outKeluar)}`);
-    set('kasTokoSisa', _rp(masukTotal - keluarTotal));
+    // Total dihitung di applyKasTokoFilter dari baris + memo jatah teknisi.
     rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
-    _kasTokoRows=rows; _kasTokoPage=1;
-    drawKasToko();
+    // simpan semua baris all-time, tampilkan sesuai filter tanggal (Hari/Minggu/Semua)
+    _kasTokoRowsAll=rows;
+    applyKasTokoFilter();
   }catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
@@ -559,13 +569,172 @@ async function kasTutupTokoSave(){
     try{ kasBarToko(); }catch(e){}
   }catch(e){ (window.showToast || alert)('Gagal simpan tutup kas: ' + (e.message || e)); }
 }
+// ---------- Filter Kas Toko: Harian / Mingguan (Senin-Sabtu) / Bulanan ----------
+// Toko sengaja TIDAK ada all-time: modal awal yg nongol terus bikin bingung.
+// Modal awal/tambahan juga dikecualikan (domain Owner Space).
+let _kasTokoFilter='today', _kasTokoRowsAll=[], _kasTokoTechJatah=[];
+function _kasTodayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _kasWeekRange(){
+  const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dow=d.getDay(); const end=new Date(d);
+  if(dow===0) end.setDate(d.getDate()-1); else end.setDate(d.getDate()+(6-dow));
+  const start=new Date(end); start.setDate(end.getDate()-5);
+  const iso=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  return {start:iso(start), end:iso(end)};
+}
+function setKasTokoFilter(f){
+  _kasTokoFilter=f;
+  try{ document.querySelectorAll('[data-kasf]').forEach(b=>b.classList.toggle('active', b.dataset.kasf===f)); }catch(e){}
+  applyKasTokoFilter();
+}
+function _kasInRange(t){
+  t=String(t||'').slice(0,10); if(!t) return false;
+  if(_kasTokoFilter==='today') return t===_kasTodayStr();
+  if(_kasTokoFilter==='week'){ const w=_kasWeekRange(); return t>=w.start&&t<=w.end; }
+  if(_kasTokoFilter==='month') return t.slice(0,7)===_kasTodayStr().slice(0,7);
+  return true;
+}
+function applyKasTokoFilter(){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  let rows=[..._kasTokoRowsAll], info='';
+  if(_kasTokoFilter==='today'){ const t=_kasTodayStr(); rows=rows.filter(r=>String(r.t||'').slice(0,10)===t); info='📅 '+t; }
+  else if(_kasTokoFilter==='week'){ const w=_kasWeekRange(); rows=rows.filter(r=>{ const t=String(r.t||'').slice(0,10); return t>=w.start&&t<=w.end; }); info='🗓️ '+w.start+' s/d '+w.end; }
+  else if(_kasTokoFilter==='month'){ const ym=_kasTodayStr().slice(0,7); rows=rows.filter(r=>String(r.t||'').slice(0,7)===ym); info='📆 '+ym; }
+  else { rows=[]; }
+  let m=0,k=0,rf=0,bt=0,op=0,st=0,nm=0;
+  rows.forEach(r=>{ const mi=Number(r.masuk)||0, ko=Number(r.keluar)||0; m+=mi; k+=ko; if(mi>0) nm++;
+    const tp=String(r.tipe||'');
+    if(tp.startsWith('💸')) rf+=ko;
+    else if(tp.startsWith('🛠')) bt+=ko;
+    else if(tp.startsWith('🧾')){ if(r.ref==='Sparepart'||r.ref==='Accessories') st+=ko; else op+=ko; }
+  });
+  set('kasTokoMasuk', _rp(m)); set('kasTokoMasukSub', nm+' transaksi masuk');
+  set('kasTokoKeluar', _rp(k)); set('kasTokoKeluarSub', 'operasional '+_rp(op)+' • belanja stok '+_rp(st)+' • refund '+_rp(rf)+' • beban toko '+_rp(bt));
+  set('kasTokoSisa', _rp(m-k));
+  set('kasTokoFilterInfo', info);
+  // Memo jatah teknisi periode ini (komisi+hadir) — belum keluar kas, dibayar Sabtu. Bukan pengurang sisa.
+  let jt=0; const per=[];
+  (_kasTokoTechJatah||[]).forEach(o=>{
+    let s=0; (o.riwayat||[]).forEach(l=>{ if(!_kasInRange(l.tanggal)) return; if(l.tipe==='komisi_cair'||l.tipe==='allowance') s+=Number(l.masuk)||0; });
+    if(s>0){ jt+=s; per.push(_esc(o.nama)+' '+_rp(s)); }
+  });
+  const jm=document.getElementById('kasTokoJatah');
+  if(jm) jm.innerHTML='💰 Jatah teknisi periode ini <strong>'+_rp(jt)+'</strong> — dibayar Sabtu malam, <strong>belum keluar kas</strong>'
+    +(per.length?'<br><span style="font-size:11px">'+per.join(' • ')+'</span>':'<br><span style="font-size:11px">belum ada jatah periode ini</span>')
+    +' <button class="btn btn-dark small" style="margin-left:8px;white-space:nowrap" onclick="switchView(\'gajian\')">Buka Gajian →</button>';
+  rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
+  _kasTokoRows=rows; _kasTokoPage=1;
+  drawKasToko();
+}
+// ---------- Gajian Sabtu: slip mingguan Senin-Sabtu per teknisi ----------
+// Sumber: /engine/kas/teknisi/{id} (riwayat ledger), difilter tanggal minggu.
+// Tanda lunas disimpan di HP ini (localStorage) per teknisi per minggu.
+let _gajiWeekStart=null; // ISO Senin; null = minggu berjalan
+function _gajiISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _gajiParse(s){ const p=String(s||'').split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+function _gajiAdd(iso, days){ const d=_gajiParse(iso); d.setDate(d.getDate()+days); return _gajiISO(d); }
+function _gajiWeek(){ // {start,end} Senin-Sabtu; hari Minggu => minggu yg tutup kemarin
+  if(_gajiWeekStart) return {start:_gajiWeekStart, end:_gajiAdd(_gajiWeekStart,5)};
+  const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dow=d.getDay(); const end=new Date(d);
+  if(dow===0) end.setDate(d.getDate()-1); else end.setDate(d.getDate()+(6-dow));
+  const start=new Date(end); start.setDate(end.getDate()-5);
+  return {start:_gajiISO(start), end:_gajiISO(end)};
+}
+function _gajiFmt(iso){ const N=['Min','Sen','Sel','Rab','Kam','Jum','Sab']; const B=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; const d=_gajiParse(iso); return N[d.getDay()]+' '+d.getDate()+' '+B[d.getMonth()]; }
+function gajiWeekShift(delta){ const w=_gajiWeek(); _gajiWeekStart=_gajiAdd(w.start, delta); renderGajian(); }
+function gajiWeekReset(){ _gajiWeekStart=null; renderGajian(); }
+function _gajiPaidKey(id, start){ return 'gajian_paid_'+id+'_'+start; }
+function _gajiPaidGet(id, start){ try{ const v=localStorage.getItem(_gajiPaidKey(id,start)); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function gajiTogglePaid(id){
+  const w=_gajiWeek(); const k=_gajiPaidKey(id,w.start);
+  try{
+    if(localStorage.getItem(k)) localStorage.removeItem(k);
+    else{
+      let by='admin';
+      try{ by=localStorage.getItem('username')||(document.getElementById('sidebar-username')?.textContent)||'admin'; }catch(e){}
+      localStorage.setItem(k, JSON.stringify({at:new Date().toISOString().slice(0,16).replace('T',' '), by:String(by).slice(0,40)}));
+    }
+  }catch(e){}
+  renderGajian();
+}
+async function renderGajian(){
+  const wrap=document.getElementById('gajiCards');
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const w=_gajiWeek();
+  set('gajiRange', _gajiFmt(w.start)+' — '+_gajiFmt(w.end));
+  if(wrap) wrap.innerHTML='<p style="color:#8a8f98;font-size:12px">Menghitung slip '+_esc(w.start)+' s/d '+_esc(w.end)+'...</p>';
+  try{
+    const techs=await apiFetch('/technicians');
+    // Gajian Sabtu = khusus TEKNISI. Sembunyikan nama yg punya akun staf
+    // (admin/kasir/owner/superadmin) — mis. opi yg admin. budirn owner yg juga
+    // teknisi tetap tampil (ALLOW). Kas Toko tidak ikut difilter.
+    const GAJI_HIDE_ROLES=['admin','kasir','owner','superadmin'];
+    const GAJI_ALLOW=['budirn'];
+    const RESERVED=['superadmin','admin','administrator','kasir','owner'];
+    let staffRole={};
+    try{
+      const avail=await apiFetch('/auth/available-technicians');
+      (Array.isArray(avail)?avail:[]).forEach(a=>{
+        if(a && a.source==='user' && a.username) staffRole[String(a.username).trim().toLowerCase()]=String(a.role||'').toLowerCase();
+      });
+    }catch(e){}
+    const list=(Array.isArray(techs)?techs:[]).filter(t=>{
+      if(!t || t.id===undefined || t.id===null) return false;
+      if(!(t.is_active===undefined||t.is_active===null||Number(t.is_active)===1)) return false;
+      const nm=String(t.nama||'').trim().toLowerCase();
+      if(!nm || RESERVED.includes(nm)) return false;
+      if(GAJI_ALLOW.includes(nm)) return true;
+      return !GAJI_HIDE_ROLES.includes(staffRole[nm]||'');
+    });
+    if(!list.length){ if(wrap) wrap.innerHTML='<p style="color:#8a8f98">Belum ada teknisi.</p>'; set('gajiSummary','-'); return; }
+    let total=0, paid=0;
+    const cards=[];
+    for(const t of list){
+      let j=null;
+      try{ j=await apiFetch('/engine/kas/teknisi/'+t.id); }catch(e){ j=null; }
+      if(!j) continue;
+      const rows=(j.riwayat||[]).filter(r=>{ const d=String(r.tanggal||'').slice(0,10); return d>=w.start&&d<=w.end; });
+      let kom=0, hdr=0, cic=0, rfb=0, nSvc=0, nHdr=0;
+      rows.forEach(r=>{ const mi=Number(r.masuk)||0, ko=Number(r.keluar)||0;
+        if(r.tipe==='komisi_cair'){ kom+=mi; nSvc++; }
+        else if(r.tipe==='allowance'){ hdr+=mi; nHdr++; }
+        else if(r.tipe==='potongan_cicilan') cic+=ko;
+        else if(r.tipe==='refund_balik') rfb+=ko;
+      });
+      const bersih=kom+hdr-rfb;
+      total+=bersih;
+      const pd=_gajiPaidGet(t.id, w.start); if(pd) paid++;
+      const nama=_esc(j.nama||t.nama||('Teknisi '+t.id));
+      cards.push(
+        '<div class="card" style="border-left:4px solid '+(pd?'#059669':'#f59e0b')+'">'
+        +'<div class="card-head"><h3>'+nama+'</h3><span class="muted">'+_esc(j.level||t.level||'junior')+'</span><span style="flex:1"></span>'
+        +(pd?'<span class="badge-status Selesai">✅ Lunas</span>':'<span class="badge-status Menunggu Sparepart">⏳ Belum</span>')
+        +'</div>'
+        +'<div class="stats" style="margin-bottom:10px">'
+        +'<div class="stat-card"><div class="stat-head"><span>Komisi ('+nSvc+' svc)</span></div><h3 style="color:#059669">'+_rp(kom)+'</h3></div>'
+        +'<div class="stat-card"><div class="stat-head"><span>Hadir ('+nHdr+' hari)</span></div><h3>'+_rp(hdr)+'</h3></div>'
+        +'<div class="stat-card"><div class="stat-head"><span>Bersih</span></div><h3 style="color:#2563eb">'+_rp(bersih)+'</h3></div>'
+        +'</div>'
+        +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' • Potong refund '+_rp(rfb)+' • Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' • '+j.pending_count+' komisi pending'):'')+'</p>'
+        +(pd?'<p style="font-size:11px;color:#059669;margin-bottom:10px">Dibayar '+_esc(pd.at||'')+' oleh '+_esc(pd.by||'')+'</p>':'')
+        +'<div style="display:flex;gap:8px"><button class="btn '+(pd?'btn-ghost':'btn-dark')+' small" style="flex:1" onclick="gajiTogglePaid('+t.id+')">'+(pd?'↩️ Batalkan tanda':'✅ Tandai Sudah Dibayar')+'</button></div>'
+        +'</div>'
+      );
+    }
+    if(wrap) wrap.innerHTML=cards.join('')||'<p style="color:#8a8f98">Tidak ada data.</p>';
+    set('gajiSummary', _rp(total)+' • '+paid+'/'+list.length+' lunas');
+  }catch(e){
+    if(wrap) wrap.innerHTML='<p style="color:#dc2626">Gagal: '+_esc(e.message).slice(0,150)+'</p>';
+  }
+}
 // hook ke switchView lama
 (function(){
   const orig = window.switchView;
   window.switchView = function(view, clearSearch){
     if(orig) orig(view, clearSearch);
     try{
-      const titles = {'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas']};
+      const titles = {'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],'gajian':['Gajian Sabtu','Slip mingguan Senin–Sabtu per teknisi']};
       if(titles[view]){ document.getElementById('page-title').textContent=titles[view][0]; document.getElementById('page-subtitle').textContent=titles[view][1]; }
       if(view==='pengaturan'){ loadEngineSettings(); }
       if(view==='laporan-teknisi'){ /* tab kas butuh list */ }
@@ -579,6 +748,14 @@ async function kasTutupTokoSave(){
         }catch(e){ renderKasSaya(); }
       }
       if(view==='dashboard'){ try{ kasBarToko(); }catch(e){} }
+      if(view==='gajian'){
+        try{
+          const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+            || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+          if(isTek){ try{ showToast('⛔ Gajian khusus admin/kasir/owner'); }catch(e){} window.switchView('kas-saya'); return; }
+        }catch(e){}
+        try{ renderGajian(); }catch(e){}
+      }
     }catch(e){}
   };
 })();
