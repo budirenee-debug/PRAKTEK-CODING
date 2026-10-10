@@ -4199,13 +4199,14 @@ function renderSemuaService(){
   const q = (document.getElementById('searchSemua')?.value || '').toLowerCase();
   const kwSemua = document.getElementById('searchSemua')?.value || '';
   const fRaw = document.getElementById('filterStatusSemua')?.value || '';
-  // normalisasi filter legacy Selesai -> Service Sukses
-  const f = fRaw==='Selesai' ? 'Service Sukses' : fRaw;
+  // normalisasi filter legacy Selesai/Sudah Diambil -> Service Sukses
+  // (opsi "Sudah Diambil" dihapus dari dropdown — yang sudah diambil pasti Sukses/Failed)
+  const f = (fRaw==='Selesai' || fRaw==='Sudah Diambil') ? 'Service Sukses' : fRaw;
   let filtered=[...data];
   if(q) filtered=filtered.filter(d=> (d.id+d.nama+d.device+d.wa+d.keluhan+d.penerima+(d.imei||'')).toLowerCase().includes(q));
   if(f) {
-    // Service Sukses harus match Selesai legacy juga
-    if(f==='Service Sukses') filtered=filtered.filter(d=> d.status==='Service Sukses' || d.status==='Selesai');
+    // Service Sukses harus match Selesai + Sudah Diambil legacy juga
+    if(f==='Service Sukses') filtered=filtered.filter(d=> d.status==='Service Sukses' || d.status==='Selesai' || d.status==='Sudah Diambil');
     else filtered=filtered.filter(d=>d.status===f);
   }
   filtered=filtered.filter(passesDeadlineFilter);
