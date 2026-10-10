@@ -4601,7 +4601,17 @@ let _kasirTab = 'sparepart', _kasirPage = 1, _kasirQ = '';
 const KASIR_PER = 10;
 const KASIR_CAT_SP = ['Display','Baterai','Kamera','Mesin','Fleksibel','Konsumsi'];
 function _kasirCat(b){ const k=String((b&&b.kategori)||'').trim(); if(k==='Aksesoris') return 'asesoris'; if(KASIR_CAT_SP.includes(k)) return 'sparepart'; return 'lain'; }
-function setKasirTab(t){ _kasirTab=t; _kasirPage=1; try{ document.querySelectorAll('[data-kasirtab]').forEach(x=>x.classList.toggle('active', x.dataset.kasirtab===t)); }catch(e){} kasirRenderBarang(); }
+function setKasirTab(t){ _kasirTab=t; _kasirPage=1; try{ document.querySelectorAll('[data-kasirtab]').forEach(x=>x.classList.toggle('active', x.dataset.kasirtab===t)); }catch(e){}
+  // Kotak tambah-cepat ngikut tab: Jasa / Asesoris / Lainnya (semuanya tanpa stok).
+  try{
+    const cfg={sparepart:['+ Jasa Langsung','tanpa stok (mis. ongkos pasang)','Nama jasa'],
+      asesoris:['+ Asesoris Langsung','tanpa stok (mis. titip jual / non-stok)','Nama asesoris'],
+      lain:['+ Lainnya Langsung','tanpa stok','Nama item']}[t]||['+ Jasa Langsung','tanpa stok','Nama jasa'];
+    const tt=document.getElementById('jasaBoxTitle'); if(tt) tt.textContent=cfg[0];
+    const ss=document.getElementById('jasaBoxSub'); if(ss) ss.textContent=cfg[1];
+    const nn=document.getElementById('jasa-nama'); if(nn) nn.placeholder=cfg[2];
+  }catch(e){}
+  kasirRenderBarang(); }
 function _kasirRp(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
 async function kasirLoadBarang(){
   const tb = document.getElementById('tbodyKasirBarang');
