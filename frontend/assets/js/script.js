@@ -2497,7 +2497,7 @@ function switchView(view, clearSearch){
   if(view==='status-garansi') renderStatusView('kanbanGaransi','Garansi');
   if(view==='transaksi-pendapatan') renderTransaksiPendapatan();
   if(view==='transaksi-pembayaran') renderTransaksiPembayaran();
-  if(view==='transaksi-penjualan'){ try{ kasirLoadBarang(); kasirLoadToday(); }catch(e){} }
+  if(view==='transaksi-penjualan'){ try{ kasirLoadBarang(); kasirLoadToday(); renderPakaiKeluar(); }catch(e){} }
   if(view==='inventory-sparepart') renderSparepart();
   if(view==='inventory-asesoris') renderAsesoris();
   if(view==='inventory-alat') renderAlat();
@@ -2950,7 +2950,7 @@ function renderSparepart(){
         <td style="text-align:center"><div style="font-weight:700;font-size:13px">−${it.keluar}</div><div style="font-size:9px;color:#8a8f98">keluar (pakai/jual)</div><div style="font-size:9px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${it.lastUsedBy? `<span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#2563eb;text-decoration:underline" title="Klik lihat riwayat pakai ${escapeHtml(it.nama)}">👷 ${escapeHtml(it.lastUsedBy)}</span> • <span onclick="openDetail('${escapeHtml(it.lastUsedInvoice)}')" style="cursor:pointer;color:#059669;text-decoration:underline" title="Buka service ${escapeHtml(it.lastUsedInvoice)}">${escapeHtml(it.lastUsedInvoice||'')}</span>` : '<span style="color:#9ca3af">belum dipakai</span>'}${it.log && it.log.length? ` • <span onclick="openSparepartLog(${it.id})" style="cursor:pointer;color:#6b7280;text-decoration:underline" title="Lihat ${it.log.length} riwayat pakai">${it.log.length}x</span>` : ''}</div></td>
         <td style="text-align:center"><span title="Stok = Masuk − Keluar (otomatis, tidak bisa diedit)" style="display:inline-block;min-width:56px;padding:7px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid;background:${stokBg};${it.stok<=2?'color:#dc2626;border-color:#fecaca':it.stok<=5?'color:#b45309;border-color:#fde68a':'color:#059669;border-color:#a7f3d0'}">🔒 ${it.stok}</span><div style="font-size:9px;color:#8a8f98;margin-top:3px">auto</div></td>
         <td style="font-size:11px;color:#4b5563;white-space:nowrap;text-align:center">${escapeHtml(formatTanggal(it.tgl))}</td>
-        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="sp-harga-${it.id}" placeholder="0" ${disSp} style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div></td>
+        <td style="text-align:right"><input type="text" inputmode="numeric" value="${it.harga ? Number(it.harga).toLocaleString('id-ID') : ''}" id="sp-harga-${it.id}" placeholder="0" ${disSp} style="width:110px;padding:6px 8px;border:1px solid #ececec;border-radius:8px;text-align:right;font-size:12px" oninput="this.value=formatAngka(parseRupiah(this.value))" onchange="updateSparepartField(${it.id},'harga',this.value)"><div style="font-size:10px;color:#8a8f98">${formatRupiah(it.harga)}</div>${(!isTekSp && it.harga_beli>0) ? `<div style="font-size:10px;color:#059669;font-weight:700">📈 +${formatRupiah((it.harga||0)-(it.harga_beli||0))}/pcs</div>` : ''}</td>
         <td style="text-align:center">${isTekSp?'<span style="font-size:11px;color:#8a8f98">read-only</span>':`
           <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-dark small" style="padding:5px 8px;font-size:11px" onclick="saveSparepartRow(${it.id})">💾 Simpan</button>
@@ -2969,7 +2969,9 @@ function renderSparepart(){
   if(sumEl){
     const totalVal=base.reduce((s,i)=> s + (i.stok * i.harga),0);
     const modalNempel=base.reduce((s,i)=> s + ((i.stok||0) * (i.harga_beli||0)),0);
-    sumEl.textContent= `${base.length} item • Total nilai stok: ${formatRupiah(totalVal)} • 💰 Modal nempel: ${formatRupiah(modalNempel)} • Menampilkan ${filtered.length}`;
+    // Cuan dari up margin (jual−beli) atas stok yang masih ada — disembunyikan dari teknisi.
+    const cuanStok=base.reduce((s,i)=> s + ((i.stok||0) * ((i.harga||0)-(i.harga_beli||0))),0);
+    sumEl.textContent= `${base.length} item • Total nilai stok: ${formatRupiah(totalVal)} • 💰 Modal nempel: ${formatRupiah(modalNempel)}${isTeknisiMode()?'':` • 📈 Cuan up ${tokoInvMargin()}%: ${formatRupiah(cuanStok)}`} • Menampilkan ${filtered.length}`;
   }
 }
 // ---------- Asesories: view pisah, data sama (filter kategori Aksesoris) ----------
@@ -4765,6 +4767,25 @@ function kasirStrukShow(s){
   document.getElementById('strukModal').classList.add('show');
 }
 function kasirStrukClose(){ document.getElementById('strukModal').classList.remove('show'); }
+// ---------- Barang Keluar Dipakai: list otomatis pemakaian part teknisi (service_parts) ----------
+// Stok berkurang saat Pakai; kartu ini bikin arus keluar itu kelihatan di tab Penjualan.
+async function renderPakaiKeluar(){
+  const tb = document.getElementById('tbodyPakaiKeluar'); if(!tb) return;
+  const sumEl = document.getElementById('pakaiSummary');
+  try{
+    const rows = await apiFetch('/inventory/service-parts');
+    const arr = (Array.isArray(rows) ? rows : []).slice(0, 100);
+    const hideMargin = (typeof isTeknisiMode === 'function' && isTeknisiMode());
+    let tq = 0, tc = 0;
+    tb.innerHTML = arr.map(r=>{
+      const q = Number(r.qty) || 0, cuan = ((Number(r.harga_up_snapshot) || 0) - (Number(r.modal_asli_snapshot) || 0)) * q;
+      tq += q; tc += cuan;
+      const tgl = String(r.created_at || '').slice(0, 10);
+      return `<tr><td style="white-space:nowrap">${escapeHtml(tgl)}</td><td style="font-size:11px"><strong>${escapeHtml(r.invoice || '-')}</strong></td><td><strong style="font-size:12px">${escapeHtml(r.nama_snapshot || '-')}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(r.merk || '')}</span></td><td style="font-size:11px">👷 ${escapeHtml(r.teknisi || '-')}</td><td style="text-align:center;font-weight:700">−${q}</td><td style="text-align:right;font-weight:700;color:#059669">${hideMargin ? '•' : formatRupiah(cuan)}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Belum ada part dipakai</td></tr>';
+    if(sumEl) sumEl.textContent = `${arr.length} pemakaian • ${tq} pcs keluar${hideMargin ? '' : ' • Cuan terealisasi ' + formatRupiah(tc)}`;
+  }catch(e){ tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8a8f98">-</td></tr>'; }
+}
 function cetakStruk(){
   const s = _kasirStruk; if(!s) return;
   const toko = (typeof storeDisplayName==='function' ? storeDisplayName() : 'B_gadget');
