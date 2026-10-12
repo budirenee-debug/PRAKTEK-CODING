@@ -240,6 +240,7 @@
           </div>
         </div>
         <div class="topbar-right">
+          <span id="ownConn" title="Status koneksi ke server" style="font-size:12px;font-weight:700;color:#10b981">● Online</span>
           <a class="btn btn-ghost small" href="index.html" style="text-decoration:none">🏬 Dashboard Toko</a>
           <button class="btn btn-dark small" onclick="ownLoadAll()">↻ Refresh</button>
         </div>
@@ -1376,6 +1377,75 @@
       if (window.BOSAuth) window.BOSAuth.logout();
       else location.href = 'login-owner.html';
     }
+
+    // ---------- AUTO-RECONNECT (blip tunnel/internet 1-2 mnt pulih sendiri) ----------
+    // Owner Space sebelumnya tanpa polling: sekali fetch gagal, data basi sampai refresh manual.
+    // Ping /health (publik, tanpa auth) tiap 20 detik; saat offline->online, reload tab aktif saja.
+    let ownOnline = true;
+    let _ownPingBusy = false;
+    function ownConnUrl(){ try{ return BOS_API.replace(/\/api$/, '') + '/health'; }catch(e){ return '/health'; } }
+    function ownSetConn(ok, recovered){
+      ownOnline = !!ok;
+      const el = document.getElementById('ownConn');
+      if(!el) return;
+      if(ok && recovered){
+        el.textContent = '✅ Online kembali — data disinkron';
+        el.style.color = '#10b981';
+        setTimeout(()=>{ try{
+          const still = document.getElementById('ownConn');
+          if(still && ownOnline){ still.textContent = '● Online'; }
+        }catch(e){} }, 5000);
+        return;
+      }
+      el.textContent = ok ? '● Online' : '● Offline — auto-reconnect…';
+      el.style.color = ok ? '#10b981' : '#f59e0b';
+      el.title = ok ? 'Terhubung ke server' : 'Server tidak terjangkau, dicoba lagi tiap 20 detik';
+    }
+    function ownCurrentKey(){
+      try{
+        const id = (document.querySelector('#ownWrap .view.active') || {}).id || '';
+        return id.replace('view-own-', '') || null;
+      }catch(e){ return null; }
+    }
+    async function ownPing(){
+      if(_ownPingBusy || document.hidden) return;
+      _ownPingBusy = true;
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>{ try{ ctl.abort(); }catch(e){} }, 8000);
+        let ok = false;
+        try{
+          const res = await fetch(ownConnUrl(), {signal: ctl.signal, cache: 'no-store'});
+          ok = !!(res && res.ok);
+        }catch(e){ ok = false; }
+        clearTimeout(t);
+        if(ok === ownOnline) return;
+        if(ok){
+          const wrapVisible = (function(){ try{ return document.getElementById('ownWrap').style.display !== 'none'; }catch(e){ return false; } })();
+          if(wrapVisible){
+            const k = ownCurrentKey();
+            try{ if(k) ownShow(k); }catch(e){}
+          } else {
+            // guard sempat gagal karena offline → tawarkan muat ulang
+            try{
+              const g = document.getElementById('guardMsg');
+              if(g && /offline/i.test(g.textContent || '')){
+                g.innerHTML = '✅ Server online lagi — <button class="btn btn-dark small" onclick="location.reload()">↻ Muat ulang halaman</button>';
+              }
+            }catch(e){}
+          }
+          ownSetConn(true, true);
+        } else {
+          ownSetConn(false);
+        }
+      }finally{ _ownPingBusy = false; }
+    }
+    try{ setInterval(ownPing, 20000); }catch(e){}
+    try{
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) ownPing(); });
+      window.addEventListener('online', ()=>{ ownPing(); });
+    }catch(e){}
+    try{ setTimeout(ownPing, 5000); }catch(e){}
 
     function fillStoreSel(){
       const sel = document.getElementById('ownStoreSel');
@@ -4694,7 +4764,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         me = await res.json();
       }catch(e){
-        document.getElementById('guardMsg').innerHTML = 'Gagal verifikasi sesi (offline?): ' + esc(e.message) + '<br><br><a href="index.html">← Dashboard Toko</a>';
+        document.getElementById('guardMsg').innerHTML = 'Gagal verifikasi sesi (offline?): ' + esc(e.message) + '<br><br><button class="btn btn-dark small" onclick="location.reload()">↻ Coba lagi</button> <a href="index.html">← Dashboard Toko</a>';
         try{ document.documentElement.classList.remove('guard-lock'); }catch(_){}
         return;
       }
