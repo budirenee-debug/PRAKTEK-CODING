@@ -124,6 +124,7 @@ class ServiceBase(BaseModel):
     garansi_sampai: Optional[datetime.date] = Field(default=None, description="batas klaim garansi (auto dari tgl diambil + hari, editable)")
     metode_bayar: Optional[str] = Field(default=None, max_length=20, description="Tunai / Transfer / QRIS")
     diambil_oleh: Optional[str] = Field(default=None, max_length=120, description="pengambil HP, default nama pelanggan")
+    client_key: Optional[str] = Field(default=None, max_length=40, description="kunci idempotency client anti double-submit")
 
     @field_validator('metode_bayar')
     @classmethod

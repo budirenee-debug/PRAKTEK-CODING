@@ -22,6 +22,21 @@ from . import models
 from .seed import seed
 from .auth import ensure_superadmin
 
+# Migration: kunci idempotency anti double-submit (POST ulang key sama -> baris sama)
+def _migrate_client_key():
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(services)")).fetchall()]
+            if "client_key" not in cols:
+                conn.execute(text("ALTER TABLE services ADD COLUMN client_key VARCHAR(40)"))
+                print("migrated: client_key")
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_services_client_key ON services(client_key)"))
+            conn.commit()
+    except Exception as e:
+        print("migrate client_key fail:", e)
+_migrate_client_key()
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 # Migration: tambah kolom deadline & penerima & hasil jika DB lama belum ada

@@ -268,6 +268,16 @@ def count_services(db: Session, status: str = None, search: str = None, device: 
     return q.count()
 
 def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, store=None):
+    # Idempotency: kiriman ulang (dobel-klik / retry / replay outbox offline)
+    # dengan client_key yang sama -> kembalikan baris yang sudah ada.
+    ckey = (getattr(payload, "client_key", None) or "").strip() or None
+    if ckey:
+        q = db.query(models.Service).filter(models.Service.client_key == ckey)
+        if store_id is not None:
+            q = q.filter(models.Service.store_id == store_id)
+        existing = q.first()
+        if existing:
+            return enrich_service(existing)
     invoice = generate_invoice(db, store)
     # upsert customer berdasarkan WA di toko yang sama
     cq = db.query(models.Customer).filter(models.Customer.wa == payload.wa)
@@ -316,10 +326,25 @@ def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, s
         date=date.today(),
         estimasi_selesai=payload.estimasi_selesai,
         deadline_type=dtype,
-        deadline=dl
+        deadline=dl,
+        client_key=ckey,
     )
     db.add(svc)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        # Balapan kiriman kembar dalam milidetik yang sama: unique violated ->
+        # ambil baris pemenang, jangan bikin dobel.
+        db.rollback()
+        from sqlalchemy.exc import IntegrityError
+        if ckey and isinstance(e, IntegrityError):
+            q = db.query(models.Service).filter(models.Service.client_key == ckey)
+            if store_id is not None:
+                q = q.filter(models.Service.store_id == store_id)
+            winner = q.first()
+            if winner:
+                return enrich_service(winner)
+        raise
     db.refresh(svc)
     return enrich_service(svc)
 

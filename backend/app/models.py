@@ -41,6 +41,9 @@ class Service(Base):
 
     # Invoice sebagai PK string: INV-2026-XXXX
     invoice = Column(String(20), primary_key=True, index=True)
+    # Kunci idempotency dari client (anti double-submit / replay outbox offline):
+    # POST dengan client_key yang sama tidak pernah bikin 2 baris.
+    client_key = Column(String(40), nullable=True, unique=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=True)

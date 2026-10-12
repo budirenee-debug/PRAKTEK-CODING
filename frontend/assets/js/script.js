@@ -815,6 +815,8 @@ async function flushOutbox(){
     for(const entry of [...q]){
       try{
         if(entry.op === 'create'){
+          // backfill: antrean lama (sebelum update) belum punya key -> pakai clientTmp yg stabil
+          if(entry.payload && !entry.payload.client_key && entry.clientTmp) entry.payload.client_key = entry.clientTmp;
           const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(entry.payload||{})});
           const real = normalize(created);
           const idx = data.findIndex(d => d && (d.id === entry.clientTmp));
@@ -847,7 +849,15 @@ async function flushOutbox(){
           try{ showToast('⚠ 1 antrean dibuang: ' + msg.slice(0,120)); }catch{}
           continue;
         }
-        break; // error lain (mis. 401/500) — berhenti, coba lagi nanti
+        // token expired saat antrean mau naik (JWT 2 jam): jangan macet selamanya,
+        // tendang ke login agar dapat token baru — antrean tetap aman di localStorage.
+        if(/401|token tidak valid|belum login|unauthorized|expired|tidak sah/i.test(msg)){
+          try{ localStorage.removeItem('access_token'); }catch{}
+          try{ showToast('Sesi habis — login lagi untuk sync antrean'); }catch{}
+          try{ setTimeout(()=>goLoginReplace(), 1200); }catch{}
+          break;
+        }
+        break; // error lain (mis. 500) — berhenti, coba lagi nanti
       }
     }
     if(done.length) dropOutboxByIds(done);
@@ -1131,8 +1141,12 @@ async function loadData(silent){
 }
 
 async function apiCreateService(payload){
+  // Kunci idempotency STABIL per data: dobel-klik / retry / replay outbox
+  // dengan key sama tidak pernah bikin 2 invoice (server dedupe via client_key).
+  payload = {...(payload||{}), client_key: (payload&&payload.client_key) || makeTmpId()};
+  const ck = payload.client_key;
   if(!USE_API){
-    const newId = makeTmpId();
+    const newId = ck;
     const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
     data.unshift(obj); saveLocal();
     enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
@@ -1148,9 +1162,9 @@ async function apiCreateService(payload){
     if(msg.includes('422') || msg.toLowerCase().includes('field required')){
       showToast('Gagal validasi API: '+ msg.slice(0,200));
     } else if(isNetErr(e)){
-      // offline / server gangguan — simpan sementara + antre sync
+      // offline / server gangguan — simpan sementara + antre sync (key sama!)
       console.warn('apiCreateService offline, antrekan:', msg);
-      const newId = makeTmpId();
+      const newId = ck;
       const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
       data.unshift(obj); saveLocal();
       enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
@@ -1160,7 +1174,7 @@ async function apiCreateService(payload){
     } else {
       // coba fallback lokal agar input tetap masuk meski API down sementara
       console.warn('apiCreateService fallback lokal:', msg);
-      const newId = makeTmpId();
+      const newId = ck;
       const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
       data.unshift(obj); saveLocal();
       enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
