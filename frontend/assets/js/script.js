@@ -836,9 +836,12 @@ async function flushOutbox(){
         saveLocal();
       }catch(e){
         if(isNetErr(e)){
-          USE_API = false;
-          const el = document.querySelector('.store-info span:first-child');
-          if(el){ el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
+          _netFails++;
+          if(_netFails >= 3){
+            USE_API = false;
+            const el = document.querySelector('.store-info span:first-child');
+            if(el){ el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
+          }
           break; // berhenti, coba lagi nanti
         }
         const msg = String((e && e.message) || '');
@@ -865,6 +868,7 @@ async function flushOutbox(){
     try{ await loadData(true); }catch{}
     try{ renderAll(); renderSemuaService(); }catch{}
     const left = loadOutbox().length;
+    if(done.length){ _netFails = 0; try{ updateOutboxBadge(); }catch{} }
     if(done.length && !left){ try{ showToast(`✅ Sync selesai (${done.length} antrean naik)`); }catch{} USE_API = true; }
     else if(done.length){ try{ showToast(`🔄 Sync ${done.length} naik, sisa ${left} antre`); }catch{} }
   }finally{
@@ -1003,6 +1007,7 @@ async function apiFetch(path, opts={}){
 }
 
 let _offlineToastShown = false;
+let _netFails = 0; // debounce: orange hanya setelah 3x gagal beruntun (±24 dtk), bukan sekali blip
 // ---------- Batas visibilitas teknisi (frontend lapis 2; backend yang menegakkan) ----------
 function myActiveRole(){
   // delegasi ke BOSAuth (single source) jika ada; fallback lokal agar tidak crash
@@ -1121,10 +1126,18 @@ async function loadData(silent){
     if(el) el.textContent = '● Sistem Online (API)';
     if(el) el.style.color = '#10b981';
     _offlineToastShown = false;
+    _netFails = 0; // pulih — blip sebelumnya dimaafkan
     try{ updateOutboxBadge(); }catch{}
     // jika ada antrean, flush di background (tanpa blokir render)
     try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 500); }catch{}
   }catch(e){
+    _netFails++;
+    if(silent && _netFails < 3){
+      // blip sesaat (tunnel/ISP kedip 1-2x poll): jangan oren-kan layar + jangan timpa
+      // data segar dengan snapshot lokal yang lebih tua — coba lagi di poll berikutnya.
+      console.warn('API blip (silent, coba lagi):', e.message);
+      return;
+    }
     // hanya warn di console, toast sekali saja (hindari spam tiap 8 detik)
     if(!_offlineToastShown && !silent) {
       console.warn('API gagal, fallback localStorage:', e.message);
@@ -5797,9 +5810,21 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 function clearCacheAndReload(){
+  // AMAN: antrean upload (outbox) + login TIDAK ikut dihapus — yang dibersihkan cuma cache file.
+  // Menghapus antrean = data yang belum naik ke server hilang permanen (bug laporan admin).
   try{
+    const keep = {};
+    ['b_gadget_outbox_v1','access_token','role','username','active_store_id','API_BASE'].forEach(k=>{
+      try{ const v = localStorage.getItem(k); if(v !== null) keep[k] = v; }catch(e){}
+    });
+    let nq = 0;
+    try{ nq = (typeof loadOutbox === 'function' ? loadOutbox().length : 0); }catch(e){}
+    if(nq > 0){
+      if(!confirm(`⚠ Ada ${nq} data belum naik ke server.\nClear cache TETAP aman (antrean dipertahankan), tapi pastikan server online agar langsung sync.\n\nLanjut clear cache?`)) return;
+    }
     localStorage.clear();
     sessionStorage.clear();
+    Object.keys(keep).forEach(k=>{ try{ localStorage.setItem(k, keep[k]); }catch(e){} });
     if('caches' in window){ caches.keys().then(keys=> keys.forEach(k=> caches.delete(k))); }
   }catch(e){}
   const url=new URL(window.location.href);
