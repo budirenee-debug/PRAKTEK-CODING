@@ -5500,6 +5500,8 @@ async function updateDeadline(invoice){
 
 async function handleServiceSubmit(e){
   e.preventDefault();
+  // Anti double-submit: dobel-klik / Enter 2x / jaringan lemot = 2 invoice (kasus RPL-2026-0036/37 dst).
+  if(window._svcSubmitBusy) return showToast('Tunggu — lagi menyimpan...');
   const nama=document.getElementById('f-nama').value.trim();
   const wa=document.getElementById('f-wa').value.trim();
   const device=document.getElementById('f-device').value.trim();
@@ -5534,6 +5536,11 @@ async function handleServiceSubmit(e){
     harga_part_up: 0
   };
 
+  window._svcSubmitBusy = true;
+  const _svcForm = document.getElementById('serviceForm');
+  const _svcBtn = _svcForm ? _svcForm.querySelector('button[type="submit"]') : null;
+  const _svcBtnTxt = _svcBtn ? _svcBtn.textContent : '';
+  if(_svcBtn){ _svcBtn.disabled = true; _svcBtn.textContent = 'Menyimpan...'; }
   try{
     const created = await apiCreateService(payload);
     // jika pakai API, reload dari server untuk dapat invoice asli
@@ -5544,6 +5551,9 @@ async function handleServiceSubmit(e){
     openNotaModal(created.invoice||created.id); // nota digital: preview + kirim via WA
   }catch(err){
     showToast('Gagal simpan: '+ err.message);
+  }finally{
+    window._svcSubmitBusy = false;
+    if(_svcBtn){ _svcBtn.disabled = false; _svcBtn.textContent = _svcBtnTxt; }
   }
 }
 function resetForm(){
