@@ -4772,8 +4772,15 @@ let _pkSub = 'kasir', _pkPer = 'month', _pkRowsAll = [];
 function setPkSub(t){
   _pkSub = (t === 'pakai') ? 'pakai' : 'kasir';
   try{ document.querySelectorAll('[data-pksub]').forEach(b=>b.classList.toggle('active', b.dataset.pksub===_pkSub)); }catch(e){}
-  try{ document.getElementById('panelKasir').style.display = _pkSub==='kasir'?'':'none'; }catch(e){}
-  try{ document.getElementById('panelPakai').style.display = _pkSub==='pakai'?'':'none'; }catch(e){}
+  try{
+    const pk = document.getElementById('panelKasir'), pp = document.getElementById('panelPakai');
+    if(pk){ pk.style.cssText = _pkSub==='kasir' ? 'display:block;' : 'display:none !important;'; }
+    if(pp){
+      pp.style.cssText = _pkSub==='pakai' ? 'display:block !important;visibility:visible;' : 'display:none !important;';
+      pp.removeAttribute('hidden');
+      if(_pkSub==='pakai'){ void pp.offsetHeight; try{ pp.scrollIntoView({block:'nearest'}); }catch(e){} }
+    }
+  }catch(e){}
   if(_pkSub === 'pakai') renderPakaiKeluar();
 }
 function _pkToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
