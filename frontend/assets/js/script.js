@@ -4767,24 +4767,68 @@ function kasirStrukShow(s){
   document.getElementById('strukModal').classList.add('show');
 }
 function kasirStrukClose(){ document.getElementById('strukModal').classList.remove('show'); }
-// ---------- Barang Keluar Dipakai: list otomatis pemakaian part teknisi (service_parts) ----------
-// Stok berkurang saat Pakai; kartu ini bikin arus keluar itu kelihatan di tab Penjualan.
-async function renderPakaiKeluar(){
+// ---------- Barang Keluar Dipakai: sub-tab Penjualan (Hari/Minggu/Bulan + cuan per periode) ----------
+let _pkSub = 'kasir', _pkPer = 'today', _pkRowsAll = [];
+function setPkSub(t){
+  _pkSub = (t === 'pakai') ? 'pakai' : 'kasir';
+  try{ document.querySelectorAll('[data-pksub]').forEach(b=>b.classList.toggle('active', b.dataset.pksub===_pkSub)); }catch(e){}
+  try{ document.getElementById('panelKasir').style.display = _pkSub==='kasir'?'':'none'; }catch(e){}
+  try{ document.getElementById('panelPakai').style.display = _pkSub==='pakai'?'':'none'; }catch(e){}
+  if(_pkSub === 'pakai') renderPakaiKeluar();
+}
+function _pkToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _pkWeek(){ // Senin–Sabtu berjalan (kunci gajian)
+  const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dow=d.getDay(); const end=new Date(d);
+  if(dow===0) end.setDate(d.getDate()-1); else end.setDate(d.getDate()+(6-dow));
+  const start=new Date(end); start.setDate(end.getDate()-5);
+  const iso=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  return {start:iso(start), end:iso(end)};
+}
+function _pkCuan(r){ return ((Number(r.harga_up_snapshot)||0) - (Number(r.modal_asli_snapshot)||0)) * (Number(r.qty)||0); }
+function setPkPer(t){
+  _pkPer = (t==='week'||t==='month') ? t : 'today';
+  try{ document.querySelectorAll('[data-pkper]').forEach(b=>b.classList.toggle('active', b.dataset.pkper===_pkPer)); }catch(e){}
+  drawPakaiKeluar();
+}
+function drawPakaiKeluar(){
   const tb = document.getElementById('tbodyPakaiKeluar'); if(!tb) return;
+  const today = _pkToday(), w = _pkWeek(), ym = today.slice(0,7);
+  let rows = [..._pkRowsAll], info = '';
+  if(_pkPer === 'today'){ rows = rows.filter(r=>String(r.created_at||'').slice(0,10)===today); info = '📅 ' + today; }
+  else if(_pkPer === 'week'){ rows = rows.filter(r=>{ const t=String(r.created_at||'').slice(0,10); return t>=w.start&&t<=w.end; }); info = `🗓️ ${w.start} s/d ${w.end}`; }
+  else { rows = rows.filter(r=>String(r.created_at||'').slice(0,10).slice(0,7)===ym); info = '📆 ' + ym; }
+  rows.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  const hideMargin = (typeof isTeknisiMode === 'function' && isTeknisiMode());
+  let tq = 0, tc = 0;
+  tb.innerHTML = rows.map(r=>{
+    const q = Number(r.qty) || 0, cuan = _pkCuan(r);
+    tq += q; tc += cuan;
+    const tgl = String(r.created_at || '').slice(0, 10);
+    return `<tr><td style="white-space:nowrap">${escapeHtml(tgl)}</td><td style="font-size:11px"><strong>${escapeHtml(r.invoice || '-')}</strong></td><td><strong style="font-size:12px">${escapeHtml(r.nama_snapshot || '-')}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(r.merk || '')}</span></td><td style="font-size:11px">👷 ${escapeHtml(r.teknisi || '-')}</td><td style="text-align:center;font-weight:700">−${q}</td><td style="text-align:right;font-weight:700;color:#059669">${hideMargin ? '•' : formatRupiah(cuan)}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Belum ada part dipakai periode ini</td></tr>';
   const sumEl = document.getElementById('pakaiSummary');
+  if(sumEl) sumEl.textContent = `${info} • ${rows.length} pemakaian • ${tq} pcs keluar${hideMargin ? '' : ' • Cuan ' + formatRupiah(tc)}`;
+  const infoEl = document.getElementById('pkPerInfo');
+  if(infoEl) infoEl.textContent = info;
+}
+async function renderPakaiKeluar(){
+  const tb = document.getElementById('tbodyPakaiKeluar');
   try{
     const rows = await apiFetch('/inventory/service-parts');
-    const arr = (Array.isArray(rows) ? rows : []).slice(0, 100);
-    const hideMargin = (typeof isTeknisiMode === 'function' && isTeknisiMode());
-    let tq = 0, tc = 0;
-    tb.innerHTML = arr.map(r=>{
-      const q = Number(r.qty) || 0, cuan = ((Number(r.harga_up_snapshot) || 0) - (Number(r.modal_asli_snapshot) || 0)) * q;
-      tq += q; tc += cuan;
-      const tgl = String(r.created_at || '').slice(0, 10);
-      return `<tr><td style="white-space:nowrap">${escapeHtml(tgl)}</td><td style="font-size:11px"><strong>${escapeHtml(r.invoice || '-')}</strong></td><td><strong style="font-size:12px">${escapeHtml(r.nama_snapshot || '-')}</strong><br><span style="font-size:10px;color:#8a8f98">${escapeHtml(r.merk || '')}</span></td><td style="font-size:11px">👷 ${escapeHtml(r.teknisi || '-')}</td><td style="text-align:center;font-weight:700">−${q}</td><td style="text-align:right;font-weight:700;color:#059669">${hideMargin ? '•' : formatRupiah(cuan)}</td></tr>`;
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Belum ada part dipakai</td></tr>';
-    if(sumEl) sumEl.textContent = `${arr.length} pemakaian • ${tq} pcs keluar${hideMargin ? '' : ' • Cuan terealisasi ' + formatRupiah(tc)}`;
-  }catch(e){ tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8a8f98">-</td></tr>'; }
+    _pkRowsAll = Array.isArray(rows) ? rows : [];
+    const today = _pkToday(), w = _pkWeek(), ym = today.slice(0,7);
+    const inR = (d,a,b)=>{ const t=String(d||'').slice(0,10); return t>=a&&t<=b; };
+    const sum = (f)=>_pkRowsAll.filter(r=>f(String(r.created_at||'').slice(0,10))).reduce((s,r)=>s+_pkCuan(r),0);
+    const cnt = (f)=>_pkRowsAll.filter(r=>f(String(r.created_at||'').slice(0,10))).length;
+    const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+    const cH = sum(t=>t===today), cM = sum(t=>inR(t,w.start,w.end)), cB = sum(t=>t.slice(0,7)===ym);
+    const hideM = (typeof isTeknisiMode === 'function' && isTeknisiMode());
+    set('pkCuanHari', hideM ? '•' : formatRupiah(cH)); set('pkCuanHariSub', cnt(t=>t===today)+' pemakaian hari ini');
+    set('pkCuanMinggu', hideM ? '•' : formatRupiah(cM)); set('pkCuanMingguSub', `${w.start} s/d ${w.end}`);
+    set('pkCuanBulan', hideM ? '•' : formatRupiah(cB)); set('pkCuanBulanSub', cnt(t=>t.slice(0,7)===ym)+' pemakaian bulan '+ym);
+    drawPakaiKeluar();
+  }catch(e){ if(tb) tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8a8f98">-</td></tr>'; }
 }
 function cetakStruk(){
   const s = _kasirStruk; if(!s) return;
