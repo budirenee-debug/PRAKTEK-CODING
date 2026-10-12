@@ -4768,7 +4768,7 @@ function kasirStrukShow(s){
 }
 function kasirStrukClose(){ document.getElementById('strukModal').classList.remove('show'); }
 // ---------- Barang Keluar Dipakai: sub-tab Penjualan (Hari/Minggu/Bulan + cuan per periode) ----------
-let _pkSub = 'kasir', _pkPer = 'today', _pkRowsAll = [];
+let _pkSub = 'kasir', _pkPer = 'month', _pkRowsAll = [];
 function setPkSub(t){
   _pkSub = (t === 'pakai') ? 'pakai' : 'kasir';
   try{ document.querySelectorAll('[data-pksub]').forEach(b=>b.classList.toggle('active', b.dataset.pksub===_pkSub)); }catch(e){}
