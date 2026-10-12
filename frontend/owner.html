@@ -684,7 +684,7 @@
               <div class="toolbar-right">
                 <select id="outFilterKat" onchange="ownKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option value="B1">Sparepart</option><option value="B2">Accessories</option><option value="C1">Gaji</option><option value="C2">Tempat</option><option value="C3">Internet</option><option value="C4">Harian</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="D">Aset</option></select>
                 <button class="btn btn-ghost small" onclick="ownKeluar()">↻</button>
-                <button class="btn btn-dark small" onclick="ownOutOpen()">+ Catat Keluar</button>
+                <a class="btn btn-dark small" href="index.html" style="text-decoration:none">+ Catat di Kas Toko</a>
               </div>
             </div>
             <div class="stats" style="margin-bottom:10px">
@@ -718,33 +718,13 @@
               <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Total Tercatat</span></div><h3 id="inTotal">-</h3><p class="trend" id="inTotalSub">-</p></div>
             </div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Metode</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyMasuk"><tr><td colspan="7" style="text-align:center">Memuat...</td></tr></tbody></table></div>
-            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Input dari <strong>Dashboard Toko → Kas Toko → + Catat Masuk</strong>. Salah input bisa dihapus di sini.</p>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Input dari <strong>Dashboard Toko → Kas Toko → + Catat Masuk</strong>. Koreksi salah input juga di sana (kolom Aksi, owner/admin).</p>
           </div>
-          <div class="modal" id="outModal">
+          <div class="modal" id="outModal" style="display:none">
             <div class="modal-box" style="max-width:480px">
               <button class="modal-close" onclick="ownOutClose()">×</button>
               <h3 style="margin-bottom:4px">🧾 Catat Pengeluaran</h3>
-              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Sewa, listrik, gaji, belanja part — otomatis masuk Total Keluar Kas Toko + Laba-Rugi.</p>
-              <form id="outForm" onsubmit="ownOutSave(event)">
-                <div class="form-grid">
-                  <div class="field"><label>Keperluan *</label><input id="out-keperluan" required placeholder="Sewa ruko Oktober"></div>
-                  <div class="field"><label>Nominal (Rp) *</label><input id="out-nominal" type="number" min="1" required placeholder="2500000" oninput="ownOutPreview()"><span id="out-nominalInfo" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
-                  <div class="field"><label>Kategori (mentor) *</label><select id="out-kategori" onchange="ownOutKat()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="C4">Operasional Harian</option><option value="C1">Gaji & Upah</option><option value="C2">Tempat (sewa/listrik/air)</option><option value="C3">Internet & Sistem</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="B1">Belanja Sparepart (HPP)</option><option value="B2">Belanja Accessories (HPP)</option><option value="D">Aset / Investasi</option></select></div>
-                  <div class="field" id="out-subWrap" style="display:none"><label>Jenis D *</label><select id="out-sub" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Aset</option><option>Investasi</option></select></div>
-                  <div id="out-stokWrap" style="display:none;grid-column:1/-1;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px">
-                    <div style="display:flex;gap:6px;flex-wrap:wrap">
-                      <div class="field" style="flex:2;min-width:160px;margin:0"><label>➕ Tambah ke stok (opsional)</label><select id="out-sp" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="">— tidak tambah stok —</option></select></div>
-                      <div class="field" style="flex:1;min-width:90px;margin:0"><label>Qty</label><input id="out-spqty" type="number" min="1" placeholder="5"></div>
-                    </div>
-                    <p style="font-size:11px;color:#8a8f98;margin:6px 0 0">Belanja = uang berkurang + stok bertambah (persediaan, belum HPP).</p>
-                  </div>
-                  <div class="field"><label>Metode</label><select id="out-metode" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option>Tunai</option><option>Transfer</option><option>QRIS</option></select></div>
-                  <div class="field"><label>Tanggal</label><input id="out-tanggal" type="date"></div>
-                  <div class="field"><label>Keterangan</label><input id="out-ket" placeholder="Opsional"></div>
-                </div>
-                <div id="out-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
-                <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="ownOutClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Pengeluaran</button></div>
-              </form>
+              <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Pencatatan pindah ke <strong>Dashboard Toko → Kas Toko → + Catat Keluar</strong> (satu pintu, anti dobel). <a href="index.html">Buka Dashboard Toko →</a></p>
             </div>
           </div>
         </section>
@@ -3117,7 +3097,7 @@
         set('inBulanSub', (ring.bulan_ini || 0) + ' catatan bulan ini');
         set('inTotal', rp(ring.total_nominal || 0));
         set('inTotalSub', (ring.total || 0) + ' catatan semua');
-        if(tb) tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.sumber || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#059669">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownInDel(${r.id})">🗑</button></td></tr>`).join('')
+        if(tb) tb.innerHTML = arr.slice(0, 100).map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.sumber || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td>${esc(r.kategori || '-')}</td><td style="text-align:right;font-weight:700;color:#059669">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><span style="font-size:11px;color:#d1d5db" title="Koreksi hapus di Dashboard Toko → Kas Toko">-</span></td></tr>`).join('')
           || '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pemasukan manual — catat di Dashboard Toko → Kas Toko → + Catat Masuk</td></tr>';
       }catch(e){
         if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`;
@@ -3170,13 +3150,13 @@
       if(_outPage > pages) _outPage = pages;
       if(_outPage < 1) _outPage = 1;
       if(!arr.length){
-        if(tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — klik + Catat Keluar</td></tr>';
+        if(tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8a8f98">Belum ada pengeluaran — catat di Dashboard Toko → Kas Toko → + Catat Keluar</td></tr>';
         if(pg) pg.innerHTML = '';
         return;
       }
       const start = (_outPage - 1) * OUT_PER_PAGE;
       const rows = arr.slice(start, start + OUT_PER_PAGE);
-      if(tb) tb.innerHTML = rows.map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td style="font-size:11px">${esc(expLbl(r.kategori))}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownOutDel(${r.id})">🗑</button></td></tr>`).join('')
+      if(tb) tb.innerHTML = rows.map(r => `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td><td><strong>${esc(r.keperluan || '-')}</strong>${r.keterangan ? `<br><span style="font-size:11px;color:#8a8f98">${esc(r.keterangan)}</span>` : ''}</td><td style="font-size:11px">${esc(expLbl(r.kategori))}</td><td style="text-align:right;font-weight:700;color:#dc2626">${rp(r.nominal || 0)}</td><td>${esc(r.metode || '-')}</td><td style="font-size:11px">${esc(r.dibuat_oleh || '-')}</td><td style="text-align:center"><span style="font-size:11px;color:#d1d5db" title="Koreksi hapus di Dashboard Toko → Kas Toko">-</span></td></tr>`).join('')
         + `<tr style="background:#f9fafb;font-size:11px;color:#8a8f98"><td colspan="7" style="text-align:center">Menampilkan ${start + 1}–${start + rows.length} dari ${arr.length} catatan</td></tr>`;
       if(!pg) return;
       if(pages <= 1){ pg.innerHTML = ''; return; }

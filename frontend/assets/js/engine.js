@@ -139,8 +139,22 @@ function setKasTab(t){
   if(t==='toko') renderKasToko();
   else renderKasSaya();
 }
-function _kasTokoRow(tanggal, ref, tipe, masuk, keluar, ket){
-  return `<tr><td style="white-space:nowrap">${_esc(tanggal||'-')}</td><td style="font-size:11px"><strong>${_esc(ref||'-')}</strong></td><td>${_esc(tipe||'')}</td><td style="text-align:right;color:#059669;font-weight:700">${masuk?_rp(masuk):''}</td><td style="text-align:right;color:#dc2626">${keluar?_rp(keluar):''}</td><td style="font-size:11px">${_esc(ket||'')}</td></tr>`;
+function _kasTokoRow(tanggal, ref, tipe, masuk, keluar, ket, aksi){
+  return `<tr><td style="white-space:nowrap">${_esc(tanggal||'-')}</td><td style="font-size:11px"><strong>${_esc(ref||'-')}</strong></td><td>${_esc(tipe||'')}</td><td style="text-align:right;color:#059669;font-weight:700">${masuk?_rp(masuk):''}</td><td style="text-align:right;color:#dc2626">${keluar?_rp(keluar):''}</td><td style="font-size:11px">${_esc(ket||'')}</td><td style="text-align:center">${aksi||'<span style="font-size:11px;color:#d1d5db">-</span>'}</td></tr>`;
+}
+function _kasCanHapus(){
+  // Koreksi salah input kas: owner/admin/superadmin (backend juga menolak kasir/teknisi).
+  try{ return ['owner','admin','superadmin'].includes(_kasMyRole()); }catch(e){ return false; }
+}
+async function kasKasDel(src, id){
+  // Hapus catatan kas manual (pengeluaran/pemasukan salah input) + jejak bukunya.
+  if(src !== 'expense' && src !== 'income') return;
+  if(!confirm('Hapus catatan kas ini? (salah input — jejak di buku besar ikut terhapus)')) return;
+  try{
+    await apiFetch(src === 'expense' ? `/finance/expenses/${id}` : `/finance/incomes/${id}`, {method:'DELETE'});
+    try{ showToast('🗑 Catatan kas dihapus'); }catch(e){}
+    await renderKasToko(true);
+  }catch(e){ try{ showToast('Gagal hapus: '+(e.message||e)); }catch(_){} }
 }
 async function renderKasToko(force){
   const tbody = document.getElementById('tbodyKasToko');
@@ -150,7 +164,7 @@ async function renderKasToko(force){
       || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
     if(isTek){ setKasTab('saya'); return; }
     // Selalu hitung ulang tiap dibuka (jangan cache) — struk/pengeluaran/refund baru langsung masuk.
-    if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Menghitung arus kas toko...</td></tr>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Menghitung arus kas toko...</td></tr>';
     const SUKSES = ['Service Sukses','Sudah Diambil','Selesai'];
     const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0,10);
     let services = [];
@@ -174,7 +188,7 @@ async function renderKasToko(force){
         const n = Number(s.nominal)||0; if(n<=0) return;
         if(/modal/i.test(String(s.kategori||''))) return; // Modal Awal/Tambahan = Owner Space, bukan kas harian toko
         inManual += n; masukTotal += n;
-        rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kategori||'Masuk', tipe: '📥 Pemasukan', masuk: n, keluar: 0, ket: `${s.sumber||''}${s.dibuat_oleh?' • '+s.dibuat_oleh:''}`});
+        rows.push({t: String(s.tanggal||'').slice(0,10), ref: s.kategori||'Masuk', tipe: '📥 Pemasukan', masuk: n, keluar: 0, ket: `${s.sumber||''}${s.dibuat_oleh?' • '+s.dibuat_oleh:''}`, src:'income', srcId: s.id});
       });
     }catch(e){}
     // Jatah teknisi (komisi+hadir): TIDAK dikurangi dari kas — baru keluar tunai Sabtu malam.
@@ -239,7 +253,7 @@ async function renderKasToko(force){
       xlist.forEach(r=>{
         const n = Number(r.nominal)||0; if(n<=0) return; outKeluar += n;
         const KL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
-        rows.push({t: String(r.tanggal||'').slice(0,10), ref: KL[r.kategori]||r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`});
+        rows.push({t: String(r.tanggal||'').slice(0,10), ref: KL[r.kategori]||r.kategori||'Keluar', tipe: '🧾 Pengeluaran', masuk: 0, keluar: n, ket: `${r.keperluan||''}${r.dibuat_oleh?' • '+r.dibuat_oleh:''}`, src:'expense', srcId: r.id});
       });
     }catch(e){}
     // Total dihitung di applyKasTokoFilter dari baris + memo jatah teknisi.
@@ -248,7 +262,7 @@ async function renderKasToko(force){
     _kasTokoRowsAll=rows;
     applyKasTokoFilter();
   }catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
 }
 let _kasTokoRows=[], _kasTokoPage=1;
@@ -262,8 +276,13 @@ function drawKasToko(){
   const tbody=document.getElementById('tbodyKasToko');
   _kasTokoPage=_kasPagerDraw('kasTokoPaginationInfo','kasTokoPaginationBtns',_kasTokoRows.length,_kasTokoPage,'kasTokoGo');
   const slice=_kasTokoRows.slice((_kasTokoPage-1)*KAS_PER,_kasTokoPage*KAS_PER);
+  const canDel = _kasCanHapus();
   if(tbody){
-    tbody.innerHTML = slice.map(r=>_kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket)).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
+    tbody.innerHTML = slice.map(r=>{
+      const aksi = (canDel && (r.src==='expense'||r.src==='income') && r.srcId)
+        ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi (salah input)" onclick="kasKasDel('${r.src}',${r.srcId})">🗑</button>` : '';
+      return _kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket, aksi);
+    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
     tbody.dataset.filled = '1';
   }
 }
@@ -372,6 +391,11 @@ function kasInPreview(){
 }
 async function kasInSave(e){
   if(e) e.preventDefault();
+  if(window._kasInBusy) return; // anti double-submit (tombol diklik 2x = 2 catatan)
+  window._kasInBusy = true;
+  const _btn = document.querySelector('#kasInForm button[type="submit"]');
+  const _txt = _btn ? _btn.textContent : '';
+  if(_btn){ _btn.disabled = true; _btn.textContent = 'Menyimpan...'; }
   try{
     const sumber = document.getElementById('kasin-sumber')?.value.trim()||'';
     const nominal = parseInt(document.getElementById('kasin-nominal')?.value)||0;
@@ -391,6 +415,10 @@ async function kasInSave(e){
     await renderKasToko(true);
   }catch(err){
     (window.showToast||alert)('Gagal simpan: '+(err.message||err));
+  }finally{
+    window._kasInBusy = false;
+    const _b2 = document.querySelector('#kasInForm button[type="submit"]');
+    if(_b2){ _b2.disabled = false; _b2.textContent = _txt; }
   }
 }
 // ---------- Catat pengeluaran langsung dari Kas Toko (kasir/owner/admin) ----------
@@ -444,6 +472,11 @@ async function kasOutSpFill(){
 }
 async function kasOutSave(e){
   if(e) e.preventDefault();
+  if(window._kasOutBusy) return; // anti double-submit (tombol diklik 2x = 2 catatan)
+  window._kasOutBusy = true;
+  const _btn = document.querySelector('#kasOutForm button[type="submit"]');
+  const _txt = _btn ? _btn.textContent : '';
+  if(_btn){ _btn.disabled = true; _btn.textContent = 'Menyimpan...'; }
   try{
     const keperluan = document.getElementById('kasout-keperluan')?.value.trim()||'';
     const nominal = parseInt(document.getElementById('kasout-nominal')?.value)||0;
@@ -469,6 +502,10 @@ async function kasOutSave(e){
     await renderKasToko(true);
   }catch(err){
     (window.showToast||alert)('Gagal simpan: '+(err.message||err));
+  }finally{
+    window._kasOutBusy = false;
+    const _b2 = document.querySelector('#kasOutForm button[type="submit"]');
+    if(_b2){ _b2.disabled = false; _b2.textContent = _txt; }
   }
 }
 // ---------- Tutup Kas ritual (dashboard toko: banner + kartu compact di Kas Toko) ----------
