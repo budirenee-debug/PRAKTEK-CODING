@@ -139,7 +139,7 @@
           <button class="menu-item" data-own="keuangan" data-hubmenu="hpp" onclick="ownShowKeu('hpp', this)">
             <span class="mi">🧾</span> HPP / Modal
           </button>
-          <button class="menu-item" data-own="keuangan" data-hubmenu="operasional" onclick="ownShowKeu('operasional', this)">
+          <button class="menu-item" data-own="keuangan" data-hubmenu="operasional" onclick="location.href='index.html#kas-keluar'">
             <span class="mi">🏪</span> Operasional
           </button>
           <button class="menu-item" data-own="keuangan" data-hubmenu="aset" onclick="ownShowKeu('aset', this)">
@@ -684,7 +684,7 @@
               <div class="toolbar-right">
                 <select id="outFilterKat" onchange="ownKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option value="B1">Sparepart</option><option value="B2">Accessories</option><option value="C1">Gaji</option><option value="C2">Tempat</option><option value="C3">Internet</option><option value="C4">Harian</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="D">Aset</option></select>
                 <button class="btn btn-ghost small" onclick="ownKeluar()">↻</button>
-                <a class="btn btn-dark small" href="index.html" style="text-decoration:none">+ Catat di Kas Toko</a>
+                <a class="btn btn-dark small" href="index.html#kas-keluar" style="text-decoration:none">+ Catat di Kas Toko</a>
               </div>
             </div>
             <div class="stats" style="margin-bottom:10px">
@@ -4769,6 +4769,7 @@
         const h = String(location.hash || '').toLowerCase();
         if(h === '#laporan') ownShow('laporan');
         else if(h === '#approval' && role === 'superadmin') ownShow('approval');
+        else if(h === '#keu-operasional') ownShowKeu('operasional');
       }catch(e){}
     })();
   </script>

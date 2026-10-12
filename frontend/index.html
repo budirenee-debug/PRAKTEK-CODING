@@ -827,6 +827,11 @@
                 </div>
                 <div id="kasPanel-toko">
                 <div class="tabs" style="margin-bottom:10px">
+                    <button class="tab active" data-kassub="arus" onclick="setKasSub('arus')">🏪 Arus Toko</button>
+                    <button class="tab" data-kassub="rincian" onclick="setKasSub('rincian')">🧾 Rincian Keluar</button>
+                </div>
+                <div id="kasPanel-arus">
+                <div class="tabs" style="margin-bottom:10px">
                     <button class="tab active" data-kasf="today" onclick="setKasTokoFilter('today')">📅 Harian</button>
                     <button class="tab" data-kasf="week" onclick="setKasTokoFilter('week')">🗓️ Mingguan (Senin–Sabtu)</button>
                     <button class="tab" data-kasf="month" onclick="setKasTokoFilter('month')">📆 Bulanan</button>
@@ -841,6 +846,21 @@
                 <div id="kasTokoJatah" style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:10px">💰 Menghitung jatah teknisi...</div>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                 <div class="pagination"><span id="kasTokoPaginationInfo"></span><div id="kasTokoPaginationBtns"></div></div>
+                </div>
+                <div id="kasPanel-rincian" style="display:none">
+                <div class="stats" style="margin-bottom:10px">
+                    <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Hari Ini</span></div><h3 id="rkHari" style="color:#dc2626">Rp 0</h3><p class="trend" id="rkHariSub">-</p></div>
+                    <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="rkBulan">Rp 0</h3><p class="trend" id="rkBulanSub">-</p></div>
+                    <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Total Tercatat</span></div><h3 id="rkTotal">Rp 0</h3><p class="trend" id="rkTotalSub">-</p></div>
+                </div>
+                <div class="card-head toolbar" style="margin-bottom:10px">
+                    <div class="toolbar-left"><select id="rkKat" onchange="renderRincianKeluar()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option><option value="B1">Sparepart</option><option value="B2">Accessories</option><option value="C1">Gaji</option><option value="C2">Tempat</option><option value="C3">Internet</option><option value="C4">Harian</option><option value="C5">Marketing</option><option value="C6">Maintenance</option><option value="D">Aset</option></select>
+                    <button class="btn btn-ghost small" onclick="renderRincianKeluar()">↻</button></div>
+                    <div class="toolbar-right"><a class="btn btn-ghost small" href="owner.html#keu-operasional" style="text-decoration:none">📊 Laba-Rugi (Owner)</a> <button class="btn btn-dark small" onclick="kasOutOpen()">+ Catat Keluar</button></div>
+                </div>
+                <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keperluan</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Metode</th><th>Oleh</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyRincianKeluar"><tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                <div class="pagination"><span id="rkPaginationInfo"></span><div id="rkPaginationBtns"></div></div>
+                </div>
                 <div class="card" id="tksCard" style="margin-top:12px">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>🌙 Tutup Kas Hari Ini</h3><span class="muted" id="tksDate">sistem vs fisik • selisih target Rp0</span></div>

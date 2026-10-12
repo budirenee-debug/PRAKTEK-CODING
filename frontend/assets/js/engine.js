@@ -797,5 +797,80 @@ async function renderGajian(){
   };
 })();
 // Banner kas langsung saat pertama buka (dashboard aktif by default tanpa switchView).
-if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} });
-else { try{ kasBarToko(); }catch(e){} }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} });
+else { try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} }
+// ---------- Rincian Keluar: tab khusus pengeluaran di Kas Toko (satu pintu operasional) ----------
+let _kasSub = 'arus', _rkRows = [], _rkPage = 1;
+const RK_PER = 10;
+const RK_LBL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
+function setKasSub(t){
+  _kasSub = (t === 'rincian') ? 'rincian' : 'arus';
+  try{ document.querySelectorAll('[data-kassub]').forEach(b=>b.classList.toggle('active', b.dataset.kassub===_kasSub)); }catch(e){}
+  try{ document.getElementById('kasPanel-arus').style.display = _kasSub==='arus'?'':'none'; }catch(e){}
+  try{ document.getElementById('kasPanel-rincian').style.display = _kasSub==='rincian'?'':'none'; }catch(e){}
+  if(_kasSub === 'rincian') renderRincianKeluar();
+}
+function rkGo(p){
+  const max = Math.max(1, Math.ceil(_rkRows.length / RK_PER));
+  if(p < 1 || p > max) return;
+  _rkPage = p;
+  drawRincianKeluar();
+}
+function drawRincianKeluar(){
+  const tb = document.getElementById('tbodyRincianKeluar');
+  const canDel = _kasCanHapus();
+  const max = Math.max(1, Math.ceil(_rkRows.length / RK_PER));
+  if(_rkPage > max) _rkPage = max;
+  const slice = _rkRows.slice((_rkPage-1)*RK_PER, _rkPage*RK_PER);
+  const info = document.getElementById('rkPaginationInfo'), wrap = document.getElementById('rkPaginationBtns');
+  if(info) info.textContent = _rkRows.length ? `Menampilkan ${(_rkPage-1)*RK_PER+1}-${Math.min(_rkRows.length,_rkPage*RK_PER)} dari ${_rkRows.length}` : 'Tidak ada data';
+  if(wrap){
+    if(max <= 1){ wrap.innerHTML = ''; }
+    else{
+      let h = `<button class="page-btn" ${_rkPage<=1?'disabled':''} onclick="rkGo(${_rkPage-1})">‹</button>`;
+      for(let p=1;p<=max;p++) h += `<button class="page-btn${p===_rkPage?' active':''}" onclick="rkGo(${p})">${p}</button>`;
+      h += `<button class="page-btn" ${_rkPage>=max?'disabled':''} onclick="rkGo(${_rkPage+1})">›</button>`;
+      wrap.innerHTML = h;
+    }
+  }
+  if(tb){
+    tb.innerHTML = slice.map(r=>`<tr><td style="white-space:nowrap">${_esc(String(r.tanggal||'').slice(0,10))}</td><td><strong>${_esc(r.keperluan||'-')}</strong>${r.keterangan?`<br><span style="font-size:11px;color:#8a8f98">${_esc(r.keterangan)}</span>`:''}</td><td style="font-size:11px">${_esc(RK_LBL[r.kategori]||r.kategori||'-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${_rp(r.nominal||0)}</td><td>${_esc(r.metode||'-')}</td><td style="font-size:11px">${_esc(r.dibuat_oleh||'-')}</td><td style="text-align:center">${(canDel&&r.id)?`<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi (salah input)" onclick="kasKasDel('expense',${r.id})">🗑</button>`:'<span style="font-size:11px;color:#d1d5db">-</span>'}</td></tr>`).join('')
+      || '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Belum ada pengeluaran</td></tr>';
+  }
+}
+async function renderRincianKeluar(){
+  const tb = document.getElementById('tbodyRincianKeluar');
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  try{
+    const kat = document.getElementById('rkKat')?.value || '';
+    if(tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr>';
+    const [rows, ring] = await Promise.all([
+      apiFetch('/finance/expenses' + (kat ? '?kategori=' + encodeURIComponent(kat) : '')),
+      apiFetch('/finance/expenses/ringkasan'),
+    ]);
+    const arr = Array.isArray(rows) ? rows : [];
+    set('rkHari', _rp(ring.nominal_hari_ini || 0));
+    set('rkHariSub', (ring.hari_ini || 0) + ' catatan hari ini');
+    set('rkBulan', _rp(ring.nominal_bulan_ini || 0));
+    set('rkBulanSub', (ring.bulan_ini || 0) + ' catatan bulan ini');
+    set('rkTotal', _rp(ring.total_nominal || 0));
+    set('rkTotalSub', (ring.total || 0) + ' catatan semua');
+    _rkRows = arr; _rkPage = 1;
+    drawRincianKeluar();
+  }catch(e){
+    if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
+  }
+}
+// Deep-link: index.html#kas-keluar -> buka Kas Toko di tab Rincian Keluar.
+function kasHashRoute(){
+  try{
+    if(String(location.hash || '').toLowerCase() !== '#kas-keluar') return;
+    const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+      || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
+    if(isTek) return;
+    if(typeof switchView === 'function') switchView('kas-saya');
+    setKasTab('toko');
+    setKasSub('rincian');
+  }catch(e){}
+}
+if(typeof window !== 'undefined'){ try{ window.addEventListener('hashchange', ()=>{ try{ kasHashRoute(); }catch(e){} }); }catch(e){} }
