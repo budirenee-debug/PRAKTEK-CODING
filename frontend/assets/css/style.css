@@ -190,6 +190,17 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 #view-service-masuk .queue-item{padding:8px 10px}
 #view-service-masuk .queue-item img{width:30px;height:30px}
 
+/* KAS TOKO — mode padat: kurangi scroll halaman */
+#view-kas-saya .stats{margin-bottom:8px}
+#view-kas-saya .stat-card{padding:8px 10px}
+#view-kas-saya .stat-card h3{font-size:16px}
+#view-kas-saya .stat-head{margin-bottom:2px}
+#view-kas-saya .tabs{margin-bottom:8px}
+#view-kas-saya #kasTokoJatah{padding:8px 10px;margin-bottom:8px;font-size:11.5px}
+#view-kas-saya .pagination{padding-top:10px}
+#view-kas-saya #tksCard{margin-top:8px}
+#view-kas-saya #kasPanel-rincian .stats{margin-bottom:8px}
+
 /* PELANGGAN */
 .toolbar{flex-wrap:wrap;gap:12px}
 .toolbar-left,.toolbar-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
