@@ -1051,6 +1051,27 @@
             </div>
             <p id="engineMsg" style="font-size:11px;color:#059669;margin-top:8px"></p>
           </div>
+          <div class="card" id="opsEngineCard" style="max-width:760px;margin:14px auto 0;display:none">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>🏠 Tabungan Operasional</h3><span class="pill ok">owner</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOpsSettings()">↻ Refresh</button></div>
+            </div>
+            <p style="font-size:12px;color:#8a8f98;margin-bottom:12px">Sewa dikumpul <strong>harian</strong> (admin catat via Pengeluaran C2). Wifi/listrik/gaji admin <strong>bulanan</strong> — celengan disisih otomatis tiap Tutup Kas, dibayar owner dari tabungan. Dana memo, tidak menyentuh komisi teknisi.</p>
+            <div class="form-grid">
+              <div class="field"><label>Sewa Tempat /hari (Rp)</label><input id="oops-sewa" inputmode="numeric" placeholder="150000"></div>
+              <div class="field"><label>Wifi /bulan (Rp)</label><input id="oops-wifi" inputmode="numeric" placeholder="200000"></div>
+              <div class="field"><label>Wifi jatuh tempo tgl</label><input id="oops-wifi-tgl" type="number" min="1" max="28" placeholder="20"></div>
+              <div class="field"><label>Listrik /bulan (Rp)</label><input id="oops-listrik" inputmode="numeric" placeholder="300000"></div>
+              <div class="field"><label>Listrik jatuh tempo tgl</label><input id="oops-listrik-tgl" type="number" min="1" max="28" placeholder="15"></div>
+              <div class="field"><label>Gaji Admin /bulan (Rp)</label><input id="oops-gaji" inputmode="numeric" placeholder="1200000"></div>
+              <div class="field"><label>Gaji Admin jatuh tempo tgl</label><input id="oops-gaji-tgl" type="number" min="1" max="28" placeholder="1"></div>
+            </div>
+            <p id="oopsAuto" style="font-size:12px;color:#059669;margin-top:10px"></p>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-dark" style="flex:1" onclick="ownSaveOps()">💾 Simpan Tabungan Operasional</button>
+            </div>
+            <p id="oopsMsg" style="font-size:11px;color:#059669;margin-top:8px"></p>
+          </div>
         </section>
 
         <!-- LOG ANTI-FRAUD -->
@@ -2083,6 +2104,7 @@
         set('eng-senior', s.komisi_senior); set('eng-junior', s.komisi_junior);
         set('eng-cicil', s.cicilan_max_pct); set('eng-toleransi-rp', s.toleransi_junior_rp);
       }catch(e){ try{ document.getElementById('engineMsg').textContent = 'Gagal load: ' + e.message.slice(0,120); }catch(_){} }
+      try{ await ownOpsSettings(); }catch(e){}
     }
     async function ownSaveEngine(){
       const num = id => { const v = document.getElementById(id)?.value || ''; const n = parseInt(String(v).replace(/\D/g, '')); return isNaN(n) ? undefined : n; };
@@ -2099,6 +2121,42 @@
         await ownFetch('/engine/settings', {method: 'PUT', body: JSON.stringify(body)});
         document.getElementById('engineMsg').textContent = '✅ Tersimpan ' + new Date().toLocaleTimeString('id-ID');
       }catch(e){ ownAlert('err', 'Gagal simpan engine: ' + e.message); }
+    }
+    // ---------- Tabungan Operasional (setting nominal, owner only) ----------
+    const _oopsNum = id => { const v = document.getElementById(id)?.value || ''; const n = parseInt(String(v).replace(/\D/g, '')); return isNaN(n) ? 0 : n; };
+    function _oopsAuto(){
+      try{
+        const b = _oopsNum('oops-wifi') + _oopsNum('oops-listrik') + _oopsNum('oops-gaji');
+        document.getElementById('oopsAuto').textContent = `Target harian: ${rp(_oopsNum('oops-sewa'))} (sewa) • Target bulanan: ${rp(b)} • Sisihan auto ± ${rp(Math.round(b / 7))}/minggu dari omzet`;
+      }catch(e){}
+    }
+    async function ownOpsSettings(){
+      const card = document.getElementById('opsEngineCard');
+      const role = window.BOSAuth ? window.BOSAuth.myActiveRole() : '';
+      const isOwner = role === 'superadmin' || role === 'owner';
+      try{ if(card) card.style.display = isOwner ? '' : 'none'; }catch(e){}
+      if(!isOwner) return;
+      try{
+        const s = await ownFetch('/ops/settings');
+        const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = (v ?? '') === '' ? '' : v; };
+        set('oops-sewa', s.sewa_harian); set('oops-wifi', s.wifi_nominal); set('oops-wifi-tgl', s.wifi_tgl);
+        set('oops-listrik', s.listrik_nominal); set('oops-listrik-tgl', s.listrik_tgl);
+        set('oops-gaji', s.gaji_nominal); set('oops-gaji-tgl', s.gaji_tgl);
+        _oopsAuto();
+      }catch(e){ try{ document.getElementById('oopsMsg').textContent = 'Gagal load: ' + e.message.slice(0, 120); }catch(_){} }
+    }
+    async function ownSaveOps(){
+      const body = {sewa_harian: _oopsNum('oops-sewa'), wifi_nominal: _oopsNum('oops-wifi'),
+        wifi_tgl: parseInt(document.getElementById('oops-wifi-tgl')?.value) || 20,
+        listrik_nominal: _oopsNum('oops-listrik'),
+        listrik_tgl: parseInt(document.getElementById('oops-listrik-tgl')?.value) || 15,
+        gaji_nominal: _oopsNum('oops-gaji'),
+        gaji_tgl: parseInt(document.getElementById('oops-gaji-tgl')?.value) || 1};
+      try{
+        await ownFetch('/ops/settings', {method: 'PUT', body: JSON.stringify(body)});
+        _oopsAuto();
+        document.getElementById('oopsMsg').textContent = '✅ Tersimpan ' + new Date().toLocaleTimeString('id-ID');
+      }catch(e){ ownAlert('err', 'Gagal simpan operasional: ' + e.message); }
     }
 
     // Cache services untuk dipakai lintas tab owner (keuangan skoring, sukses, bayar)
