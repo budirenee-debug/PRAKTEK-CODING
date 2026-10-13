@@ -109,6 +109,11 @@ def check_quota(db: Session, store, teknisi_nama: str, kategori: str):
         models.Service.date == today,
         models.Service.teknisi.ilike(f"%{teknisi_nama}%")).count()
     if ringans >= berats * rasio:
+        if berats == 0:
+            # Polos: senior yang belum pegang kasus berat hari ini tetap boleh
+            # ambil ringan. Alur real diatur admin di toko — kuota 2:1 baru
+            # mengikat setelah ada kasus berat (berat=0 & ringan=0 lolos).
+            return
         raise HTTPException(
             status_code=400,
             detail=f"Kuota ringan habis (2:1 harian). {teknisi_nama} berat={berats}, ringan={ringans}. Ambil kasus berat dulu.")
