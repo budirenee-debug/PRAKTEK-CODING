@@ -290,8 +290,9 @@ async function renderKasSaya(){
   const tbody = document.getElementById('tbodyKasSaya');
   try{
     const j = await apiFetch('/engine/kas/saya');
-    document.getElementById('kasSayaSub').textContent = `${j.nama} (${j.level}) • transparan`;
-    document.getElementById('kasSayaLevel').textContent = `${j.level} • total ${_rp(j.netto ?? j.total_diterima)}`;
+    // Level (senior/junior) disembunyikan dari teknisi — tampil netral tanpa perbedaan.
+    document.getElementById('kasSayaSub').textContent = `${j.nama} • transparan`;
+    document.getElementById('kasSayaLevel').textContent = `Total ${_rp(j.netto ?? j.total_diterima)}`;
     // hari ini & bulan ini dari riwayat (hari lokal WIB, bukan UTC)
     const _d = new Date();
     const today = _d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');
@@ -309,7 +310,7 @@ async function renderKasSaya(){
       const q = await apiFetch('/engine/kuota/me');
       const el = document.getElementById('kasSayaKuota');
       if(el){
-        if(q.sisa===null||q.sisa===undefined) el.textContent = `Level: ${q.level} — bebas ambil ringan.`;
+        if(q.sisa===null||q.sisa===undefined) el.textContent = `Bebas ambil ringan.`;
         else el.textContent = `Kuota 2:1 hari ini — berat ${q.berat_hari_ini}, ringan ${q.ringan_hari_ini}/${q.kuota_max}, sisa ${q.sisa}. Reset 00:00.`;
       }
     }catch{}
@@ -337,7 +338,7 @@ async function refreshKuotaInfo(){
   if(!tek || tek==='Menunggu Teknisi'){ el.textContent=''; return; }
   try{
     // kuota milik sendiri hanya akurat jika teknisi login; untuk kasir tampilkan hint umum
-    el.textContent = `Kuota 2:1 senior — pastikan ${tek} sudah ambil berat sebelum 2 ringan.`;
+    el.textContent = `Kuota 2:1 — pastikan ${tek} sudah ambil berat sebelum 2 ringan.`;
   }catch{ el.textContent=''; }
 }
 async function setPartUp(invoice){
@@ -734,6 +735,9 @@ async function renderGajian(){
   const wrap=document.getElementById('gajiCards');
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   const w=_gajiWeek();
+  // Level disembunyikan dari penampil teknisi (slip gajian bisa dibuka semua peran).
+  const _isTekGaji = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
+    || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
   set('gajiRange', _gajiFmt(w.start)+' — '+_gajiFmt(w.end));
   if(wrap) wrap.innerHTML='<p style="color:#8a8f98;font-size:12px">Menghitung slip '+_esc(w.start)+' s/d '+_esc(w.end)+'...</p>';
   try{
@@ -788,7 +792,7 @@ async function renderGajian(){
       const nama=_esc(j.nama||t.nama||('Teknisi '+t.id));
       cards.push(
         '<div class="card" style="border-left:4px solid '+(pd?'#059669':'#f59e0b')+'">'
-        +'<div class="card-head"><h3>'+nama+'</h3><span class="muted">'+_esc(j.level||t.level||'junior')+'</span><span style="flex:1"></span>'
+        +'<div class="card-head"><h3>'+nama+'</h3>'+(_isTekGaji?'':'<span class="muted">'+_esc(j.level||t.level||'junior')+'</span>')+'<span style="flex:1"></span>'
         +(pd?'<span class="badge-status Selesai">✅ Lunas</span>':'<span class="badge-status Menunggu Sparepart">⏳ Belum</span>')
         +'</div>'
         +'<div class="stats" style="margin-bottom:10px">'

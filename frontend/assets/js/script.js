@@ -1158,9 +1158,11 @@ function applyRoleMenu(){
 }
 async function loadData(silent){
   if(!USE_API){
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if(stored && Array.isArray(stored) && stored.length>0) data = stored;
-    else data = defaultData;
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if(stored && Array.isArray(stored) && stored.length>0) data = stored;
+      else data = defaultData;
+    } catch { data = defaultData; }
     // jika stored 0 tapi API sebenarnya ada 88, jangan pakai 0 — fallback ke default dan coba online lagi next poll
     if(!data || !data.length) data = defaultData;
     data = filterTeknisiView(data);
@@ -1221,7 +1223,9 @@ async function loadData(silent){
       console.warn('API gagal (silent):', e.message);
     }
     USE_API = false;
-    data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData;
+    try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData; }
+    catch { data = defaultData; }
+    if (!Array.isArray(data)) data = defaultData;
     const el = document.querySelector('.store-info span:first-child');
     if(el) { el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
   }
@@ -1960,11 +1964,14 @@ async function loadTeamData(){
         ? '<span style="background:#ecfdf5;color:#059669;padding:4px 8px;border-radius:20px;font-size:11px">Aktif</span>'
         : '<span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:20px;font-size:11px">Nonaktif</span>';
       const lv = lvlByName[String(m.username||'').toLowerCase()];
+      // Level (senior/junior) disembunyikan dari penampil teknisi — netral tanpa perbedaan.
       const lvlCell = m.role==='teknisi'
-        ? `<select onchange="changeTechLevel('${escapeHtml(m.username||'')}', this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
-             <option value="junior" ${(lv?.level||'junior')==='junior'?'selected':''}>junior 35%</option>
-             <option value="senior" ${(lv?.level||'')==='senior'?'selected':''}>senior 50%</option>
-           </select>`
+        ? (isTeknisiMode()
+          ? '<span style="color:#8a8f98;font-size:12px">teknisi</span>'
+          : `<select onchange="changeTechLevel('${escapeHtml(m.username||'')}', this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
+              <option value="junior" ${(lv?.level||'junior')==='junior'?'selected':''}>junior 35%</option>
+              <option value="senior" ${(lv?.level||'')==='senior'?'selected':''}>senior 50%</option>
+            </select>`)
         : '<span style="color:#d1d5db">-</span>';
       return `<tr style="${!m.is_active?'background:#fffbeb':''}">
         <td><strong>${escapeHtml(m.username||'-')}</strong>${isMe?' <span style="font-size:10px;background:#111;color:#fff;padding:2px 6px;border-radius:8px">Anda</span>':''}</td>
@@ -1990,10 +1997,12 @@ async function loadTeamData(){
       return `<tr style="background:#f0fdf4">
         <td><strong>${escapeHtml(t.nama)}</strong> <span style="font-size:10px;background:#059669;color:#fff;padding:2px 6px;border-radius:8px">teknisi</span></td>
         <td style="font-size:12px;color:#6b7280">teknisi (tanpa akun)</td>
-        <td><select onchange="changeTechLevelById(${t.id}, this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
+        <td>${isTeknisiMode()
+          ? '<span style="color:#8a8f98;font-size:12px">teknisi</span>'
+          : `<select onchange="changeTechLevelById(${t.id}, this.value)" title="Level komisi: senior 50% / junior 35%" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px">
               <option value="junior" ${lvl==='junior'?'selected':''}>junior 35%</option>
               <option value="senior" ${lvl==='senior'?'selected':''}>senior 50%</option>
-            </select></td>
+            </select>`}</td>
         <td>${stBadge}</td>
         <td style="font-size:11px;color:#6b7280">-</td>
         <td style="text-align:center"><button class="btn btn-ghost small" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="removeTechnician(${t.id}, '${escapeHtml(t.nama||'')}')">🗑 Hapus</button></td>
@@ -3960,7 +3969,14 @@ function renderPelanggan(){
   let filtered=[...data];
   if(pelangganFilter) filtered=filtered.filter(d=> (d.nama+d.device+d.wa+d.id).toLowerCase().includes(pelangganFilter));
   if(filterDevice) filtered=filtered.filter(d=>d.device.includes(filterDevice));
-  tbody.innerHTML = filtered.map(d=>{
+  // pagination 10/halaman (reset ke hal 1 jika filter berubah)
+  const _pkey = (pelangganFilter||'') + '|' + (filterDevice||'') + '|' + filtered.length;
+  if(_pkey !== _pelangganFilterKey){ _pelangganFilterKey = _pkey; currentPagePelanggan = 1; }
+  window._pelangganTotal = filtered.length;
+  const _pTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if(currentPagePelanggan > _pTotalPages) currentPagePelanggan = _pTotalPages;
+  const _pRows = filtered.slice((currentPagePelanggan-1)*pageSize, currentPagePelanggan*pageSize);
+  tbody.innerHTML = _pRows.map(d=>{
   const kw = pelangganFilter || '';
   return `
     <tr style="${kw?'background:#f0fdf4':''}">
@@ -3974,8 +3990,7 @@ function renderPelanggan(){
   `}).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#8a8f98">Tidak ada data</td></tr>`;
   const pc = document.getElementById('pelangganCount');
   if(pc) pc.textContent = filtered.length + ' pelanggan';
-  const pi = document.getElementById('paginationInfo');
-  if(pi) pi.textContent = `Menampilkan ${filtered.length} dari ${data.length}`;
+  currentPagePelanggan = kanbanPagerDraw('paginationInfo', 'pelangganPaginationBtns', filtered.length, currentPagePelanggan, 'setPelangganPage');
 }
 
 function statusOptions(){
@@ -4244,11 +4259,18 @@ function renderKanban(){
    }
    filtered = filtered.filter(passesDeadlineFilter);
    filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiProses'));
-   // terbaru dulu (aktivitas terakhir di atas) biar habis klik langsung ketemu
-   filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
-   const opts = statusOptionsProses().map(s=>`<option>${s}</option>`).join('');
-   const kw = pelangganFilter || '';
-  wrap.innerHTML = filtered.map(d=>{
+    // terbaru dulu (aktivitas terakhir di atas) biar habis klik langsung ketemu
+    filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
+    // pagination 10/halaman per sub-tab filter (reset ke hal 1 jika filter berubah)
+    const _kkey = statusFilter + '|' + (pelangganFilter||'') + '|' + deadlineFilter + '|' + techFilterVal('filterTeknisiProses') + '|' + filtered.length;
+    if(_kkey !== _kanbanFilterKey){ _kanbanFilterKey = _kkey; currentPageKanban = 1; }
+    window._kanbanTotal = filtered.length;
+    const _kTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if(currentPageKanban > _kTotalPages) currentPageKanban = _kTotalPages;
+    const _kRows = filtered.slice((currentPageKanban-1)*pageSize, currentPageKanban*pageSize);
+    const opts = statusOptionsProses().map(s=>`<option>${s}</option>`).join('');
+    const kw = pelangganFilter || '';
+  wrap.innerHTML = _kRows.map(d=>{
     const usedCount = (serviceSpareparts[d.id]||[]).length;
     return `
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}${kw?';background:#f0fdf4;border-color:#bbf7d0':''}">
@@ -4281,6 +4303,7 @@ function renderKanban(){
     const sp = tab.querySelector('span');
     if(sp) sp.textContent = count;
   });
+  kanbanPagerDraw('kanbanPaginationInfo', 'kanbanPaginationBtns', filtered.length, currentPageKanban, 'setKanbanPage');
 }
 function renderMenungguTeknisiBlock(){
   const block=document.getElementById('menungguTeknisiBlock');
@@ -4294,7 +4317,7 @@ function renderMenungguTeknisiBlock(){
   block.style.display='block';
   countEl.textContent = menunggu.length + ' device';
   const baseTechOpts = ['Menunggu Teknisi', ...availableTechs.map(t=>t.username)];
-  listEl.innerHTML = menunggu.slice(0,12).map(d=>{
+  listEl.innerHTML = menunggu.slice(0,10).map(d=>{
     const uniqOpts = [...new Set([...baseTechOpts, d.teknisi].filter(Boolean))];
     const optsHtml = uniqOpts.map(name=>{
       const sel = name===d.teknisi ? 'selected' : '';
@@ -4318,7 +4341,7 @@ function renderMenungguTeknisiBlock(){
         <span style="font-size:10px;color:#8a8f98">${escapeHtml(formatTanggal(d.date))} • ${deadlineBadge(d)}</span>
       </div>
     </div>`;
-  }).join('') + (menunggu.length>12 ? `<div style="grid-column:1/-1;text-align:center;font-size:11px;color:#92400e;padding:6px">+ ${menunggu.length-12} device lainnya di tabel bawah</div>` : '');
+  }).join('') + (menunggu.length>10 ? `<div style="grid-column:1/-1;text-align:center;font-size:11px;color:#92400e;padding:6px">+ ${menunggu.length-10} device lainnya di tabel bawah</div>` : '');
 }
 function renderSemuaService(){
   const tbody=document.querySelector('#tableSemua tbody');
@@ -4441,6 +4464,57 @@ function setSemuaPage(p){
   if(p < 1 || p > totalPages) return;
   currentPageSemua = p;
   renderSemuaService();
+}
+// ---------- Pager generik kanban/pelanggan: 10 baris per halaman + nomor ----------
+// Dipakai: kanban Proses, 4 sub-tab status (Bisa/Sudah/Failed/Garansi), tabel Pelanggan.
+let currentPageKanban = 1, _kanbanFilterKey = '';
+let currentPagePelanggan = 1, _pelangganFilterKey = '';
+const statusPage = {}, _statusFilterKey = {};
+function kanbanPagerDraw(infoId, btnsId, total, cur, goFn){
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if(cur > totalPages) cur = totalPages;
+  const info = document.getElementById(infoId);
+  if(info){
+    const _s = total ? (cur - 1) * pageSize + 1 : 0;
+    const _e = Math.min(total, cur * pageSize);
+    info.textContent = total ? `Menampilkan ${_s}-${_e} dari ${total}` : 'Tidak ada data';
+  }
+  const wrap = document.getElementById(btnsId);
+  if(wrap){
+    const btn = (label, page, opts={}) =>
+      `<button class="page-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} onclick="${goFn}(${page})">${label}</button>`;
+    let nums = '';
+    const win = 2;
+    let lo = Math.max(1, cur - win), hi = Math.min(totalPages, cur + win);
+    if(cur <= win + 1) hi = Math.min(totalPages, 1 + win * 2);
+    if(cur >= totalPages - win) lo = Math.max(1, totalPages - win * 2);
+    for(let p = lo; p <= hi; p++) nums += btn(p, p, {active: p === cur});
+    wrap.innerHTML = totalPages <= 1 ? '' : btn('‹', cur - 1, {disabled: cur <= 1})
+      + (lo > 1 ? btn(1, 1) + (lo > 2 ? '<span style="padding:0 4px;color:#8a8f98">…</span>' : '') : '')
+      + nums
+      + (hi < totalPages ? (hi < totalPages - 1 ? '<span style="padding:0 4px;color:#8a8f98">…</span>' : '') + btn(totalPages, totalPages) : '')
+      + btn('›', cur + 1, {disabled: cur >= totalPages});
+  }
+  return cur;
+}
+function setKanbanPage(p){
+  const max = Math.max(1, Math.ceil((window._kanbanTotal || 0) / pageSize));
+  if(p < 1 || p > max) return;
+  currentPageKanban = p;
+  renderKanban();
+}
+function setStatusPage(key, p){
+  const max = Math.max(1, Math.ceil(((window._statusTotal || {})[key] || 0) / pageSize));
+  if(p < 1 || p > max) return;
+  statusPage[key] = p;
+  const statusOf = {kanbanBisaDiambil:'Bisa Diambil', kanbanSudahDiambil:'Sudah Diambil', kanbanFailed:'Service Failed', kanbanGaransi:'Garansi'};
+  renderStatusView(key, statusOf[key]);
+}
+function setPelangganPage(p){
+  const max = Math.max(1, Math.ceil((window._pelangganTotal || 0) / pageSize));
+  if(p < 1 || p > max) return;
+  currentPagePelanggan = p;
+  renderPelanggan();
 }
 function toggleInlineDetail(invoice){
   const existing = document.getElementById(`inline-detail-${invoice}`);
@@ -4642,6 +4716,15 @@ function renderStatusView(targetId, statusName){
   if(statusTechMap[targetId]) filtered=applyTechFilter(filtered, techFilterVal(statusTechMap[targetId]));
   // terbaru dulu (aktivitas terakhir di atas) di semua tab status
   filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
+  // pagination 10/halaman per sub-tab (state terpisah tiap targetId)
+  if(!(targetId in statusPage)) statusPage[targetId] = 1;
+  const _skey = targetId + '|' + (isStatusActive ? qStatus : '') + '|' + (statusTechMap[targetId] ? techFilterVal(statusTechMap[targetId]) : '') + '|' + bisaFilter + '|' + deadlineFilter + '|' + filtered.length;
+  if(_skey !== _statusFilterKey[targetId]){ _statusFilterKey[targetId] = _skey; statusPage[targetId] = 1; }
+  window._statusTotal = window._statusTotal || {};
+  window._statusTotal[targetId] = filtered.length;
+  const _sTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if(statusPage[targetId] > _sTotalPages) statusPage[targetId] = _sTotalPages;
+  const _sRows = filtered.slice((statusPage[targetId]-1)*pageSize, statusPage[targetId]*pageSize);
   // Opsi status di Bisa Diambil mengikuti hasil: JADI→Sukses saja, TIDAK→Failed saja
   const optsBisa = (hasil)=>{
     if(hasil==='JADI') return ['Service Sukses'];
@@ -4650,7 +4733,7 @@ function renderStatusView(targetId, statusName){
   };
   // highlight keyword hanya saat kanban-nya memang aktif & difilter globalSearch
   const kwStatus = (isStatusActive && qStatus) ? qStatusRaw : '';
-  wrap.innerHTML = filtered.map(d=>{
+  wrap.innerHTML = _sRows.map(d=>{
     const hasil = d.hasil || (isBisa ? 'JADI' : '');
     const gagal = hasil==='TIDAK';
     const optsHtml = (isBisa ? optsBisa(hasil) : statusOptions()).map(s=>`<option>${s}</option>`).join('');
@@ -4693,6 +4776,11 @@ function renderStatusView(targetId, statusName){
     `;
   }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Belum ada service <strong>${isGaransiTab ? 'dalam masa garansi' : statusName==='Bisa Diambil' ? 'Bisa Diambil' : statusName==='Sudah Diambil' ? 'Service Sukses / Sudah Diambil' : 'dengan status ' + escapeHtml(displayStatus(statusName))}</strong>${isBisa && bisaFilter!=='all' ? ` • filter ${bisaFilter==='JADI' ? '✅ Berhasil' : '❌ Gagal'}` : ''}</div>`;
   if(isBisa) document.querySelectorAll('[data-bisa]').forEach(b=> b.classList.toggle('active', b.dataset.bisa===bisaFilter));
+  // pager 10/halaman per sub-tab
+  try{
+    const _pg = {kanbanBisaDiambil:['bisaPaginationInfo','bisaPaginationBtns'], kanbanSudahDiambil:['sudahPaginationInfo','sudahPaginationBtns'], kanbanFailed:['failedPaginationInfo','failedPaginationBtns'], kanbanGaransi:['garansiPaginationInfo','garansiPaginationBtns']}[targetId];
+    if(_pg) statusPage[targetId] = kanbanPagerDraw(_pg[0], _pg[1], filtered.length, statusPage[targetId], `setStatusPage.bind(null,'${targetId}')`);
+  }catch(e){}
   // update transaksi tab jika sedang aktif
   if(document.getElementById('view-transaksi-pendapatan')?.classList.contains('active')) renderTransaksiPendapatan();
   if(document.getElementById('view-transaksi-pembayaran')?.classList.contains('active')) renderTransaksiPembayaran();

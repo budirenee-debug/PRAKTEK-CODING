@@ -378,7 +378,7 @@
                             <tbody></tbody>
                         </table>
                     </div>
-                    <div class="pagination"><span id="paginationInfo">Menampilkan 6 dari 48</span><div><button class="page-btn" disabled>‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">›</button></div></div>
+                    <div class="pagination"><span id="paginationInfo">Menampilkan 6 dari 48</span><div id="pelangganPaginationBtns"><button class="page-btn" disabled>‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">›</button></div></div>
                 </div>
             </section>
 
@@ -403,6 +403,7 @@
                     <select id="filterTeknisiProses" onchange="renderKanban()" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select>
                 </div>
                 <div class="kanban" id="kanban"></div>
+                <div class="pagination"><span id="kanbanPaginationInfo"></span><div id="kanbanPaginationBtns"></div></div>
             </section>
 
             <!-- SERVICE: SEMUA SERVICE -->
@@ -432,22 +433,22 @@
 
             <!-- SERVICE: BISA DIAMBIL -->
             <section class="view" id="view-bisa-diambil">
-                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span><select id="filterTeknisiBisa" onchange="renderStatusView('kanbanBisaDiambil','Bisa Diambil')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="tabs" style="margin-bottom:10px"><button class="tab active" data-bisa="all" onclick="setBisaFilter('all')">Semua</button><button class="tab" data-bisa="JADI" onclick="setBisaFilter('JADI')">✅ Berhasil</button><button class="tab" data-bisa="TIDAK" onclick="setBisaFilter('TIDAK')">❌ Gagal</button></div><div class="kanban" id="kanbanBisaDiambil"></div></div>
+                <div class="card"><div class="card-head"><h3>Bisa Diambil</h3><span class="count-pill" id="bisaCount">0 siap</span><span class="badge-status Selesai">Siap diambil pelanggan</span><select id="filterTeknisiBisa" onchange="renderStatusView('kanbanBisaDiambil','Bisa Diambil')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="tabs" style="margin-bottom:10px"><button class="tab active" data-bisa="all" onclick="setBisaFilter('all')">Semua</button><button class="tab" data-bisa="JADI" onclick="setBisaFilter('JADI')">✅ Berhasil</button><button class="tab" data-bisa="TIDAK" onclick="setBisaFilter('TIDAK')">❌ Gagal</button></div><div class="kanban" id="kanbanBisaDiambil"></div><div class="pagination"><span id="bisaPaginationInfo"></span><div id="bisaPaginationBtns"></div></div></div>
             </section>
 
             <!-- SERVICE: SUDAH DIAMBIL -->
             <section class="view" id="view-sudah-diambil">
-                <div class="card"><div class="card-head toolbar"><div class="toolbar-left"><h3>Sudah Diambil</h3><span class="count-pill" id="sudahCount">0 selesai</span><span class="muted">Terurut dari Bisa Diambil terbaru</span></div><div class="toolbar-right"><select id="filterTeknisiSudah" onchange="renderStatusView('kanbanSudahDiambil','Sudah Diambil')" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select></div></div><div class="kanban" id="kanbanSudahDiambil"></div></div>
+                <div class="card"><div class="card-head toolbar"><div class="toolbar-left"><h3>Sudah Diambil</h3><span class="count-pill" id="sudahCount">0 selesai</span><span class="muted">Terurut dari Bisa Diambil terbaru</span></div><div class="toolbar-right"><select id="filterTeknisiSudah" onchange="renderStatusView('kanbanSudahDiambil','Sudah Diambil')" title="Filter kinerja per teknisi" style="padding:8px 10px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Teknisi</option></select></div></div><div class="kanban" id="kanbanSudahDiambil"></div><div class="pagination"><span id="sudahPaginationInfo"></span><div id="sudahPaginationBtns"></div></div></div>
             </section>
 
             <!-- SERVICE: FAILED -->
             <section class="view" id="view-service-failed">
-                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="count-pill" id="failedCount">0 failed</span><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span><select id="filterTeknisiFailed" onchange="renderStatusView('kanbanFailed','Service Failed')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanFailed"></div></div>
+                <div class="card"><div class="card-head"><h3>Service Failed</h3><span class="count-pill" id="failedCount">0 failed</span><span class="badge-status Menunggu Sparepart">Gagal / tidak bisa diperbaiki</span><select id="filterTeknisiFailed" onchange="renderStatusView('kanbanFailed','Service Failed')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanFailed"></div><div class="pagination"><span id="failedPaginationInfo"></span><div id="failedPaginationBtns"></div></div></div>
             </section>
 
             <!-- SERVICE: GARANSI -->
             <section class="view" id="view-status-garansi">
-                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="count-pill" id="garansiCount">0 garansi</span><span class="muted">Service dalam masa garansi</span><select id="filterTeknisiGaransi" onchange="renderStatusView('kanbanGaransi','Garansi')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanGaransi"></div></div>
+                <div class="card"><div class="card-head"><h3>Status Garansi</h3><span class="count-pill" id="garansiCount">0 garansi</span><span class="muted">Service dalam masa garansi</span><select id="filterTeknisiGaransi" onchange="renderStatusView('kanbanGaransi','Garansi')" title="Filter kinerja per teknisi" style="padding:6px 8px;border:1px solid #ececec;border-radius:10px;font-size:11px;background:#fff;margin-left:auto"><option value="">Semua Teknisi</option></select></div><div class="kanban" id="kanbanGaransi"></div><div class="pagination"><span id="garansiPaginationInfo"></span><div id="garansiPaginationBtns"></div></div></div>
             </section>
 
             <!-- CUSTOMER: TAMBAH PELANGGAN -->
