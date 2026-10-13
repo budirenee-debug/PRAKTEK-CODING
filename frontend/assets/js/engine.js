@@ -130,12 +130,13 @@ function setKasTab(t){
       t = 'toko';
       try{ showToast('Kas Saya khusus teknisi — admin/kasir pakai Arus Toko & Gajian Sabtu'); }catch(e){}
     }
-    try{ document.querySelectorAll('.tab[data-kas="saya"]').forEach(b=>{ b.style.display = (rl==='admin'||rl==='kasir')?'none':''; }); }catch(e){}
+    try{ document.querySelectorAll('.tab[data-kas="saya"],.tab[data-kasview="saya"]').forEach(b=>{ b.style.display = (rl==='admin'||rl==='kasir')?'none':''; }); }catch(e){}
   }catch(e){}
   _kasTab = t;
   document.querySelectorAll('[data-kas]').forEach(b=>b.classList.toggle('active', b.dataset.kas===t));
   try{ document.getElementById('kasPanel-toko').style.display = t==='toko'?'':'none'; }catch(e){}
   try{ document.getElementById('kasPanel-saya').style.display = t==='saya'?'':'none'; }catch(e){}
+  _kasViewSync();
   if(t==='toko') renderKasToko();
   else renderKasSaya();
 }
@@ -827,6 +828,7 @@ async function renderGajian(){
           const isTek = (window.BOSAuth && window.BOSAuth.isTeknisi && window.BOSAuth.isTeknisi())
             || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
           document.querySelectorAll('[data-kas="toko"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+          document.querySelectorAll('[data-kasview="arus"],[data-kasview="rincian"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
           setKasTab(isTek ? 'saya' : (_kasTab || 'toko'));
           if(!isTek){ try{ kasTutupTokoLoad(); }catch(e){} }
         }catch(e){ renderKasSaya(); }
@@ -856,6 +858,19 @@ function setKasSub(t){
   try{ document.getElementById('kasPanel-arus').style.display = _kasSub==='arus'?'':'none'; }catch(e){}
   try{ document.getElementById('kasPanel-rincian').style.display = _kasSub==='rincian'?'':'none'; }catch(e){}
   if(_kasSub === 'rincian') renderRincianKeluar();
+  _kasViewSync();
+}
+// Sub-tab kas satu baris: Arus Toko | Rincian Keluar | Kas Saya (ganti 2 baris tab ganda).
+function _kasViewSync(){
+  try{
+    const v = (_kasTab === 'saya') ? 'saya' : _kasSub;
+    document.querySelectorAll('[data-kasview]').forEach(b=>b.classList.toggle('active', b.dataset.kasview===v));
+  }catch(e){}
+}
+function setKasView(v){
+  if(v === 'saya') setKasTab('saya');
+  else { setKasTab('toko'); setKasSub(v === 'rincian' ? 'rincian' : 'arus'); }
+  _kasViewSync();
 }
 function rkGo(p){
   const max = Math.max(1, Math.ceil(_rkRows.length / RK_PER));

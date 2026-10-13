@@ -848,14 +848,11 @@
             <section class="view" id="view-kas-saya">
                 <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-dark small" data-kas="toko" style="background:#059669;border-color:#059669" onclick="kasInOpen()">+ Catat Masuk</button> <button class="btn btn-dark small" data-kas="toko" onclick="kasOutOpen()">+ Catat Keluar</button> <button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
                 <div class="tabs" style="margin-bottom:10px">
-                    <button class="tab active" data-kas="toko" onclick="setKasTab('toko')">🏪 Arus Toko</button>
-                    <button class="tab" data-kas="saya" onclick="setKasTab('saya')">👤 Kas Saya</button>
+                    <button class="tab active" data-kasview="arus" onclick="setKasView('arus')">🏪 Arus Toko</button>
+                    <button class="tab" data-kasview="rincian" onclick="setKasView('rincian')">🧾 Rincian Keluar</button>
+                    <button class="tab" data-kasview="saya" onclick="setKasView('saya')">👤 Kas Saya</button>
                 </div>
                 <div id="kasPanel-toko">
-                <div class="tabs" style="margin-bottom:10px">
-                    <button class="tab active" data-kassub="arus" onclick="setKasSub('arus')">🏪 Arus Toko</button>
-                    <button class="tab" data-kassub="rincian" onclick="setKasSub('rincian')">🧾 Rincian Keluar</button>
-                </div>
                 <div id="kasPanel-arus">
                 <div class="tabs" style="margin-bottom:10px">
                     <button class="tab active" data-kasf="today" onclick="setKasTokoFilter('today')">📅 Harian</button>
