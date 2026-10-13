@@ -150,13 +150,17 @@ def check_in(store_id: Optional[int] = Query(None),
             tipe="allowance", masuk_rp=allowance, keluar_rp=0,
             sisa_hutang_saat_itu=sisa, keterangan=f"Uang hadir {jam_now}"))
         # Buku besar (prinsip mentor): uang hadir = biaya gaji & upah (C1), kas keluar.
+        # TANPA gerak kas: sama seperti komisi, uang hadir menumpuk sampai dibayar
+        # Sabtu via gajian/bayar (di situ kas baru kepotong). Kalau kas ikut
+        # kepotong saat check-in, tutup kas selisih tiap malam.
         # Guard duplikat via (allowance, attendance.id) agar check-in ganda aman.
         try:
             from .finance import _ledger_add
             _ledger_add(db, store.id, today, "keluar", "C1",
                         f"Uang hadir {tech.nama} {jam_now}", allowance,
                         "kas_utama", ref_type="allowance", ref_id=row.id,
-                        oleh=getattr(current, "username", None))
+                        oleh=getattr(current, "username", None),
+                        pengaruh_kas=False)
         except Exception as e:
             print("ledger allowance skip:", e)
         db.commit()
@@ -565,3 +569,116 @@ def list_potongans(store_id: Optional[int] = Query(None), technician_id: Optiona
                           if l.tipe not in ("potongan_cicilan", "refund_balik")),
                           "jumlah": len(alls), "bulan_ini": bln,
                           "sisa_hutang": sisa, "per_teknisi": per_tech}}
+
+
+def _ctx_gajian(db: Session, current, store_id):
+    """Bayar gajian: owner/admin/kasir (kasir yang pegang laci Sabtu malam)."""
+    if not current:
+        raise HTTPException(status_code=401, detail="Belum login")
+    store = resolve_store(db, current, store_id)
+    if store is None:
+        store = default_store(db)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Belum ada toko aktif")
+    role = store_role(db, current, store)
+    if role not in ["superadmin", "owner", "admin", "kasir"]:
+        raise HTTPException(status_code=403, detail="Hanya tim toko yang boleh bayar gajian")
+    return store
+
+
+def _gajian_cari(db: Session, store_id: int, technician_id: int, week_start: str):
+    return db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store_id,
+        models.LedgerEntry.ref_type == "gajian",
+        models.LedgerEntry.ref_id == technician_id,
+        models.LedgerEntry.keterangan.like(f"%{week_start}%")).all()
+
+
+@router.get("/gajian/paid")
+def gajian_paid(week_start: str = Query(...), store_id: Optional[int] = Query(None),
+                db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Status bayar per teknisi untuk minggu Senin tertentu. Dipakai tombol Gajian Sabtu."""
+    store = _ctx_gajian(db, current, store_id)
+    rows = db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.ref_type == "gajian",
+        models.LedgerEntry.keterangan.like(f"%{week_start}%")).all()
+    out = {}
+    for r in rows:
+        out[r.ref_id] = {"nominal": r.nominal, "tanggal": r.tanggal,
+                         "media": r.media, "oleh": r.dibuat_oleh,
+                         "keterangan": r.keterangan}
+    return {"week_start": week_start, "paid": out}
+
+
+@router.post("/gajian/bayar", status_code=201)
+def gajian_bayar(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Serahkan jatah mingguan teknisi (komisi+hadir − refund): kas BENAR-BENAR keluar.
+    HPP/biaya sudah diakui saat cair/check-in (tanpa gerak kas), jadi payout ini
+    masuk_laba=False agar laba tidak kepotong dua kali. Idempotent per teknisi/minggu."""
+    store = _ctx_gajian(db, current, store_id)
+    try:
+        tech_id = int(payload.get("technician_id") or 0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="technician_id harus angka")
+    try:
+        nominal = int(payload.get("nominal") or 0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="nominal harus angka")
+    if nominal <= 0:
+        raise HTTPException(status_code=400, detail="nominal harus > 0")
+    media = (payload.get("media") or "kas_utama").strip().lower()
+    from .. import ledger_meta as lm
+    if media not in lm.MEDIA or media == "stok":
+        raise HTTPException(status_code=400, detail="media harus kas_utama/kas_kecil/bank/qris")
+    week_start = (payload.get("week_start") or "").strip()[:10]
+    if len(week_start) != 10:
+        raise HTTPException(status_code=400, detail="week_start wajib YYYY-MM-DD (Senin)")
+    tech = db.query(models.Technician).filter(
+        models.Technician.id == tech_id,
+        models.Technician.store_id == store.id).first()
+    if not tech:
+        raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan di toko ini")
+    ex = _gajian_cari(db, store.id, tech_id, week_start)
+    if ex:
+        r = ex[0]
+        return {"ok": True, "duplikat": True, "id": r.id, "nominal": r.nominal,
+                "teknisi": tech.nama, "week_start": week_start}
+    today = datetime.date.today()
+    from .finance import _ledger_add
+    row = _ledger_add(db, store.id, today, "keluar", "C1",
+                      f"Gajian {tech.nama} {week_start} (komisi+hadir)",
+                      nominal, media, ref_type="gajian", ref_id=tech_id,
+                      oleh=getattr(current, "username", None),
+                      masuk_laba=False, pengaruh_kas=True)
+    db.commit()
+    db.refresh(row)
+    log_action(db, "engine.gajian_bayar", target=tech.nama,
+               detail=f"minggu {week_start} nominal={nominal} via {media}",
+               actor=current, store_id=store.id)
+    return {"ok": True, "duplikat": False, "id": row.id, "nominal": nominal,
+            "teknisi": tech.nama, "week_start": week_start, "media": media}
+
+
+@router.delete("/gajian/bayar")
+def gajian_batal(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Batalkan tanda bayar (salah tekan): hapus baris payout minggu itu, kas kembali."""
+    store = _ctx_gajian(db, current, store_id)
+    try:
+        tech_id = int(payload.get("technician_id") or 0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="technician_id harus angka")
+    week_start = (payload.get("week_start") or "").strip()[:10]
+    rows = _gajian_cari(db, store.id, tech_id, week_start)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Tidak ada payout minggu itu untuk teknisi ini")
+    n = sum(int(r.nominal or 0) for r in rows)
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    log_action(db, "engine.gajian_batal", target=f"tech-{tech_id}",
+               detail=f"minggu {week_start} nominal={n} dibatalkan",
+               actor=current, store_id=store.id)
+    return {"ok": True, "dibatalkan": len(rows), "nominal": n}

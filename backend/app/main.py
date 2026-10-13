@@ -123,6 +123,18 @@ def _migrate_ledger():
                 conn.commit()
             except Exception as e2:
                 print("backfill persediaan skip:", e2)
+            # Komisi + uang hadir = HPP/biaya TANPA gerak kas (kas baru keluar saat
+            # dibayar Sabtu via gajian/bayar). Tanpa ini tutup kas selisih tiap malam.
+            try:
+                cur = conn.execute(text(
+                    "UPDATE ledger_entries SET pengaruh_kas = 0 "
+                    "WHERE ref_type IN ('service_komisi', 'allowance') "
+                    "AND (pengaruh_kas IS NULL OR pengaruh_kas != 0)"))
+                conn.commit()
+                if cur.rowcount:
+                    print(f"backfill komisi/allowance tanpa gerak kas: {cur.rowcount} baris")
+            except Exception as e3:
+                print("backfill komisi kas skip:", e3)
     except Exception as e:
         print("migrate ledger fail:", e)
 _migrate_ledger()

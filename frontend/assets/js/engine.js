@@ -683,16 +683,51 @@ function gajiWeekShift(delta){ const w=_gajiWeek(); _gajiWeekStart=_gajiAdd(w.st
 function gajiWeekReset(){ _gajiWeekStart=null; renderGajian(); }
 function _gajiPaidKey(id, start){ return 'gajian_paid_'+id+'_'+start; }
 function _gajiPaidGet(id, start){ try{ const v=localStorage.getItem(_gajiPaidKey(id,start)); return v?JSON.parse(v):null; }catch(e){ return null; } }
-function gajiTogglePaid(id){
-  const w=_gajiWeek(); const k=_gajiPaidKey(id,w.start);
+// Status bayar dari server (kas benar-benar kepotong) per minggu. Fallback tanda lokal.
+let _gajiPaidSrv={};
+let _gajiBersih={}; // nominal slip per teknisi utk payload bayar
+async function _gajiPaidLoad(start){
+  _gajiPaidSrv={};
+  if(!USE_API && typeof USE_API !== 'undefined') return;
   try{
-    if(localStorage.getItem(k)) localStorage.removeItem(k);
-    else{
+    const j=await apiFetch('/engine/gajian/paid?week_start='+encodeURIComponent(start));
+    if(j && j.paid) _gajiPaidSrv=j.paid;
+  }catch(e){ /* offline: pakai tanda lokal saja */ }
+}
+async function gajiTogglePaid(id){
+  const w=_gajiWeek(); const k=_gajiPaidKey(id,w.start);
+  const nominal=Math.max(0, Math.round(Number(_gajiBersih[id])||0));
+  const srvPaid=_gajiPaidSrv[id]||_gajiPaidSrv[String(id)];
+  const localPaid=(()=>{ try{ return !!localStorage.getItem(k); }catch(e){ return false; } })();
+  try{
+    if(srvPaid || localPaid){
+      // Batalkan: hapus payout server (kas kembali) + hapus tanda lokal
+      try{ await apiFetch('/engine/gajian/bayar', {method:'DELETE', body: JSON.stringify({technician_id:id, week_start:w.start})}); }
+      catch(e){ if(!(typeof isNetErr==='function' && isNetErr(e))) throw e; }
+      try{ localStorage.removeItem(k); }catch(e){}
+      try{ (window.showToast||alert)('↩️ Tanda bayar dibatalkan — kas kembali'); }catch(e){}
+    }else{
+      if(!(nominal>0)) return (window.showToast||alert)('Nominal Rp0 — tidak ada yang dibayar');
+      if(!confirm('Bayar '+_rp(nominal)+' tunai dari laci (kas_utama)? Kas benar-benar kepotong.')) return;
+      const r=await apiFetch('/engine/gajian/bayar', {method:'POST', body: JSON.stringify({technician_id:id, nominal, media:'kas_utama', week_start:w.start})});
       let by='admin';
       try{ by=localStorage.getItem('username')||(document.getElementById('sidebar-username')?.textContent)||'admin'; }catch(e){}
-      localStorage.setItem(k, JSON.stringify({at:new Date().toISOString().slice(0,16).replace('T',' '), by:String(by).slice(0,40)}));
+      try{ localStorage.setItem(k, JSON.stringify({at:new Date().toISOString().slice(0,16).replace('T',' '), by:String(by).slice(0,40)})); }catch(e){}
+      try{ (window.showToast||alert)(r && r.duplikat ? 'Sudah dibayar sebelumnya — tidak dobel' : '✅ Gajian '+_rp(nominal)+' dibayar, kas kepotong'); }catch(e){}
     }
-  }catch(e){}
+  }catch(e){
+    if(typeof isNetErr==='function' && isNetErr(e)){
+      // Offline: tanda lokal saja (existing behavior), ingatkan posting ulang saat online
+      try{
+        if(localStorage.getItem(k)) localStorage.removeItem(k);
+        else localStorage.setItem(k, JSON.stringify({at:new Date().toISOString().slice(0,16).replace('T',' '), by:'offline'}));
+      }catch(_){}
+      try{ (window.showToast||alert)('⚠ Offline — tanda lokal saja. Ketuk lagi saat online agar kas kepotong.'); }catch(_){}
+    }else{
+      try{ (window.showToast||alert)('Gagal: '+String((e&&e.message)||e).replace(/^HTTP \d+:\s*/,'').slice(0,160)); }catch(_){}
+      return;
+    }
+  }
   renderGajian();
 }
 async function renderGajian(){
@@ -725,6 +760,8 @@ async function renderGajian(){
       return !GAJI_HIDE_ROLES.includes(staffRole[nm]||'');
     });
     if(!list.length){ if(wrap) wrap.innerHTML='<p style="color:#8a8f98">Belum ada teknisi.</p>'; set('gajiSummary','-'); return; }
+    await _gajiPaidLoad(w.start);
+    _gajiBersih={};
     let total=0, paid=0;
     const cards=[];
     for(const t of list){
@@ -741,7 +778,13 @@ async function renderGajian(){
       });
       const bersih=kom+hdr-rfb;
       total+=bersih;
-      const pd=_gajiPaidGet(t.id, w.start); if(pd) paid++;
+      _gajiBersih[t.id]=bersih;
+      const srv=_gajiPaidSrv[t.id]||_gajiPaidSrv[String(t.id)]||null;
+      const loc=_gajiPaidGet(t.id, w.start);
+      const pd=srv||loc; if(pd) paid++;
+      const paidNote=srv
+        ? ('Dibayar '+_esc(String(srv.tanggal||'').slice(0,10))+' oleh '+_esc(srv.oleh||'-')+' • '+_rp(srv.nominal)+' via '+_esc(srv.media||'kas_utama')+' (kas kepotong)')
+        : (loc ? ('Dibayar '+_esc(loc.at||'')+' oleh '+_esc(loc.by||'')) : '');
       const nama=_esc(j.nama||t.nama||('Teknisi '+t.id));
       cards.push(
         '<div class="card" style="border-left:4px solid '+(pd?'#059669':'#f59e0b')+'">'
@@ -754,7 +797,7 @@ async function renderGajian(){
         +'<div class="stat-card"><div class="stat-head"><span>Bersih</span></div><h3 style="color:#2563eb">'+_rp(bersih)+'</h3></div>'
         +'</div>'
         +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' • Potong refund '+_rp(rfb)+' • Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' • '+j.pending_count+' komisi pending'):'')+'</p>'
-        +(pd?'<p style="font-size:11px;color:#059669;margin-bottom:10px">Dibayar '+_esc(pd.at||'')+' oleh '+_esc(pd.by||'')+'</p>':'')
+        +(pd?'<p style="font-size:11px;color:#059669;margin-bottom:10px">'+paidNote+'</p>':'')
         +'<div style="display:flex;gap:8px"><button class="btn '+(pd?'btn-ghost':'btn-dark')+' small" style="flex:1" onclick="gajiTogglePaid('+t.id+')">'+(pd?'↩️ Batalkan tanda':'✅ Tandai Sudah Dibayar')+'</button></div>'
         +'</div>'
       );

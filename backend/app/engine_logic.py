@@ -278,11 +278,14 @@ def cairkan(db: Session, svc: models.Service, actor=None):
                       max(0, int(svc.biaya or 0)), _svc_media(svc),
                       "service", svc.invoice, getattr(actor, "username", None))
     if komisi > 0:
+        # HPP komisi terbentuk TANPA gerak kas: uangnya masih di laci/bank sampai
+        # dibayar Sabtu (endpoint gajian/bayar). Kalau kas ikut kepotong di sini,
+        # tutup kas selisih tiap malam padahal fisik belum berkurang.
         _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "keluar", "B1",
                           f"Komisi {svc.teknisi or ''} {svc.invoice} ({pct}%)",
                           komisi, _svc_media(svc),
                           "service_komisi", svc.invoice, getattr(actor, "username", None),
-                          subkategori="Komisi")
+                          subkategori="Komisi", pengaruh_kas=False)
     db.commit()
     db.refresh(row)
     return row
