@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=black3">
+    <link rel="stylesheet" href="assets/css/style.css?v=padat1">
     <link rel="stylesheet" href="assets/css/ai-widget.css?v=multi1">
     <style>html.guard-lock body{visibility:hidden}</style>
     <script>
@@ -342,14 +342,14 @@
                     </div>
 
                     <div class="stack">
-                        <div class="card info-card">
-                            <h4>💡 Tips Input</h4>
+                        <details class="card info-card">
+                            <summary style="font-size:13px;font-weight:700;cursor:pointer;list-style:none">💡 Tips Input <span style="font-weight:400;color:#8a8f98;font-size:11px">(klik)</span></summary>
                             <ul>
                                 <li>Pastikan No WA aktif untuk notifikasi otomatis.</li>
                                 <li>Foto kondisi HP sebelum service (opsional).</li>
                                 <li>Nota akan ter-generate otomatis + QR tracking.</li>
                             </ul>
-                        </div>
+                        </details>
                         <div class="card">
                             <div class="card-head"><h3>Antrian Hari Ini</h3><span class="badge-count" id="queueCount">12 antrian</span></div>
                             <div class="queue-list" id="queueList"></div>

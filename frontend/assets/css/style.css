@@ -169,6 +169,27 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .queue-item .price{margin-left:auto;font-weight:700;font-size:13px}
 .badge-count{background:var(--brand);color:#fff;font-size:11px;padding:4px 8px;border-radius:20px}
 
+/* SERVICE MASUK — mode padat: form + antrean muat 1 layar tanpa scroll halaman */
+#view-service-masuk .grid-form{gap:12px;align-items:start}
+#view-service-masuk .card{padding:10px 12px}
+#view-service-masuk .card-head{margin-bottom:8px}
+#view-service-masuk .form-grid{gap:10px}
+#view-service-masuk .form-grid .field.full{grid-column:auto}
+#view-service-masuk .field{gap:4px}
+#view-service-masuk .field label{font-size:11px}
+#view-service-masuk .field input,#view-service-masuk .field select,#view-service-masuk .field textarea{padding:8px 10px;font-size:12.5px}
+#view-service-masuk .field textarea{min-height:52px}
+#view-service-masuk .chips{gap:6px}
+#view-service-masuk .chip{padding:5px 10px;font-size:11px}
+#view-service-masuk .form-actions{margin-top:12px;position:sticky;bottom:0;background:inherit;padding:8px 0 2px}
+#view-service-masuk .stack{display:flex;flex-direction:column;gap:12px;position:sticky;top:0}
+#view-service-masuk .info-card{padding:10px 14px}
+#view-service-masuk .info-card summary::-webkit-details-marker{display:none}
+#view-service-masuk .info-card ul{margin-top:8px}
+#view-service-masuk .queue-list{max-height:300px;gap:8px}
+#view-service-masuk .queue-item{padding:8px 10px}
+#view-service-masuk .queue-item img{width:30px;height:30px}
+
 /* PELANGGAN */
 .toolbar{flex-wrap:wrap;gap:12px}
 .toolbar-left,.toolbar-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
