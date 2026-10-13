@@ -64,6 +64,81 @@ async function saveEngineSettings(){
   }catch(e){ showToast('Gagal: '+e.message); }
 }
 
+// ---------- Tabungan Operasional: sewa harian + celengan bulanan (owner atur, tim baca) ----------
+function _opsIsOwner(){
+  try{
+    const role = (localStorage.getItem('role')||'').toLowerCase();
+    const myRole = document.getElementById('waMyRole')?.textContent.toLowerCase() || '';
+    return role==='superadmin' || role==='owner' || myRole.includes('owner') || myRole.includes('superadmin');
+  }catch(e){ return false; }
+}
+function _opsRp(v){ const n=parseInt(String(v??'').replace(/\D/g,'')); return isNaN(n)?0:n; }
+function _opsFmt(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
+async function loadOpsSettings(){
+  const card = document.getElementById('opsSettingsCard');
+  const msg = document.getElementById('opsSettingsMsg');
+  try{
+    if(card) card.style.display = _opsIsOwner() ? '' : 'none';
+    if(!_opsIsOwner()) return;
+    const s = await apiFetch('/ops/settings');
+    const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=(v??'')===''?'':v; };
+    set('ops-sewa', s.sewa_harian); set('ops-wifi', s.wifi_nominal); set('ops-wifi-tgl', s.wifi_tgl);
+    set('ops-listrik', s.listrik_nominal); set('ops-listrik-tgl', s.listrik_tgl);
+    set('ops-gaji', s.gaji_nominal); set('ops-gaji-tgl', s.gaji_tgl);
+    _opsAutoPreview();
+    if(msg) msg.style.display='none';
+  }catch(e){
+    if(msg){ msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='Gagal: '+String(e.message).slice(0,150); }
+  }
+}
+function _opsAutoPreview(){
+  const el = document.getElementById('opsAuto'); if(!el) return;
+  const bulanan = _opsRp(document.getElementById('ops-wifi')?.value) + _opsRp(document.getElementById('ops-listrik')?.value) + _opsRp(document.getElementById('ops-gaji')?.value);
+  el.textContent = `Target harian: ${_opsFmt(_opsRp(document.getElementById('ops-sewa')?.value))} (sewa) • Target bulanan: ${_opsFmt(bulanan)} • Sisihan auto ± ${_opsFmt(Math.round(bulanan/7))}/minggu dari omzet`;
+}
+async function saveOpsSettings(){
+  const msg = document.getElementById('opsSettingsMsg');
+  const body = {sewa_harian:_opsRp(document.getElementById('ops-sewa')?.value),
+    wifi_nominal:_opsRp(document.getElementById('ops-wifi')?.value),
+    wifi_tgl:parseInt(document.getElementById('ops-wifi-tgl')?.value)||20,
+    listrik_nominal:_opsRp(document.getElementById('ops-listrik')?.value),
+    listrik_tgl:parseInt(document.getElementById('ops-listrik-tgl')?.value)||15,
+    gaji_nominal:_opsRp(document.getElementById('ops-gaji')?.value),
+    gaji_tgl:parseInt(document.getElementById('ops-gaji-tgl')?.value)||1};
+  try{
+    await apiFetch('/ops/settings', {method:'PUT', body: JSON.stringify(body)});
+    showToast('✅ Tabungan operasional disimpan');
+    _opsAutoPreview();
+    if(msg){ msg.style.display='block'; msg.style.color='#059669'; msg.textContent='✅ Tersimpan '+new Date().toLocaleTimeString('id-ID'); }
+  }catch(e){ showToast('Gagal: '+e.message); }
+}
+async function opsMemoLoad(){
+  const el = document.getElementById('opsMemo');
+  if(!el) return;
+  try{
+    const j = await apiFetch('/ops/status');
+    const sw = j.sewa||{}, bl = j.bulanan||{};
+    const kumpul = (bl.sisih||0)+(bl.ngendap||0);
+    const pct = bl.need ? Math.min(100, Math.round(kumpul/bl.need*100)) : 0;
+    const t = bl.terdekat;
+    el.innerHTML = `🏠 Operasional • Sewa hari ini ${sw.ok?'✅':'⏳'} <strong>${_opsFmt(sw.terbayar||0)}/${_opsFmt(sw.target_harian||0)}</strong>`
+      + ` • Celengan bln ini <strong>${_opsFmt(kumpul)}/${_opsFmt(bl.need||0)}</strong> (${pct}%)`
+      + (t ? ` • terdekat: ${_esc(t.label)} tgl ${String(t.jatuh_tempo||'').slice(8,10)}` : '');
+  }catch(e){ el.textContent = '🏠 Operasional: belum diatur (owner atur di Pengaturan)'; }
+}
+async function tksOpsLoad(){
+  const el = document.getElementById('tksOps');
+  if(!el) return;
+  try{
+    const j = await apiFetch('/ops/status');
+    const sw = j.sewa||{}, bl = j.bulanan||{};
+    const kumpul = (bl.sisih||0)+(bl.ngendap||0);
+    const pct = bl.need ? Math.min(100, Math.round(kumpul/bl.need*100)) : 0;
+    el.innerHTML = `Sewa hari ini ......... ${sw.ok?'✅':'⏳'} <strong>${_opsFmt(sw.terbayar||0)}</strong> / target ${_opsFmt(sw.target_harian||0)}`
+      + `<br>Celengan bulanan ...... <strong>${_opsFmt(kumpul)}</strong> / ${_opsFmt(bl.need||0)} (${pct}%)`;
+  }catch(e){ el.textContent = '🏠 Operasional: belum diatur'; }
+}
+
 function setLapTekTab(t){
   // Guard: tab kas owner khusus owner/admin — teknisi pakai Kas Saya
   try{
@@ -592,6 +667,7 @@ async function kasTutupTokoLoad(){
   }catch(e){
     tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0, 120)}</td></tr>`;
   }
+  try{ tksOpsLoad(); }catch(e){}
 }
 async function kasTutupTokoSave(){
   if(_tksIsTek()){ (window.showToast || alert)('⛔ Hanya kasir/admin/owner yang boleh tutup kas'); return; }
@@ -604,6 +680,11 @@ async function kasTutupTokoSave(){
   try{
     const r = await apiFetch('/finance/cash/close', {method: 'POST', body: JSON.stringify({fisik, catatan: catatan || undefined})});
     (window.showToast || alert)(Number(r.selisih || 0) === 0 ? '✅ Tutup kas pas Rp0 — mantap!' : `🌙 Tersimpan, selisih ${_rp(r.selisih)} — cek lagi ya`);
+    // Celengan operasional: sisih otomatis hari ini (memo, idempoten — gagal tidak menggagalkan tutup kas)
+    try{
+      const s = await apiFetch('/ops/sisih-otomatis', {method: 'POST', body: JSON.stringify({})});
+      if(s && s.disisihkan && s.disisihkan.length) (window.showToast || alert)('🏠 Celengan operasional disisihkan hari ini');
+    }catch(e){}
     await kasTutupTokoLoad();
     try{ kasBarToko(); }catch(e){}
   }catch(e){ (window.showToast || alert)('Gagal simpan tutup kas: ' + (e.message || e)); }
@@ -664,6 +745,7 @@ function applyKasTokoFilter(){
   rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
   _kasTokoRows=rows; _kasTokoPage=1;
   drawKasToko();
+  try{ opsMemoLoad(); }catch(e){}
 }
 // ---------- Gajian Sabtu: slip mingguan Senin-Sabtu per teknisi ----------
 // Sumber: /engine/kas/teknisi/{id} (riwayat ledger), difilter tanggal minggu.
@@ -821,7 +903,7 @@ async function renderGajian(){
     try{
       const titles = {'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],'gajian':['Gajian Sabtu','Slip mingguan Senin–Sabtu per teknisi']};
       if(titles[view]){ document.getElementById('page-title').textContent=titles[view][0]; document.getElementById('page-subtitle').textContent=titles[view][1]; }
-      if(view==='pengaturan'){ loadEngineSettings(); }
+      if(view==='pengaturan'){ loadEngineSettings(); loadOpsSettings(); }
       if(view==='laporan-teknisi'){ /* tab kas butuh list */ }
       if(view==='kas-saya'){
         try{

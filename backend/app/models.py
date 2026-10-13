@@ -502,3 +502,38 @@ class CashConfig(Base):
     kas_kecil_limit = Column(Integer, default=500000)
     updated_oleh = Column(String(80), nullable=True)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class OpsSetting(Base):
+    """Tabungan Operasional per toko: sewa harian + wifi/listrik/gaji bulanan.
+    Diatur owner, dibaca semua tim (admin butuh buat cocokkan tutup kas)."""
+    __tablename__ = "ops_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, unique=True, index=True)
+    sewa_harian = Column(Integer, default=0)  # target sewa per hari (dicatat admin via expense C2)
+    wifi_nominal = Column(Integer, default=0)
+    wifi_tgl = Column(Integer, default=20)  # jatuh tempo tiap bulan
+    listrik_nominal = Column(Integer, default=0)
+    listrik_tgl = Column(Integer, default=15)
+    gaji_nominal = Column(Integer, default=0)  # gaji admin
+    gaji_tgl = Column(Integer, default=1)
+    updated_oleh = Column(String(80), nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class OpsEntry(Base):
+    """Celengan operasional: sisih (memo tabungan, tanpa gerak kas) & bayar.
+    Bayar selalu bertaut ke Expense (kas beneran keluar sekali, tercatat sekali)."""
+    __tablename__ = "ops_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    tanggal = Column(Date, default=datetime.date.today, index=True)
+    item = Column(String(20), nullable=False, index=True)  # wifi / listrik / gaji_admin (sewa via expense C2)
+    arah = Column(String(10), nullable=False, index=True)  # sisih / bayar
+    nominal = Column(Integer, default=0)
+    expense_id = Column(Integer, nullable=True, index=True)  # terisi jika arah=bayar
+    keterangan = Column(String(255), nullable=True)
+    dibuat_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now())

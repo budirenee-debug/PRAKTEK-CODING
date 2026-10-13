@@ -418,6 +418,16 @@
             <div class="card" style="margin-top:12px"><div class="card-head"><h3>🛠 Insiden Kerja (beban)</h3><span class="muted">beban toko = HPP • beban teknisi = hutang</span></div><div id="hubHppCelaka"></div></div>
           </div>
           <div id="hubPanel-operasional" style="display:none">
+            <div class="card" style="border-left:4px solid #059669;margin-bottom:12px">
+              <div class="card-head toolbar"><div class="toolbar-left"><h3>🏠 Tabungan Operasional</h3><span class="muted" id="opsTabSub">sewa harian + celengan bulanan • memo, tidak menyentuh komisi teknisi</span></div><div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownOpsTabungan()">↻</button></div></div>
+              <div class="stats" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-head"><span>Sewa Hari Ini</span></div><h3 id="opsSewa">-</h3><p class="trend" id="opsSewaSub">-</p></div>
+                <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Celengan Bulan Ini</span></div><h3 id="opsCelengan" style="color:#2563eb">-</h3><p class="trend" id="opsCelenganSub">-</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Sudah Dibayar</span></div><h3 id="opsDibayar">-</h3><p class="trend">bulan ini</p></div>
+                <div class="stat-card"><div class="stat-head"><span>Sisa Ngendap</span></div><h3 id="opsNgendap">-</h3><p class="trend">bulan-bulan lalu</p></div>
+              </div>
+              <div class="table-wrap"><table class="table compact"><thead><tr><th>Item</th><th style="text-align:right">Target</th><th>Jatuh Tempo</th><th style="text-align:right">Dibayar</th><th>Status</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyOpsTab"><tr><td colspan="6" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            </div>
             <div class="tabs" style="margin-bottom:12px">
               <button class="tab active" data-subg="ops" data-subk="all" onclick="ownOpsSub('all')">Semua</button>
               <button class="tab" data-subg="ops" data-subk="C1" onclick="ownOpsSub('C1')">Gaji</button>
@@ -2321,7 +2331,7 @@
       const L = {
         pendapatan: () => ownPendapatan(),
         hpp: () => ownHpp(),
-        operasional: () => ownOperasional(),
+        operasional: () => { ownOperasional(); try{ ownOpsTabungan(); }catch(e){} },
         aset: () => ownAset(),
         owner: () => ownOwnerTab(),
         non: () => ownNonTab(),
@@ -2621,6 +2631,58 @@
           || '<tr><td colspan="5" style="text-align:center;color:#8a8f98">Belum ada data operasional</td></tr>';
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="5" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
       try{ await ownKeluar(); }catch(e){}
+    }
+    // ---------- TABUNGAN OPERASIONAL (sewa harian + celengan bulanan, owner only) ----------
+    async function ownOpsTabungan(){
+      const tb = document.getElementById('tbodyOpsTab');
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      try{
+        const j = await ownFetch('/ops/status');
+        const sw = j.sewa || {}, bl = j.bulanan || {};
+        const kumpul = (bl.sisih || 0) + (bl.ngendap || 0);
+        set('opsSewa', rp(sw.terbayar || 0) + ' / ' + rp(sw.target_harian || 0));
+        set('opsSewaSub', sw.ok ? '✅ lunas hari ini' : '⏳ belum lunas');
+        set('opsCelengan', rp(kumpul) + ' / ' + rp(bl.need || 0));
+        set('opsCelenganSub', 'bulan ' + (j.bulan || ''));
+        set('opsDibayar', rp(bl.dibayar || 0));
+        set('opsNgendap', rp(bl.ngendap || 0));
+        const badge = s => s === 'lunas'
+          ? '<span class="badge-status Selesai">✅ Lunas</span>'
+          : s === 'terlambat'
+          ? '<span class="badge-status Menunggu Sparepart">⚠ Terlambat</span>'
+          : s === 'belum_diatur'
+          ? '<span style="font-size:11px;color:#8a8f98">belum diatur</span>'
+          : '<span class="badge-status Menunggu Konfirmasi">⏳ Menunggu</span>';
+        const rows = [{
+          item: 'sewa', label: 'Sewa tempat (harian)', nominal: sw.target_harian || 0,
+          jatuh_tempo: 'tiap hari', dibayar: sw.terbayar || 0,
+          status: sw.ok ? 'lunas' : ((sw.target_harian || 0) > 0 ? 'menunggu' : 'belum_diatur'),
+        }].concat((bl.items || []).map(it => ({
+          item: it.item, label: it.label + ' (bulanan)', nominal: it.nominal,
+          jatuh_tempo: 'tgl ' + String(it.jatuh_tempo || '').slice(8, 10),
+          dibayar: it.dibayar, status: it.status,
+        })));
+        tb.innerHTML = rows.map(r => `<tr><td><strong>${esc(r.label)}</strong></td>`
+          + `<td style="text-align:right">${rp(r.nominal)}</td><td>${esc(r.jatuh_tempo)}</td>`
+          + `<td style="text-align:right">${rp(r.dibayar)}</td><td>${badge(r.status)}</td>`
+          + `<td style="text-align:center">${r.nominal > 0 && r.status !== 'lunas'
+            ? `<button class="btn btn-dark small" style="padding:4px 10px;font-size:11px" onclick="ownOpsBayar('${r.item}',${r.nominal - r.dibayar},'${esc(r.label)}')">💸 Bayar</button>`
+            : '<span style="color:#d1d5db">-</span>'}</td></tr>`).join('')
+          || '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Belum diatur — atur nominal di index → Pengaturan → Tabungan Operasional</td></tr>';
+      }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="6" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
+    }
+    async function ownOpsBayar(item, sisa, label){
+      const nominal = prompt(`Bayar ${label} dari tabungan (Rp):`, String(sisa || ''));
+      if(nominal === null) return;
+      const n = parseInt(String(nominal).replace(/\D/g, '')) || 0;
+      if(n <= 0){ alert('Nominal harus > 0'); return; }
+      const metode = prompt('Metode (Tunai/Transfer/QRIS):', 'Tunai') || 'Tunai';
+      if(!confirm(`Bayar ${label} Rp ${n.toLocaleString('id-ID')} via ${metode} dari tabungan? (kas keluar tercatat sekali)`)) return;
+      try{
+        await ownFetch('/ops/bayar', {method: 'POST', body: JSON.stringify({item, nominal: n, metode})});
+        alert('✅ Terbayar dari tabungan');
+        await ownOpsTabungan();
+      }catch(e){ alert('Gagal bayar: ' + e.message); }
     }
     // ---------- 4. ASET ----------
     function ownAsetSub(k){ ownSubSet('aset', k, () => ownAset()); }

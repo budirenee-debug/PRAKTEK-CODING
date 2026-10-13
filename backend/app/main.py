@@ -17,6 +17,7 @@ from .routers import services, customers, technicians, stats, auth, inventory, s
 from .routers import ai as ai_router
 from .routers import engine as engine_router
 from .routers import finance as finance_router
+from .routers import operasional as operasional_router
 from .routers import sales as sales_router
 from . import models
 from .seed import seed
@@ -529,6 +530,7 @@ app.include_router(inventory.router, prefix="/api")
 app.include_router(track.router, prefix="/api")
 app.include_router(engine_router.router, prefix="/api")
 app.include_router(finance_router.router, prefix="/api")
+app.include_router(operasional_router.router, prefix="/api")
 app.include_router(sales_router.router, prefix="/api")
 app.include_router(ai_router.router, prefix="/api")
 
