@@ -444,6 +444,12 @@ def upload_my_foto(file: UploadFile = File(...), db: Session = Depends(get_db), 
     return {"foto": current.foto, "size": len(blob)}
 
 @router.post("/seed-superadmin")
-def seed_superadmin(db: Session = Depends(get_db)):
+def seed_superadmin(db: Session = Depends(get_db), current = Depends(get_current_user)):
+    # bootstrap sekali saja saat belum ada superadmin; selebihnya wajib superadmin
+    existing = db.query(models.User).filter(models.User.username == "superadmin").first()
+    if existing:
+        if not current or current.role != "superadmin":
+            raise HTTPException(status_code=403, detail="Hanya superadmin")
+        return {"message": "superadmin ready", "username": existing.username, "role": existing.role}
     user = ensure_superadmin(db)
     return {"message": "superadmin ready", "username": user.username, "role": user.role}

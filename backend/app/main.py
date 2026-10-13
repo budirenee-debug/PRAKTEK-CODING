@@ -263,7 +263,7 @@ def _migrate_unique_per_store():
                 created_at DATETIME,
                 CONSTRAINT uq_technician_nama_store UNIQUE (nama, store_id)
             )""",
-            "cols": "id, store_id, nama, foto, is_active, created_at",
+            "cols": "id, store_id, nama, foto, is_active, level, created_at",
             "indexes": ["CREATE INDEX ix_technicians_nama ON technicians (nama)",
                         "CREATE INDEX ix_technicians_store_id ON technicians (store_id)"],
             "marker": "uq_technician_nama_store",
@@ -281,10 +281,19 @@ def _migrate_unique_per_store():
                     continue
                 if spec["marker"] in row[0]:
                     continue  # sudah komposit
+                # introspeksi kolom lama agar rebuild aman untuk DB lawas
+                # (mis. technicians lama belum punya kolom level/store_id)
+                old_cols = [r[1] for r in conn.execute(
+                    text(f"PRAGMA table_info({table})")).fetchall()]
+                want = [c.strip() for c in spec["cols"].split(",")]
+                sel_parts = []
+                for c in want:
+                    sel_parts.append(c if c in old_cols else
+                        ("'junior'" if c == "level" else ("NULL" if c == "store_id" else "NULL")))
                 print(f"multistore: rebuild {table} -> UNIQUE komposit per toko...")
                 conn.execute(text(spec["create"]))
                 conn.execute(text(
-                    f"INSERT INTO {table}_new ({spec['cols']}) SELECT {spec['cols']} FROM {table}"))
+                    f"INSERT INTO {table}_new ({', '.join(want)}) SELECT {', '.join(sel_parts)} FROM {table}"))
                 conn.execute(text(f"DROP TABLE {table}"))
                 conn.execute(text(f"ALTER TABLE {table}_new RENAME TO {table}"))
                 for idx in spec["indexes"]:
@@ -596,7 +605,7 @@ def root(request: Request):
 
 @app.get("/health", tags=["Root"])
 def health():
-    return {"status": "ok", "db": "sqlite", "engine": str(engine.url)}
+    return {"status": "ok", "db": "sqlite"}
 
 @app.post("/api/seed", tags=["Root"])
 def seed_db(db: Session = Depends(get_db), current = Depends(auth.require_superadmin)):

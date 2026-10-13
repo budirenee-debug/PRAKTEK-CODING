@@ -6,8 +6,8 @@ Aturan resolve_store(db, current, store_id):
   (superadmin bebas semua toko)
 - tanpa store_id + superadmin -> None (semua toko, perilaku legacy)
 - tanpa store_id + member -> toko primer (membership aktif pertama)
-- tanpa store_id + anonimus -> toko default (BGJ / toko aktif pertama,
-  agar dashboard publik tetap tampil seperti dulu)
+- tanpa store_id + anonimus -> 401 (wajib login; endpoint publik seperti /track
+  tidak memakai helper ini agar tetap bisa diakses tanpa token)
 """
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -84,10 +84,8 @@ def resolve_store(db: Session, current, store_id: Optional[int]) -> Optional[mod
         if not s or not s.is_active:
             raise HTTPException(status_code=403, detail="Toko tidak aktif")
         return s
-    s = default_store(db)
-    if not s:
-        raise HTTPException(status_code=404, detail="Belum ada toko aktif")
-    return s
+    # anonimus tanpa store_id eksplisit -> wajib login (anti-intip data pelanggan/WA)
+    raise HTTPException(status_code=401, detail="Login dulu untuk akses data toko")
 
 
 def ensure_in_store(row, store: Optional[models.Store], label: str = "Data"):
