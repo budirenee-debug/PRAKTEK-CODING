@@ -2,7 +2,7 @@
 Main FastAPI - B_gadget POS Service HP
 Root + Models + SQLite
 """
-from fastapi import FastAPI, Depends, Request, HTTPException
+from fastapi import FastAPI, Depends, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
@@ -476,6 +476,7 @@ ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -538,6 +539,18 @@ if os.path.exists(FRONTEND_DIR):
     for _p in _CLEAN_PAGES:
         app.add_api_route(f"/{_p}", _clean_page(_p), methods=["GET"],
                           tags=["Root"], include_in_schema=False)
+
+@app.get("/favicon.ico", tags=["Root"], include_in_schema=False)
+def favicon():
+    # Hilangkan 404 favicon di Console (PC lain sering dikira "offline").
+    # Serve logo jika ada, else 204 kosong.
+    try:
+        fp = os.path.join(FRONTEND_DIR, "assets", "images", "logo.svg")
+        if os.path.isfile(fp):
+            return FileResponse(fp, media_type="image/svg+xml")
+    except Exception:
+        pass
+    return Response(status_code=204)
 
 @app.get("/", tags=["Root"])
 def root(request: Request):

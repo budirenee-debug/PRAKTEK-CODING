@@ -845,12 +845,26 @@ async function flushOutbox(){
           break; // berhenti, coba lagi nanti
         }
         const msg = String((e && e.message) || '');
-        if(/404|tidak ditemukan|422|validasi/i.test(msg)){
-          // entry basi/validasi gagal — buang agar tidak macet, tampilkan info
-          done.push(entry.qid);
-          console.warn('outbox drop entry:', entry, msg.slice(0,200));
-          try{ showToast('⚠ 1 antrean dibuang: ' + msg.slice(0,120)); }catch{}
-          continue;
+        // Server nolak (4xx: kuota 2:1, belum ada toko, validasi, dsb):
+        // retry selamanya = spam 400 tiap poll (kasus "sering offline" di PC lain).
+        // Permanen -> buang antrean + kasih tahu user (baris lokal TMP tetap terlihat).
+        // Selain itu -> hitung gagal, buang setelah 5x (localStorage, antar-poll).
+        if(/HTTP 4\d\d|404|tidak ditemukan|422|validasi|kuota|quota|belum ada toko|dikunci|harga_part_up/i.test(msg)){
+          const permanent = /404|tidak ditemukan|422|validasi|kuota|quota|dikunci/i.test(msg);
+          let fails = (entry.fails || 0) + 1;
+          if(permanent || fails >= 5){
+            done.push(entry.qid);
+            console.warn('outbox drop entry (server nolak):', entry, msg.slice(0,250));
+            try{ showToast('⚠ 1 antrean dibuang: ' + msg.replace(/^HTTP \d+:\s*/, '').slice(0,160)); }catch{}
+            continue;
+          }
+          // transien (<5x): simpan counter, berhenti dulu, coba lagi nanti
+          try{
+            const qsave = loadOutbox();
+            const qi = qsave.findIndex(x => x.qid === entry.qid);
+            if(qi >= 0){ qsave[qi].fails = fails; saveOutbox(qsave); }
+          }catch{}
+          break;
         }
         // token expired saat antrean mau naik (JWT 2 jam): jangan macet selamanya,
         // tendang ke login agar dapat token baru — antrean tetap aman di localStorage.
@@ -978,14 +992,51 @@ window.addEventListener('pageshow', ()=>{
     enforceAuthOrRedirect();
   }catch(e){}
 });
-async function apiFetch(path, opts={}){
+let _storeRecovering = false; // guard: pemulihan store basi cukup 1x per sesi error
+function _isStoreScopeErr(status, body){
+  if(![400, 403, 404].includes(status)) return false;
+  const m = String(body || '').toLowerCase();
+  return m.includes('toko') || m.includes('anggota') || m.includes('store')
+    || m.includes('member') || m.includes('tidak ditemukan');
+}
+async function _recoverStoreOnce(){
+  // Store id lokal basi (mis. DB server di-restore, toko dihapus/nonaktif):
+  // buang id lama, ambil daftar segar dari server, pakai toko pertama.
+  if(_storeRecovering) return false;
+  _storeRecovering = true;
+  try{
+    try{ localStorage.removeItem('active_store_id'); }catch{}
+    const token = localStorage.getItem('access_token');
+    if(!token) return false;
+    const res = await fetch(`${API_BASE}/stores`, {headers: getAuthHeaders()});
+    if(!res.ok) return false;
+    const stores = await res.json();
+    if(!Array.isArray(stores) || !stores.length) return false;
+    try{
+      localStorage.setItem('bos_stores', JSON.stringify(stores));
+      localStorage.setItem('active_store_id', String(stores[0].id));
+    }catch{}
+    try{ buildStoreSwitcher(stores, stores[0].id); updateStoreBrand(); }catch{}
+    console.warn('store basi dipulihkan -> toko:', stores[0].id, stores[0].nama);
+    return true;
+  }catch{ return false; }
+  finally{ _storeRecovering = false; }
+}
+async function apiFetch(path, opts={}, _retried){
   const url = `${API_BASE}${withStoreScope(path)}`;
   const token = localStorage.getItem('access_token');
   const baseHeaders = {'Content-Type':'application/json'};
   if(token) baseHeaders['Authorization'] = `Bearer ${token}`;
   // merge headers: opts.headers overrides base if provided
   const headers = {...baseHeaders, ...(opts.headers||{})};
-  const res = await fetch(url, {...opts, headers});
+  let res;
+  try{
+    res = await fetch(url, {...opts, headers});
+  }catch(netErr){
+    // network murni (tunnel putus, server mati): biarkan caller yang handle
+    // sebagai offline — pesannya sudah dikenali isNetErr().
+    throw netErr;
+  }
   if(!res.ok){
     // token mati/expired saat polling/sync → tendang ke login sekali saja (anti-loop di halaman publik)
     if(res.status === 401){
@@ -1001,7 +1052,13 @@ async function apiFetch(path, opts={}){
       }catch(e){}
     }
     const txt = await res.text();
-    throw new Error(txt || res.statusText);
+    // store_id basi (403 Bukan anggota / 404 Toko nonaktif / dsb): pulihkan sekali lalu retry.
+    // Ini penyebab "sering offline" di PC lain — id toko di localStorage beda dengan server.
+    if(!_retried && url.includes('store_id=') && _isStoreScopeErr(res.status, txt)){
+      const ok = await _recoverStoreOnce();
+      if(ok) return apiFetch(path, opts, true);
+    }
+    throw new Error(`HTTP ${res.status}: ` + (txt || res.statusText));
   }
   return res.json();
 }
@@ -1131,6 +1188,23 @@ async function loadData(silent){
     // jika ada antrean, flush di background (tanpa blokir render)
     try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 500); }catch{}
   }catch(e){
+    const msg = String((e && e.message) || e || '');
+    // Aturan: HTTP xxx = server BISA dihubungi (bukan offline!) — jangan tandai Offline.
+    // Hanya network error (failed to fetch) yang berarti benar-benar offline.
+    const isHttp = /^HTTP \d+:/.test(msg);
+    const isDenied = /HTTP 40[0143]|anggota|toko|member|unauthorized|forbidden|tidak ditemukan/i.test(msg);
+    if(isDenied || isHttp){
+      // Ditolak server (token/toko/validasi), BUKAN offline — jangan tandai Offline permanen.
+      // Tampilkan sebab aslinya sekali saja agar tidak dikira "sering offline".
+      if(!_offlineToastShown && !silent) {
+        console.warn('API ditolak (bukan offline):', msg.slice(0,300));
+        showToast('⛔ ' + msg.replace(/^HTTP \d+:\s*/, '').slice(0,160));
+        _offlineToastShown = true;
+      } else {
+        console.warn('API ditolak (silent):', msg.slice(0,200));
+      }
+      return; // USE_API tetap true — poll berikutnya coba lagi (mis. habis di-approve owner)
+    }
     _netFails++;
     if(silent && _netFails < 3){
       // blip sesaat (tunnel/ISP kedip 1-2x poll): jangan oren-kan layar + jangan timpa
