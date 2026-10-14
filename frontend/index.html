@@ -171,12 +171,14 @@
                     </div>
                 </div>
                 <div class="topbar-right">
+                    <button id="connPill" onclick="manualSync()" title="Status koneksi — klik untuk sync" style="font-size:11px;font-weight:700;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:7px 10px;border-radius:10px;white-space:nowrap;cursor:pointer">🟢 Online</button>
                     <div id="realtimeClock" style="font-size:11px;color:#4b5563;background:#fff;border:1px solid #ececec;padding:7px 10px;border-radius:10px;white-space:nowrap;font-weight:600">—</div>
                     <div class="search-box" id="topSearchBox">
                         <span>⌕</span>
                         <input type="text" id="globalSearch" placeholder="Cari pelanggan, HP, IMEI, invoice...">
                     </div>
-                    <button class="btn btn-ghost small" onclick="clearCacheAndReload()" title="Clear cache & hard reload" style="padding:7px 10px;font-size:11px;background:#fef2f2;border-color:#fecaca;color:#991b1b">🔄 Clear Cache</button>
+                    <button class="btn btn-ghost small" onclick="manualSync()" title="Paksa sync antrean offline ke server sekarang" style="padding:7px 10px;font-size:11px;background:#ecfdf5;border-color:#a7f3d0;color:#065f46">🔄 Sync</button>
+                    <button class="btn btn-ghost small" onclick="clearCacheAndReload()" title="Clear cache & hard reload (antrean offline AMAN tidak ikut terhapus)" style="padding:7px 10px;font-size:11px;background:#fef2f2;border-color:#fecaca;color:#991b1b">🧹 Cache</button>
                     <button class="btn btn-dark" id="btnServiceBaru" onclick="switchView('service-masuk')" style="display:none">+ Service Baru</button>
                     <button class="notif" id="notifBell" onclick="handleNotifClick()" title="Notifikasi persetujuan akun">◐<span class="dot" id="notifDot"></span><span class="notif-count" id="notifCount">0</span></button>
                 </div>
@@ -184,6 +186,16 @@
 
             <!-- VIEW: DASHBOARD -->
             <section class="view active" id="view-dashboard">
+                <div id="syncBanner" class="approval-banner" style="display:flex;background:#ecfdf5;border-color:#a7f3d0;align-items:center">
+                    <div class="approval-banner-left">
+                        <div class="approval-banner-icon">📡</div>
+                        <div>
+                            <strong id="syncBannerTitle" style="font-size:13px">🟢 Online — 0 antrean</strong>
+                            <p id="syncBannerText" style="font-size:12px;color:#065f46;margin-top:2px">Terhubung ke server. Input langsung tersimpan. Klik Sync untuk cek ulang.</p>
+                        </div>
+                    </div>
+                    <button id="syncBannerBtn" class="btn btn-dark small" style="white-space:nowrap" onclick="manualSync()">🔄 Sync</button>
+                </div>
                 <div id="previewBanner" class="approval-banner" style="display:none;background:#eff6ff;border-color:#bfdbfe">
                     <div class="approval-banner-left">
                         <div class="approval-banner-icon">👁</div>
@@ -1371,7 +1383,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx1"></script>
-    <script src="assets/js/script.js?v=page19"></script>
+    <script src="assets/js/script.js?v=page21-sync1"></script>
     <script src="assets/js/engine.js?v=eng20"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>

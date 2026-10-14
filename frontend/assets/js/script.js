@@ -733,18 +733,134 @@ function saveOutbox(q){
   try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(q)); }catch{}
   try{ updateOutboxBadge(); }catch{}
 }
-function updateOutboxBadge(){
-  const q = loadOutbox();
-  const el = document.querySelector('.store-info span:first-child');
-  if(!el) return;
-  const base = USE_API ? '● Sistem Online (API)' : '● Offline (localStorage)';
-  if(q.length){
-    el.textContent = base + ` • ⏳ ${q.length} antre sync`;
-    el.style.color = '#b45309';
-  } else {
-    // jangan timpa warna online/offline yang diatur loadData
-    if(el.textContent.includes('antre')){ el.textContent = base; }
+function connIndicatorEl(){ return document.querySelector('.store-info span:first-child'); }
+// Sentral indikator koneksi — satu-satunya tempat yang boleh tulis status Online/Offline.
+// Render ke 3 titik: sidebar (.store-info), pill topbar (#connPill), banner dashboard (#syncBanner).
+// Anti-kedip: HTTP error butuh 2x gagal beruntun; tapi wifi/browser offline (navigator.onLine=false
+// atau event 'offline') langsung Offline tanpa tunggu — itu yang bikin kemarin "wifi putus tapi masih online".
+let _connState = null; // 'online' | 'offline' | null(belum init)
+function renderConnIndicator(){
+  let q = 0;
+  try{ q = loadOutbox().length; }catch{}
+  // browser bilang offline (wifi putus) = paksa tampil offline walau USE_API belum flip
+  let browserOff = false;
+  try{ browserOff = (typeof navigator !== 'undefined' && navigator.onLine === false); }catch{}
+  const online = USE_API && !browserOff;
+  const el = connIndicatorEl();
+  if(el){
+    if(q > 0){
+      el.textContent = (online ? '● Sistem Online (API)' : '● Offline — simpan lokal') + ` • ⏳ ${q} antre sync (klik Sync)`;
+      el.style.color = '#b45309';
+      el.style.cursor = 'pointer';
+      el.title = 'Klik untuk sync sekarang';
+      el.onclick = ()=>{ try{ manualSync(); }catch{} };
+    } else if(online){
+      el.textContent = '● Sistem Online (API)';
+      el.style.color = '#10b981';
+      el.style.cursor = 'default';
+      el.title = 'Terhubung ke server';
+      el.onclick = null;
+    } else {
+      el.textContent = '● Offline — simpan lokal (auto-sync saat online)';
+      el.style.color = '#dc2626';
+      el.style.cursor = 'default';
+      el.title = 'Wifi/server putus — input tetap tersimpan lokal & antre sync';
+      el.onclick = null;
+    }
   }
+  // pill topbar (selalu kelihatan walau sidebar ketutup di HP)
+  try{
+    const pill = document.getElementById('connPill');
+    if(pill){
+      if(q > 0){
+        pill.textContent = (online ? '🟢 Online' : '🔴 Offline') + ` • ⏳ ${q} antre`;
+        pill.style.background = '#fffbeb'; pill.style.color = '#b45309'; pill.style.borderColor = '#fde68a';
+      } else if(online){
+        pill.textContent = '🟢 Online';
+        pill.style.background = '#ecfdf5'; pill.style.color = '#065f46'; pill.style.borderColor = '#a7f3d0';
+      } else {
+        pill.textContent = '🔴 Offline — simpan lokal';
+        pill.style.background = '#fef2f2'; pill.style.color = '#dc2626'; pill.style.borderColor = '#fecaca';
+      }
+      pill.title = q > 0 ? `Klik untuk sync ${q} antrean sekarang` : (online ? 'Terhubung ke server' : 'Putus — input tetap tersimpan lokal');
+    }
+  }catch{}
+  // banner dashboard (paling mencolok, di atas statistik)
+  try{
+    const b = document.getElementById('syncBanner');
+    if(b){
+      // SELALU tampil (persistent) — user minta indikator sync kelihatan terus di dashboard
+      b.style.display = 'flex';
+      const title = document.getElementById('syncBannerTitle');
+      if(!online){ b.style.background = '#fef2f2'; b.style.borderColor = '#fecaca'; }
+      else if(q > 0){ b.style.background = '#fffbeb'; b.style.borderColor = '#fde68a'; }
+      else { b.style.background = '#ecfdf5'; b.style.borderColor = '#a7f3d0'; }
+      if(title){
+        title.textContent = !online ? '🔴 Offline — simpan lokal' : (q > 0 ? `🟠 Online — ${q} antrean` : '🟢 Online — 0 antrean');
+      }
+      const t = document.getElementById('syncBannerText');
+      if(t){
+        t.style.color = !online ? '#991b1b' : (q > 0 ? '#92400e' : '#065f46');
+        t.innerHTML = (!online
+          ? `<strong>Wifi/server putus.</strong> <strong>Input tetap tersimpan lokal</strong>, jangan tutup tab.`
+          : (q > 0
+            ? `Masih ada <strong>${q} antrean</strong> belum naik ke server. Klik <strong>Sync</strong> untuk kirim sekarang.`
+            : `Terhubung ke server. Input langsung tersimpan. Klik Sync untuk cek ulang.`));
+      }
+      const btn = document.getElementById('syncBannerBtn');
+      if(btn) btn.textContent = q > 0 ? `🔄 Sync ${q} antre` : '🔄 Sync';
+    }
+  }catch{}
+}
+function setConnState(online, force){
+  const next = online ? 'online' : 'offline';
+  // SELALU render (fix bug kemarin: throttle 4 detik bikin wifi putus tapi tampilan masih online)
+  if(_connState === next){ try{ renderConnIndicator(); }catch{} return; }
+  _connState = next;
+  USE_API = online;
+  if(online){ try{ _netFails = 0; }catch{} }
+  try{ renderConnIndicator(); }catch{}
+}
+function markNetOk(){
+  try{ _netFails = 0; }catch{}
+  if(!USE_API) setConnState(true);
+  else { try{ renderConnIndicator(); }catch{} }
+}
+function markNetFail(){
+  // wifi/browser offline = langsung offline, jangan tunggu 2x gagal
+  try{ if(typeof navigator !== 'undefined' && navigator.onLine === false){ setConnState(false, true); return; } }catch{}
+  try{ _netFails = (typeof _netFails==='number' ? _netFails : 0) + 1; }catch{}
+  // baru tandai offline setelah 2x gagal beruntun (blip 1x tidak bikin kedip)
+  try{ if(_netFails >= 2) setConnState(false); else renderConnIndicator(); }catch{ USE_API = false; }
+}
+// Heartbeat cepat tiap 5 detik ke /health (timeout 4 dtk) — deteksi wifi putus
+// tanpa nunggu polling data 8 detik. Auto-flush antrean saat pulih.
+let _hbRunning = false;
+async function heartbeatOnce(){
+  let ok = false;
+  try{
+    if(typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('browser offline');
+    const ctl = new AbortController();
+    const timer = setTimeout(()=>{ try{ ctl.abort(); }catch{} }, 4000);
+    try{
+      const base = API_BASE.replace(/\/api$/, '');
+      const r = await fetch(base + '/health', {signal: ctl.signal, cache: 'no-store'});
+      ok = !!(r && r.ok);
+    } finally { clearTimeout(timer); }
+  }catch{ ok = false; }
+  if(ok){ markNetOk(); try{ if(loadOutbox().length) flushOutbox(); }catch{} }
+  else { markNetFail(); }
+  try{ renderConnIndicator(); }catch{}
+  return ok;
+}
+function startHeartbeat(){
+  if(_hbRunning) return;
+  _hbRunning = true;
+  try{ heartbeatOnce(); }catch{}
+  try{ setInterval(()=>{ if(!document.hidden) heartbeatOnce(); }, 5000); }catch{}
+}
+function updateOutboxBadge(){
+  try{ renderConnIndicator(); }catch{}
 }
 function makeTmpId(){
   return 'TMP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,7).toUpperCase();
@@ -819,29 +935,41 @@ async function flushOutbox(){
           if(entry.payload && !entry.payload.client_key && entry.clientTmp) entry.payload.client_key = entry.clientTmp;
           const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(entry.payload||{})});
           const real = normalize(created);
-          const idx = data.findIndex(d => d && (d.id === entry.clientTmp));
-          if(idx >= 0) data[idx] = real;
-          else data.unshift(real);
+          // hapus SEMUA baris lokal dengan clientTmp sama (cegah sisa dobel offline)
+          let replaced = false;
+          data = data.map(d => (d && d.id === entry.clientTmp) ? (replaced ? null : (replaced=true, real)) : d).filter(Boolean);
+          // jika tidak ada baris lokal (mis. habis clear cache tapi outbox aman), tambah
+          if(!replaced) data.unshift(real);
           rekeyOutboxInvoice(entry.clientTmp, real.id);
+          // draft form yg sama sudah naik -> bersihkan agar tidak dikira belum save
+          try{ clearFormDraft(entry.clientTmp); }catch{}
           done.push(entry.qid);
+          markNetOk();
         } else if(entry.op === 'patch'){
+          // skip patch untuk TMP yang create-nya masih antre (sudah digabung via enqueue)
+          if(String(entry.invoice||'').startsWith('TMP-')){ done.push(entry.qid); continue; }
           await apiFetch(`/services/${entry.invoice}`, {method:'PATCH', body: JSON.stringify(entry.payload||{})});
           done.push(entry.qid);
+          markNetOk();
         } else if(entry.op === 'status'){
+          if(String(entry.invoice||'').startsWith('TMP-')){ continue; /* tunggu create naik dulu */ }
           await apiFetch(`/services/${entry.invoice}/status?status=${encodeURIComponent(entry.status)}`, {method:'PUT'});
           done.push(entry.qid);
+          markNetOk();
+        } else if(entry.op === 'api'){
+          // antrean generik offline: customer / sales / inventory / finance
+          await apiFetch(entry.endpoint, {method: entry.method||'POST', body: JSON.stringify(entry.payload||{})});
+          done.push(entry.qid);
+          markNetOk();
+          try{ if(entry.kind==='customer') await loadData(true); }catch{}
+          try{ if(entry.kind==='inventory') await loadInventory(); }catch{}
         } else {
           done.push(entry.qid);
         }
         saveLocal();
       }catch(e){
         if(isNetErr(e)){
-          _netFails++;
-          if(_netFails >= 3){
-            USE_API = false;
-            const el = document.querySelector('.store-info span:first-child');
-            if(el){ el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
-          }
+          markNetFail();
           break; // berhenti, coba lagi nanti
         }
         const msg = String((e && e.message) || '');
@@ -881,19 +1009,34 @@ async function flushOutbox(){
     saveLocal();
     try{ await loadData(true); }catch{}
     try{ renderAll(); renderSemuaService(); }catch{}
+    try{ if(typeof renderSparepart==='function') renderSparepart(); }catch{}
     const left = loadOutbox().length;
-    if(done.length){ _netFails = 0; try{ updateOutboxBadge(); }catch{} }
-    if(done.length && !left){ try{ showToast(`✅ Sync selesai (${done.length} antrean naik)`); }catch{} USE_API = true; }
+    if(done.length){ try{ _netFails = 0; }catch{} setConnState(true); }
+    if(done.length && !left){ try{ showToast(`✅ Sync selesai (${done.length} antrean naik)`); }catch{} }
     else if(done.length){ try{ showToast(`🔄 Sync ${done.length} naik, sisa ${left} antre`); }catch{} }
+    else if(!left){ setConnState(true); }
   }finally{
     _flushingOutbox = false;
-    try{ updateOutboxBadge(); }catch{}
+    try{ renderConnIndicator(); }catch{}
   }
+}
+async function manualSync(){
+  // tombol sync manual (klik indikator / tombol Sync): paksa coba online lalu flush
+  try{ showToast('🔄 Mencoba sync...'); }catch{}
+  setConnState(true);
+  try{ await loadData(true); }catch{}
+  await flushOutbox();
+  try{ renderConnIndicator(); }catch{}
+}
+function enqueueApi(kind, endpoint, payload, method){
+  // antrean generik untuk modul selain service (customer/sales/inventory)
+  return enqueueOutbox({op:'api', kind, endpoint, payload, method: method||'POST'});
 }
 if(typeof window !== 'undefined'){
   try{
-    window.addEventListener('online', ()=>{ USE_API = true; flushOutbox(); });
-    window.addEventListener('offline', ()=>{ USE_API = false; updateOutboxBadge(); });
+    window.addEventListener('online', ()=>{ try{ _netFails = 0; }catch{} setConnState(true, true); try{ showToast('✅ Internet tersambung — sync...'); }catch{} flushOutbox(); });
+    window.addEventListener('offline', ()=>{ setConnState(false, true); try{ showToast('🔴 Wifi putus — input tetap tersimpan lokal'); }catch{} });
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && loadOutbox().length) flushOutbox(); });
     setInterval(()=>{ if(loadOutbox().length && !document.hidden) flushOutbox(); }, 15000);
   }catch{}
 }
@@ -1172,21 +1315,29 @@ async function loadData(silent){
     // fetch semua (limit 200 = max backend lawas le=200) lalu filter client-side
     const rows = await apiFetch(`/services?limit=200`);
     const mapped = rows.map(normalize);
-    // jangan saveLocal jika hasil 0 tapi DB sebenarnya ada isinya (cegah corrupt localStorage)
-    if(mapped.length===0 && !silent){
-      console.warn('API return 0 rows — cek DB, tidak saveLocal agar tidak jadi 0 permanen');
+    // FIX offline-hilang: JANGAN pernah timpa data lokal dengan hasil kosong.
+    // Server scope salah / glitch sesaat return [] -> kalau ditimpa, inputan user "hilang".
+    if(mapped.length===0){
+      let localLen = 0;
+      try{ const _lc = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); localLen = Array.isArray(_lc)?_lc.length:0; }catch{}
+      if((data&&data.length) || localLen){
+        console.warn('API return 0 rows tapi lokal ada isi — pertahankan lokal, tidak saveLocal');
+        data = keepPendingRows(data);
+        data = filterTeknisiView(data);
+        markNetOk();
+        _offlineToastShown = false;
+        return;
+      }
+      // benar-benar kosong (toko baru): tetap render kosong tapi jangan corrupt pending
+      data = keepPendingRows(mapped);
+      data = filterTeknisiView(data);
     } else {
       data = keepPendingRows(mapped);
       saveLocal();
+      data = filterTeknisiView(data);
     }
-    if(mapped.length) data = keepPendingRows(mapped);
-    data = filterTeknisiView(data);
-    const el = document.querySelector('.store-info span:first-child');
-    if(el) el.textContent = '● Sistem Online (API)';
-    if(el) el.style.color = '#10b981';
+    markNetOk();
     _offlineToastShown = false;
-    _netFails = 0; // pulih — blip sebelumnya dimaafkan
-    try{ updateOutboxBadge(); }catch{}
     // jika ada antrean, flush di background (tanpa blokir render)
     try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 500); }catch{}
   }catch(e){
@@ -1207,45 +1358,58 @@ async function loadData(silent){
       }
       return; // USE_API tetap true — poll berikutnya coba lagi (mis. habis di-approve owner)
     }
-    _netFails++;
-    if(silent && _netFails < 3){
-      // blip sesaat (tunnel/ISP kedip 1-2x poll): jangan oren-kan layar + jangan timpa
+    const _before = (typeof _netFails==='number'?_netFails:0) + 1;
+    try{ _netFails = _before; }catch{}
+    if(silent && _before < 2){
+      // blip sesaat (tunnel/ISP kedip 1x poll): jangan oren-kan layar + jangan timpa
       // data segar dengan snapshot lokal yang lebih tua — coba lagi di poll berikutnya.
       console.warn('API blip (silent, coba lagi):', e.message);
+      try{ renderConnIndicator(); }catch{}
       return;
     }
     // hanya warn di console, toast sekali saja (hindari spam tiap 8 detik)
     if(!_offlineToastShown && !silent) {
       console.warn('API gagal, fallback localStorage:', e.message);
-      showToast('API offline - pakai data lokal');
+      showToast('⚠ Koneksi putus — input tetap tersimpan lokal & antre sync');
       _offlineToastShown = true;
     } else {
       console.warn('API gagal (silent):', e.message);
     }
-    USE_API = false;
-    try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData; }
-    catch { data = defaultData; }
-    if (!Array.isArray(data)) data = defaultData;
-    const el = document.querySelector('.store-info span:first-child');
-    if(el) { el.textContent = '● Offline (localStorage)'; el.style.color = '#f59e0b'; }
+    // JANGAN timpa data memori dengan snapshot tua saat blip — pertahankan data tampil
+    // agar form/kanban tidak "kedip kosong". Hanya baca localStorage jika data kosong.
+    if(!data || !data.length){
+      try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData; }
+      catch { data = defaultData; }
+      if (!Array.isArray(data)) data = defaultData;
+    }
+    setConnState(false);
   }
 }
 
+function saveServiceLocalOnce(ck, payload){
+  // single-source simpan lokal: cegah dobel unshift (bug dobel TMP saat offline)
+  let obj = data.find(d=>d && d.id===ck);
+  if(!obj){
+    obj = {id:ck, invoice:ck, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
+    data.unshift(obj); saveLocal();
+  }
+  return obj;
+}
 async function apiCreateService(payload){
   // Kunci idempotency STABIL per data: dobel-klik / retry / replay outbox
   // dengan key sama tidak pernah bikin 2 invoice (server dedupe via client_key).
   payload = {...(payload||{}), client_key: (payload&&payload.client_key) || makeTmpId()};
   const ck = payload.client_key;
-  if(!USE_API){
-    const newId = ck;
-    const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
-    data.unshift(obj); saveLocal();
-    enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
-    try{ showToast(`⚠ Offline — tersimpan sementara (${loadOutbox().length} antre, auto-sync saat online)`); }catch{}
+  if(!USE_API || !navigator.onLine){
+    const obj = saveServiceLocalOnce(ck, payload);
+    enqueueOutbox({op:'create', clientTmp:ck, payload:{...payload, status:'Antri'}});
+    try{ showToast(`⚠ Offline — tersimpan lokal (${loadOutbox().length} antre, auto-sync saat online)`); }catch{}
+    try{ renderConnIndicator(); }catch{}
     return obj;
   }
   try{
     const created = await apiFetch('/services', {method:'POST', body: JSON.stringify(payload)});
+    markNetOk();
     return normalize(created);
   }catch(e){
     const msg = String(e.message||'');
@@ -1255,20 +1419,17 @@ async function apiCreateService(payload){
     } else if(isNetErr(e)){
       // offline / server gangguan — simpan sementara + antre sync (key sama!)
       console.warn('apiCreateService offline, antrekan:', msg);
-      const newId = ck;
-      const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
-      data.unshift(obj); saveLocal();
-      enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
-      USE_API = false;
-      showToast(`⚠ Server offline — tersimpan sementara (${loadOutbox().length} antre)`);
+      const obj = saveServiceLocalOnce(ck, payload);
+      enqueueOutbox({op:'create', clientTmp:ck, payload:{...payload, status:'Antri'}});
+      markNetFail();
+      showToast(`⚠ Server offline — tersimpan lokal (${loadOutbox().length} antre)`);
       return obj;
     } else {
-      // coba fallback lokal agar input tetap masuk meski API down sementara
+      // HTTP error lain (500/kuota/ditolak): JANGAN diam-diam jadi lokal ganda —
+      // simpan lokal sekali + antrekan agar tidak hilang, tapi tandai bukan offline.
       console.warn('apiCreateService fallback lokal:', msg);
-      const newId = ck;
-      const obj = {id:newId, invoice:newId, ...payload, status:'Antri', date:todayISO(), _pending:true, _tmp:true};
-      data.unshift(obj); saveLocal();
-      enqueueOutbox({op:'create', clientTmp:newId, payload:{...payload, status:'Antri'}});
+      const obj = saveServiceLocalOnce(ck, payload);
+      enqueueOutbox({op:'create', clientTmp:ck, payload:{...payload, status:'Antri'}});
       showToast('⚠ API gagal, disimpan lokal (akan sync saat online)');
       return obj;
     }
@@ -1282,13 +1443,15 @@ async function patchServiceQueued(invoice, payload){
   if(item){ Object.assign(item, payload); saveLocal(); }
   if(!USE_API || String(invoice||'').startsWith('TMP-') || (item && item._pending)){
     enqueueOutbox({op:'patch', invoice, payload});
+    try{ renderConnIndicator(); }catch{}
     return;
   }
   try{
     await apiFetch(`/services/${invoice}`, {method:'PATCH', body: JSON.stringify(payload)});
+    markNetOk();
   }catch(e){
     if(isNetErr(e)){
-      USE_API = false;
+      markNetFail();
       enqueueOutbox({op:'patch', invoice, payload});
       try{ showToast(`⚠ Offline — perubahan ${invoice} diantrekan`); }catch{}
     } else { throw e; }
@@ -1301,13 +1464,15 @@ async function apiUpdateStatus(invoice, newStatus){
   if(!USE_API || String(invoice||'').startsWith('TMP-') || (item && item._pending)){
     enqueueOutbox({op:'status', invoice, status:newStatus});
     try{ showToast(`⚠ Offline — status ${invoice} diantrekan`); }catch{}
+    try{ renderConnIndicator(); }catch{}
     return;
   }
   try{
     await apiFetch(`/services/${invoice}/status?status=${encodeURIComponent(newStatus)}`, {method:'PUT'});
+    markNetOk();
   }catch(e){
     if(isNetErr(e)){
-      USE_API = false;
+      markNetFail();
       enqueueOutbox({op:'status', invoice, status:newStatus});
       showToast('⚠ Offline — status diantrekan, auto-sync saat online');
     } else {
@@ -1412,7 +1577,7 @@ async function assignTeknisi(invoice, newTeknisi){
     showToast(`👨‍🔧 ${invoice} → teknisi: ${newTeknisi}`);
   }catch(e){
     if(isNetErr(e)){
-      USE_API = false;
+      markNetFail();
       enqueueOutbox({op:'patch', invoice, payload:{teknisi:newTeknisi}});
       showToast(`👨‍🔧 ${invoice} tersimpan sementara (⏳ antre sync)`);
     } else showToast('Gagal assign teknisi: '+e.message);
@@ -2229,6 +2394,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   try{ document.documentElement.classList.remove('guard-lock'); }catch(e){}
   setupNavigation();
   setupChips();
+  setupFormDraftAutosave();
+  try{ _connState = USE_API ? 'online' : 'offline'; renderConnIndicator(); }catch{}
   await initStoreContext();
   await cacheMyProfile();
   refreshWaTemplates();
@@ -2243,6 +2410,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   renderAlat();
   updateInvoicePreview();
   attachRupiahLive();
+  try{ restoreFormDraft(); }catch{}
+  try{ renderConnIndicator(); }catch{}
+  try{ startHeartbeat(); }catch{}
+  // jika ada antrean lama (mis. kemarin offline), langsung coba sync 1x
+  try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 1500); }catch{}
   startAutoLock();
   // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron — hash compare, silent, anti-spam (fix P1-8)
   let lastServiceLen = data.length;
@@ -2284,12 +2456,25 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       if(newAlatHash!==prevAlatHash) lastAlatHash = newAlatHash;
       renderAlat();
     }
-    // sync service — paksa coba API meskipun offline, silent agar tidak spam toast
+    // sync service — silent, anti-kedip: JANGAN paksa USE_API=true tiap poll.
+    // loadData sendiri yang menentukan online/offline via markNetOk/markNetFail (2x gagal baru offline).
+    // Saat offline, tetap coba 1x tiap ~24 detik (poll ke-3) agar bisa pulih otomatis tanpa kedip.
     try{
+      window._pollN = (window._pollN||0)+1;
       const prevDataHash = JSON.stringify(data.map(d=>d.invoice+d.status+d.estimasi_selesai).sort());
       const wasOffline = !USE_API;
-      if(wasOffline) USE_API = true;
-      try{ await loadData(true); }catch(e){ if(wasOffline) USE_API = false; throw e; }
+      const shouldProbe = !wasOffline || (window._pollN % 3 === 0);
+      if(shouldProbe){
+        const _prevFails = (typeof _netFails==='number'?_netFails:0);
+        try{ await loadData(true); }catch{}
+        // loadData gagal saat offline TIDAK melempar (ditangani di dalam) — cek perubahan state
+        const nowOnline = USE_API;
+        if(wasOffline && nowOnline) showToast('✅ Online lagi — data sync');
+        else if(!wasOffline && !nowOnline && _prevFails < 2){ /* blip pertama: diam */ }
+      } else {
+        // poll skip saat offline: tetap gambar indikator antrean agar user tenang
+        try{ renderConnIndicator(); }catch{}
+      }
       const newHash = JSON.stringify(data.map(d=>d.invoice+d.status+d.estimasi_selesai).sort());
       const curMenunggu = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
       if(newHash!==prevDataHash || curMenunggu!==lastMenungguCount || data.length!==lastServiceLen){
@@ -2298,10 +2483,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         renderAll();
         renderSemuaService();
         renderKanban();
-        if(wasOffline && USE_API) showToast('✅ Online lagi — data sync');
       }
-      const el=document.querySelector('.store-info span:first-child');
-      if(el && USE_API){ el.textContent='● Sistem Online (API)'; el.style.color='#10b981'; }
+      try{ renderConnIndicator(); }catch{}
     }catch{}
   }, 8000);
   // listeners
@@ -3222,9 +3405,11 @@ async function handleSparepartAdd(e){
   // Auto-modal: input sparepart = modal tersimpan di barang (B1). Uncentang = stok awal/pendataan.
   const catatModal = document.getElementById('sp-modal') ? document.getElementById('sp-modal').checked : true;
   const metode = document.getElementById('sp-metode') ? document.getElementById('sp-metode').value : 'Tunai';
+  const _spPayload = {nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO(), catat_modal: catatModal, metode};
   if(USE_API){
     try{
-      const created = await apiInventoryCreate({nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO(), catat_modal: catatModal, metode});
+      const created = await apiInventoryCreate(_spPayload);
+      markNetOk();
       const modalTxt = (catatModal && beli > 0 && masuk > 0) ? ` + modal ${formatRupiah(beli * masuk)} (B1)` : '';
       showToast(`✅ ${created.nama} ditambahkan — Stok ${created.stok} (sync multi-PC)${modalTxt}`);
       e.target.reset();
@@ -3237,17 +3422,24 @@ async function handleSparepartAdd(e){
       try{ renderAsesoris(); }catch(e){}
       return;
     }catch(err){
-      showToast('Gagal API, fallback lokal: '+err.message);
+      if(isNetErr(err)){
+        markNetFail();
+        enqueueApi('inventory', '/inventory/spareparts', _spPayload);
+      }
+      showToast('⚠ Offline — sparepart tersimpan lokal & antre sync: '+String(err.message||'').slice(0,120));
     }
+  } else {
+    enqueueApi('inventory', '/inventory/spareparts', _spPayload);
   }
-  const newItem={id:nextInventoryId(), nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO()};
+  const newItem={id:nextInventoryId(), nama, merk, kategori, masuk, keluar, stok, harga, harga_beli: beli, tgl: todayISO(), _pending:true};
   inventory.unshift(newItem);
   saveInventory();
   e.target.reset();
-  showToast(`✅ ${nama} ditambahkan — Stok ${stok}`);
+  showToast(`✅ ${nama} tersimpan lokal — Stok ${stok} (⏳ ${loadOutbox().length} antre sync)`);
   switchView(kategori==='Aksesoris' ? 'inventory-asesoris' : 'inventory-sparepart');
   renderSparepart();
   try{ renderAsesoris(); }catch(e){}
+  try{ renderConnIndicator(); }catch{}
 }
 function openSpEditModal(id){
   if(isTeknisiMode()){ showToast('⛔ Stok hanya owner/admin/kasir'); return; }
@@ -4893,13 +5085,25 @@ async function kasirSave(){
   };
   try{
     const s = await apiFetch('/sales', {method:'POST', body: JSON.stringify(body)});
+    markNetOk();
     _kasirStruk = s;
     kasirStrukShow(s);
     kasirClear();
     try{ document.getElementById('kasir-pelanggan').value=''; }catch(e){}
     kasirLoadBarang(); kasirLoadToday();
     showToast('✅ Struk ' + (s.kode||'') + ' tersimpan');
-  }catch(e){ showToast('Gagal simpan: ' + String(e.message).slice(0,200)); }
+  }catch(e){
+    if(isNetErr(e)){
+      markNetFail();
+      enqueueApi('sale', '/sales', body);
+      // keranjang JANGAN di-clear — user bisa screenshot / coba lagi; simpan backup juga
+      try{ localStorage.setItem('b_gadget_kasir_pending_v1', JSON.stringify({body, ts:new Date().toISOString()})); }catch{}
+      showToast(`⚠ Offline — struk diantrekan (${loadOutbox().length} antre). Keranjang dipertahankan, auto-sync saat online.`);
+      try{ renderConnIndicator(); }catch{}
+      return;
+    }
+    showToast('Gagal simpan: ' + String(e.message).slice(0,200));
+  }
 }
 async function kasirLoadToday(){
   const tb = document.getElementById('tbodyKasirToday'); if(!tb) return;
@@ -5455,9 +5659,22 @@ async function handleCustomerSubmit(e){
   const note=document.getElementById('c-note').value.trim();
   if(!nama) return showToast('Nama wajib!');
   if(wa && !/^[0-9+\- ]+$/.test(wa)) return showToast('No WA harus angka');
-  if(USE_API){
-    try{ await apiFetch('/customers', {method:'POST', body: JSON.stringify({nama, wa: wa || ""})}); showToast('Pelanggan ditambahkan ✓'); e.target.reset(); await loadData(); renderPelanggan(); switchView('pelanggan'); }catch(err){ showToast('Gagal: '+err.message); }
-  } else { showToast('Pelanggan ditambahkan (lokal) ✓'); e.target.reset(); switchView('pelanggan'); }
+  const _cPayload = {nama, wa: wa || ""};
+  try{
+    await apiFetch('/customers', {method:'POST', body: JSON.stringify(_cPayload)});
+    markNetOk();
+    showToast('Pelanggan ditambahkan ✓'); e.target.reset(); await loadData(); renderPelanggan(); switchView('pelanggan');
+  }catch(err){
+    if(isNetErr(err)){
+      markNetFail();
+      enqueueApi('customer', '/customers', _cPayload);
+      showToast(`✅ Tersimpan offline — antre sync (${loadOutbox().length})`);
+      e.target.reset(); switchView('pelanggan');
+      try{ renderConnIndicator(); }catch{}
+      return;
+    }
+    showToast('Gagal: '+err.message);
+  }
 }
 
 // === Modal hasil JADI/TIDAK (modern, promise-based pengganti confirm/prompt) ===
@@ -5804,14 +6021,29 @@ async function handleServiceSubmit(e){
   if(_svcBtn){ _svcBtn.disabled = true; _svcBtn.textContent = 'Menyimpan...'; }
   try{
     const created = await apiCreateService(payload);
-    // jika pakai API, reload dari server untuk dapat invoice asli
-    if(USE_API) await loadData();
-    else data.unshift(created);
-    renderAll(); resetForm(); showToast('Service berhasil disimpan! '+(created.invoice||created.id));
+    const _cid = created.invoice||created.id;
+    // apiCreateService SUDAH unshift saat offline — jangan unshift 2x (bug dobel TMP).
+    // Saat online: reload agar dapat invoice asli server; saat offline: pakai baris lokal.
+    if(USE_API && !String(_cid||'').startsWith('TMP-')){
+      try{ await loadData(); }catch{}
+    } else {
+      // pastikan hanya 1 baris lokal (saveServiceLocalOnce sudah jamin, ini pengaman)
+      const _dup = data.filter(d=>d&&d.id===_cid);
+      if(_dup.length>1) data = [ _dup[0], ...data.filter(d=>!d||d.id!==_cid) ];
+      saveLocal();
+    }
+    try{ clearFormDraft(); }catch{}
+    renderAll();
+    try{ renderSemuaService(); renderKanban(); }catch{}
+    resetForm();
+    const _isOff = String(_cid||'').startsWith('TMP-');
+    showToast(_isOff ? `✅ Tersimpan offline (${_cid}) — auto-sync saat online` : 'Service berhasil disimpan! '+_cid);
     switchView('proses');
-    openNotaModal(created.invoice||created.id); // nota digital: preview + kirim via WA
+    try{ openNotaModal(_cid); }catch{} // nota digital: preview + kirim via WA
   }catch(err){
-    showToast('Gagal simpan: '+ err.message);
+    // input JANGAN hilang: simpan draft agar bisa dicoba lagi
+    try{ saveFormDraftNow(); }catch{}
+    showToast('Gagal simpan (draft aman): '+ err.message);
   }finally{
     window._svcSubmitBusy = false;
     if(_svcBtn){ _svcBtn.disabled = false; _svcBtn.textContent = _svcBtnTxt; }
@@ -5830,6 +6062,60 @@ function resetForm(){
   selectedKelengkapan.clear();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
   updateInvoicePreview();
+  try{ clearFormDraft(); }catch{}
+}
+// ---------- DRAFT OTOMATIS form service (anti-hilang saat putus/reload) ----------
+// Setiap ketikan disimpan ke localStorage; saat balik online / reload, form dipulihkan.
+const FORM_DRAFT_KEY = 'b_gadget_form_draft_v1';
+function saveFormDraftNow(){
+  try{
+    const g = id => document.getElementById(id)?.value || '';
+    const draft = {nama:g('f-nama'), wa:g('f-wa'), device:g('f-device'), imei:g('f-imei'),
+      keluhan:g('f-keluhan'), keterangan:(document.getElementById('f-keterangan')?.value||''),
+      biaya:g('f-biaya'), kategori:g('f-kategori'), teknisi:g('f-teknisi'),
+      estimasi:g('f-estimasi'), penerima:g('f-penerima'),
+      kelengkapan:[...selectedKelengkapan], ts:new Date().toISOString()};
+    if(!draft.nama && !draft.device && !draft.keluhan) return; // form kosong -> jangan timpa
+    localStorage.setItem(FORM_DRAFT_KEY, JSON.stringify(draft));
+  }catch{}
+}
+function restoreFormDraft(){
+  try{
+    const raw = localStorage.getItem(FORM_DRAFT_KEY);
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    if(!d || (!d.nama && !d.device && !d.keluhan)) return false;
+    const s = (id,v)=>{ const el=document.getElementById(id); if(el && v!=null) el.value=v; };
+    s('f-nama',d.nama); s('f-wa',d.wa); s('f-device',d.device); s('f-imei',d.imei);
+    s('f-keluhan',d.keluhan); s('f-keterangan',d.keterangan); s('f-biaya',d.biaya);
+    if(d.kategori) s('f-kategori',d.kategori);
+    if(d.teknisi) s('f-teknisi',d.teknisi);
+    s('f-estimasi',d.estimasi);
+    if(Array.isArray(d.kelengkapan)){ selectedKelengkapan = new Set(d.kelengkapan);
+      document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', selectedKelengkapan.has(c.dataset.value))); }
+    try{ updateDeadlinePreview(); }catch{}
+    // penerima butuh daftar anggota dulu — tunda 1 detik
+    if(d.penerima) setTimeout(()=>{ try{ const p=document.getElementById('f-penerima'); if(p){ p.value=d.penerima; if(!p.value) populateTeknisiSelect(); } }catch{} }, 1200);
+    try{ showToast('📝 Draft form dipulihkan (belum tersimpan)'); }catch{}
+    return true;
+  }catch{ return false; }
+}
+function clearFormDraft(tmpId){
+  try{
+    // clearFormDraft() tanpa argumen = hapus draft form input.
+    // clearFormDraft(tmpId) dari flush = hanya log, draft tetap dihapus (input sudah naik).
+    localStorage.removeItem(FORM_DRAFT_KEY);
+  }catch{}
+}
+function setupFormDraftAutosave(){
+  try{
+    const form = document.getElementById('serviceForm');
+    if(!form || form.dataset.draftOn) return;
+    form.dataset.draftOn = '1';
+    let t = null;
+    form.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(saveFormDraftNow, 600); });
+    form.addEventListener('change', saveFormDraftNow);
+  }catch{}
 }
 async function updateInvoicePreview(){
   const el = document.getElementById('invoicePreview');
@@ -5955,7 +6241,7 @@ async function assignPenerima(invoice, newPenerima){
     await loadData();
     renderAll(); renderSemuaService(); showToast(`📥 ${invoice} → penerima: ${newPenerima}`);
   }catch(e){
-    if(isNetErr(e)){ USE_API = false; enqueueOutbox({op:'patch', invoice, payload:{penerima:newPenerima}}); showToast(`📥 ${invoice} tersimpan sementara (⏳ antre sync)`); }
+    if(isNetErr(e)){ markNetFail(); enqueueOutbox({op:'patch', invoice, payload:{penerima:newPenerima}}); showToast(`📥 ${invoice} tersimpan sementara (⏳ antre sync)`); }
     else showToast('Gagal assign penerima: '+e.message);
   }
 }
@@ -5984,7 +6270,7 @@ async function updateEstimasi(invoice){
     await loadData();
     renderAll(); renderSemuaService(); closeModal(); showToast(`📅 ${invoice} estimasi → ${newDate} (deadline mengikuti)`); updateDeadlinePreview();
   }catch(e){
-    if(isNetErr(e)){ USE_API = false; enqueueOutbox({op:'patch', invoice, payload:{estimasi_selesai:newDate}}); closeModal(); showToast(`📅 ${invoice} tersimpan sementara (⏳ antre sync)`); }
+    if(isNetErr(e)){ markNetFail(); enqueueOutbox({op:'patch', invoice, payload:{estimasi_selesai:newDate}}); closeModal(); showToast(`📅 ${invoice} tersimpan sementara (⏳ antre sync)`); }
     else showToast('Gagal ubah estimasi: '+e.message);
   }
 }
@@ -6025,7 +6311,7 @@ async function saveDetailEdits(invoice){
     showToast(`✅ ${invoice} detail disimpan`);
   }catch(e){
     if(isNetErr(e)){
-      USE_API = false;
+      markNetFail();
       enqueueOutbox({op:'patch', invoice, payload:payloadDetail});
       closeModal(); openDetail(invoice);
       showToast(`✅ ${invoice} tersimpan sementara (⏳ antre sync)`);
@@ -6079,7 +6365,7 @@ window.openEditUserModal=openEditUserModal; window.closeUserModal=closeUserModal
 window.toggleFreezeUser=toggleFreezeUser; window.deleteUser=deleteUser; window.filterAllUsers=filterAllUsers; window.renderAllUsers=renderAllUsers;
 window.loadAvailableTechs=loadAvailableTechs; window.populateTeknisiSelect=populateTeknisiSelect; window.assignTeknisi=assignTeknisi; window.assignTeknisiFromModal=assignTeknisiFromModal;
 window.assignPenerima=assignPenerima; window.assignPenerimaFromModal=assignPenerimaFromModal; window.updateEstimasi=updateEstimasi;
-window.flushOutbox=flushOutbox; window.loadOutbox=loadOutbox; window.patchServiceQueued=patchServiceQueued;
+window.flushOutbox=flushOutbox; window.loadOutbox=loadOutbox; window.patchServiceQueued=patchServiceQueued; window.manualSync=manualSync; window.enqueueApi=enqueueApi; window.renderConnIndicator=renderConnIndicator; window.setConnState=setConnState; window.markNetOk=markNetOk; window.markNetFail=markNetFail; window.saveFormDraftNow=saveFormDraftNow; window.restoreFormDraft=restoreFormDraft; window.clearFormDraft=clearFormDraft; window.heartbeatOnce=heartbeatOnce; window.startHeartbeat=startHeartbeat;
 window.setDeadlineFilter=setDeadlineFilter; window.updateDeadline=updateDeadline; window.updateDeadlinePreview=updateDeadlinePreview;
 window.hitungLama=hitungLama; window.formatTanggalImage=formatTanggalImage; window.cleanWA=cleanWA; window.openWhatsApp=openWhatsApp;
 window.API_BASE=API_BASE;

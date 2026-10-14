@@ -209,6 +209,14 @@
 - Tab Operasional: label sub-tab C1–C6 dibersihkan (Gaji/Tempat/Internet/Harian/Marketing/Maintenance), kode tetap di dalam.
 - Uji: TestClient DB temp 16/16 LULUS (sale, allowance±idempoten, celaka kas+stok, manual stok, service penuh A1/komisi/part, ringkasan konsisten) + `node --check engine.js` OK.
 
+## 5t. FIX OFFLINE + INDIKATOR SYNC (14 Okt 2026, lokal — BELUM deploy ke server Ubuntu)
+- **Masalah:** PC admin sering terputus; indikator Online kedip; saat putus inputan tidak kesimpan (service dobel TMP, customer/kasir hilang, loadData timpa data lokal dengan `[]`).
+- **Fix indikator (`script.js`):** manager sentral `setConnState/markNetOk/markNetFail/renderConnIndicator` — HTTP butuh 2x gagal baru Offline; `navigator.onLine=false`/event `offline` langsung Offline; throttle 4 detik DIHAPUS (itu penyebab "wifi putus tapi masih Online"); heartbeat `/health` tiap 5 detik (timeout 4 detik) + auto-flush antrean saat pulih.
+- **Fix data:** `saveServiceLocalOnce` (anti dobel unshift TMP); `loadData` tidak pernah timpa lokal dengan hasil kosong; outbox generik `enqueueApi` untuk customer/sales/inventory; `flushOutbox` hapus semua duplikat TMP + skip patch/status TMP; draft form otomatis (`b_gadget_form_draft_v1`, pulih saat reload).
+- **UI:** pill `#connPill` topbar + banner `#syncBanner` persistent di atas dashboard (merah offline / kuning antre / hijau aman) + tombol 🔄 Sync; `script.js?v=page21-sync1`.
+- **Status deploy:** perubahan masih di file LOKAL (`M frontend/assets/js/script.js`, `M frontend/index.html`) — server Ubuntu (`192.168.0.10`, `/home/budirn/PRAKTEK`) TIDAK bisa di-SSH dari PC ini (timeout dua IP LAN yang tercatat); publik `service.reneepsl.my.id/health` OK. Deploy via `git push` → di server `bash deploy/sync-ubuntu.sh` (atau `git pull && sudo systemctl restart b-gadget`), lalu hard refresh `Ctrl+Shift+R` di PC admin.
+- **Verifikasi lokal:** `node --check script.js` OK, `py_compile` backend OK.
+
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3→BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.
 - Nanti: laporan gabungan owner, paket/billing, root `/` → landing (butuh edit `main.py`).
