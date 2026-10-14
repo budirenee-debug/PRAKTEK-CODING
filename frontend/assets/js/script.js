@@ -910,14 +910,54 @@ function rekeyOutboxInvoice(oldId, newId){
   });
   if(changed) saveOutbox(q);
 }
-function keepPendingRows(mapped){
-  // jangan hilangkan baris TMP yang belum sync saat loadData sukses
+function isPendingRow(d){
+  return !!(d && (d._pending || String(d.id||'').startsWith('TMP-')));
+}
+function outboxRefsId(id){
+  // true jika antrean masih menyebut id ini (create clientTmp / patch-status invoice)
   try{
-    const pend = data.filter(d => d && (d._pending || String(d.id||'').startsWith('TMP-')));
+    return loadOutbox().some(x => x && (x.clientTmp === id || x.invoice === id));
+  }catch{ return false; }
+}
+function keepPendingRows(mapped){
+  // jangan hilangkan baris TMP yang belum sync saat loadData sukses.
+  // FIX hilang-setelah-refresh: gabung pending dari MEMORI + localStorage,
+  // tapi hanya yang masih dirujuk antrean (atau ditandai gagal sync) —
+  // baris TMP yatim (sudah naik tapi storage basi) tidak dihantui selamanya.
+  try{
+    const seen = new Set();
+    const pend = [];
+    const push = (d)=>{
+      if(!isPendingRow(d) || seen.has(d.id)) return;
+      seen.add(d.id);
+      // simpan jika: masih antre di outbox, atau gagal sync (tampilkan errornya)
+      if(d._syncError || outboxRefsId(d.id)) pend.push(d);
+    };
+    (data||[]).forEach(push);
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const stored = raw ? JSON.parse(raw) : [];
+      if(Array.isArray(stored)) stored.forEach(push);
+    }catch{}
     if(!pend.length) return mapped;
     const ids = new Set(mapped.map(m => m.id));
     return [...pend.filter(p => !ids.has(p.id)), ...mapped];
   }catch{ return mapped; }
+}
+function markRowSyncError(id, reason){
+  try{
+    const d = data.find(x => x && x.id === id);
+    if(d){ d._syncError = String(reason||'').slice(0,180); saveLocal(); }
+    else {
+      // baris tidak di memori (mis. tab lain) — patch langsung di storage
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      if(Array.isArray(arr)){
+        const t = arr.find(x => x && x.id === id);
+        if(t){ t._syncError = String(reason||'').slice(0,180); try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
+      }
+    }
+  }catch{}
 }
 async function flushOutbox(){
   if(_flushingOutbox) return;
@@ -983,7 +1023,14 @@ async function flushOutbox(){
           if(permanent || fails >= 5){
             done.push(entry.qid);
             console.warn('outbox drop entry (server nolak):', entry, msg.slice(0,250));
-            try{ showToast('⚠ 1 antrean dibuang: ' + msg.replace(/^HTTP \d+:\s*/, '').slice(0,160)); }catch{}
+            const reason = msg.replace(/^HTTP \d+:\s*/, '').slice(0,160);
+            // baris lokal JANGAN ikut hilang: tandai error agar tetap tampil + jelas sebabnya
+            try{
+              const target = entry.clientTmp || entry.invoice;
+              if(target) markRowSyncError(target, 'Gagal sync: ' + reason);
+            }catch{}
+            try{ showToast('⚠ 1 antrean gagal naik (baris tetap tersimpan lokal): ' + reason); }catch{}
+            try{ renderAll(); renderSemuaService(); renderKanban(); }catch{}
             continue;
           }
           // transien (<5x): simpan counter, berhenti dulu, coba lagi nanti
@@ -4214,6 +4261,17 @@ function klaimBannerHtml(d){
   if(!isKlaimGaransi(d)) return '';
   return `<div class="hasil-banner" style="background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6">🔁 Klaim garansi dari <a href="#" onclick="event.preventDefault();openDetail('${escapeHtml(d.garansi_dari)}', {readonly:true})" style="font-weight:800;color:#5b21b6;text-decoration:underline">${escapeHtml(d.garansi_dari)}</a></div>`;
 }
+// ---------- Badge sync offline: tandai baris yang masih antre / gagal naik ----------
+function syncBadgeHtml(d){
+  if(!d) return '';
+  if(d._syncError){
+    return `<span title="${escapeHtml(d._syncError)} — baris tetap tersimpan lokal, klik Sync di atas untuk coba lagi" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;white-space:nowrap;cursor:help">🔴 Belum sync</span>`;
+  }
+  if(isPendingRow(d)){
+    return `<span title="Tersimpan lokal, menunggu sync ke server (otomatis saat online)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#b45309;white-space:nowrap">⏳ Antre sync</span>`;
+  }
+  return '';
+}
 function passesDeadlineFilter(d){
   if(deadlineFilter==='all') return true;
   if(deadlineFilter==='overdue') return d.is_overdue;
@@ -4466,7 +4524,7 @@ function renderKanban(){
     const usedCount = (serviceSpareparts[d.id]||[]).length;
     return `
     <div class="service-card" style="${d.is_overdue?'border-color:#fecaca;background:#fffafa':d.sisa_hari===0?'border-color:#fde68a':''}${kw?';background:#f0fdf4;border-color:#bbf7d0':''}">
-      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kw)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kw)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kw)} • ${hl(d.nama, kw)}</p></div><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}</span></div>
+      <div class="service-card-head"><div><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0"><span style="font-size:15px;font-weight:800;color:#111;line-height:1.25;overflow-wrap:anywhere">${hl(d.device, kw)}</span><span style="font-size:10px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:6px;white-space:nowrap" title="${escapeHtml(d.imei||'')}">📱 •${hl(d.imei ? d.imei.slice(-4) : '----', kw)}</span></h4><p style="font-size:11px;color:#6b7280;margin-top:4px">${hl(d.id, kw)} • ${hl(d.nama, kw)}</p></div><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}${syncBadgeHtml(d)}</span></div>
       ${klaimBannerHtml(d)}
       <p style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${hl(d.keluhan, kw)} ${d.keterangan ? `<span style="font-size:9px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px">📋 ket</span>` : ''}</p>
       <div class="service-meta"><span class="meta-pill" style="display:inline-flex;align-items:center;gap:4px">👨‍🔧 <select onchange="assignTeknisi('${escapeHtml(d.id)}', this.value)" title="Oper teknisi" class="teknisi-select" style="border:0;background:transparent;font-size:10px;font-weight:600;max-width:110px;outline:none;color:${d.teknisi==='Menunggu Teknisi'?'#92400e':'inherit'}">${teknisiOptionsHtml(d.teknisi)}</select></span><span class="meta-pill">📦 ${hl((d.kelengkapan||[]).join(', ')||'-', kw)}</span>${deadlineBadge(d)}</div>
@@ -4520,7 +4578,7 @@ function renderMenungguTeknisiBlock(){
     return `<div style="background:#fff;border:1px solid #fde68a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div><strong style="font-size:13px">${escapeHtml(d.device)}</strong><div style="font-size:11px;color:#475569;font-weight:400;margin-top:2px" title="${escapeHtml(d.imei||'')}">📱 IMEI: ${escapeHtml(d.imei||'—')} <span style="color:#94a3b8;font-size:10px">${escapeHtml(d.imei?d.imei.slice(-4):'----')}</span></div><span style="font-size:11px;color:#8a8f98">${escapeHtml(d.id)} • ${escapeHtml(d.nama)}</span></div>
-        <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}" style="font-size:10px">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span class="badge-status ${escapeHtml(badgeClassForStatus(d.status))}" style="font-size:10px">${escapeHtml(displayStatus(d.status))}</span>${klaimBadgeHtml(d)}${syncBadgeHtml(d)}</span>
       </div>
       ${klaimBannerHtml(d)}
       <div style="font-size:15px;font-weight:800;color:#111;line-height:1.3;overflow-wrap:anywhere">📝 ${escapeHtml(d.keluhan)}</div>
@@ -6033,6 +6091,18 @@ async function handleServiceSubmit(e){
       saveLocal();
     }
     try{ clearFormDraft(); }catch{}
+    // Reset SEMUA filter proses agar baris baru pasti kelihatan
+    // (bug: filter tab/search/deadline/teknisi nyangkut → service baru "tidak muncul")
+    try{
+      statusFilter = 'all';
+      deadlineFilter = 'all';
+      pelangganFilter = '';
+      currentPageKanban = 1;
+      ['globalSearch','searchSemua'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      const ftp = document.getElementById('filterTeknisiProses'); if(ftp) ftp.value = '';
+      document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all'));
+      document.querySelectorAll('[data-deadline]').forEach(b=>b.classList.toggle('active', b.dataset.deadline==='all'));
+    }catch{}
     renderAll();
     try{ renderSemuaService(); renderKanban(); }catch{}
     resetForm();
