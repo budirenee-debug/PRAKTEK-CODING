@@ -1661,19 +1661,6 @@ function setDeadlineFilter(v){
   renderKanban();
   renderSemuaService();
 }
-function resetProsesFilterForStat(){
-  // Klik kartu statistik deadline -> tampilkan SEMUA yang cocok di Proses Service.
-  // Bug: badge tulis 5 tapi kartu cuma 1 karena tab status/search/teknisi lama masih nyangkut.
-  // (pola sama seperti fix submit: reset filter dulu, baru terapkan filter deadline)
-  try{
-    statusFilter = 'all';
-    pelangganFilter = '';
-    currentPageKanban = 1;
-    ['globalSearch','searchSemua'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    const ftp = document.getElementById('filterTeknisiProses'); if(ftp) ftp.value = '';
-    document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all'));
-  }catch{}
-}
 function deadlineBadge(d){
   const sisa = d.sisa_hari;
   const dlRaw = d.deadline || '-';
@@ -2815,7 +2802,7 @@ function switchView(view, clearSearch){
   }
   if(window.innerWidth<=860) closeSidebar();
   else document.getElementById('sidebar').classList.remove('open');
-  if(view==='dashboard') renderDashboard();
+  if(view==='dashboard'){ renderDashboard(); try{ updateStats(); }catch{} }
   if(view==='proses') renderKanban();
   if(view==='semua-service'){
     // klik menu = reset total + refresh dari server agar tidak nyangkut filter lama
@@ -2862,10 +2849,10 @@ function statGoMasuk(){ switchView('semua-service'); const s=document.getElement
 function statGoProses(){ switchView('proses'); setDeadlineFilter('all'); statusFilter='all'; document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all')); renderKanban(); }
 function statGoSukses(){ switchView('semua-service'); setTimeout(()=>{ const s=document.getElementById('filterStatusSemua'); if(s){ s.value='Service Sukses'; renderSemuaService(); }},80); }
 function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('transaksi-pendapatan'); }
-function statGoOverdue(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('overdue'); },80); }
-function statGoToday(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('today'); },80); }
-function statGoHarian(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('harian'); },80); }
-function statGoMingguan(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('mingguan'); },80); }
+function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('overdue'),80); }
+function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
+function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
+function statGoMingguan(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('mingguan'),80); }
 function statGoMenungguKonfirmasi(){
   switchView('proses');
   // set status filter Menunggu Konfirmasi di Proses Service
@@ -2911,14 +2898,14 @@ function updateStats(){
   document.getElementById('queueCount').textContent = data.length+' antrian';
   const badge = document.querySelector('.menu-item[data-view="semua-service"] .badge');
   if(badge) badge.textContent = data.length;
-  // deadline counts: samakan basis dengan yang ditampilkan view Proses (kanban =
-  // PROSES_STATUSES + filter deadline). Dulu ngitung seluruh data (termasuk
-  // Bisa Diambil/Failed/Garansi yang tampil di view lain) -> badge 5, kartu 1.
-  const _prosesBase = data.filter(d=>PROSES_STATUSES.includes(d.status));
-  const overdueCount = _prosesBase.filter(d=>d.is_overdue).length;
-  const todayDl = _prosesBase.filter(d=>d.deadline===todayISO()).length;
-  const hCount = _prosesBase.filter(d=>d.deadline_type==='harian').length;
-  const mCount = _prosesBase.filter(d=>d.deadline_type==='mingguan').length;
+  // deadline counts: konjungsi SEMUA filter aktif (basis PROSES + tab status +
+  // search + teknisi) via countProses, sehingga angka badge = isi yang tampil
+  // saat kartu diklik (fix badge 5 vs 1 kartu). In-view tabs di-refresh lagi
+  // di renderKanban setiap render (termasuk tiap ketikan search).
+  const overdueCount = countProses('overdue', statusFilter);
+  const todayDl = countProses('today', statusFilter);
+  const hCount = countProses('harian', statusFilter);
+  const mCount = countProses('mingguan', statusFilter);
   const menungguKonfirmasiCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
   const elO = document.getElementById('stat-overdue'); if(elO) elO.textContent = overdueCount;
   const elT = document.getElementById('stat-deadline-today'); if(elT) elT.textContent = todayDl;
@@ -4305,6 +4292,28 @@ function passesDeadlineFilter(d){
   if(deadlineFilter==='mingguan') return d.deadline_type==='mingguan';
   return true;
 }
+// Konjungsi SEMUA filter aktif di view Proses (basis 4 status + tab status +
+// tab deadline + search + teknisi). List dan SEMUA angka tab/badge memakai ini,
+// sehingga angka yang tertulis SELALU sama dengan isi yang tampil (fix badge 5 vs 1 kartu,
+// tab Dikerjakan 7 vs kosong). Argumen opsional menimpa dimensi itu saja.
+function filterProses(deadlineV, statusF){
+  let out = data.filter(d=> PROSES_STATUSES.includes(d.status));
+  const q = (pelangganFilter||'').toLowerCase();
+  if(q) out = out.filter(d=> (d.nama+d.device+d.keluhan+(d.imei||'')+(d.wa||'')).toLowerCase().includes(q));
+  out = applyTechFilter(out, techFilterVal('filterTeknisiProses'));
+  const dl = (deadlineV !== undefined) ? deadlineV : deadlineFilter;
+  if(dl==='overdue') out = out.filter(d=>d.is_overdue);
+  else if(dl==='today') out = out.filter(d=>d.deadline===todayISO());
+  else if(dl==='harian') out = out.filter(d=>d.deadline_type==='harian');
+  else if(dl==='mingguan') out = out.filter(d=>d.deadline_type==='mingguan');
+  const st0 = (statusF !== undefined) ? statusF : statusFilter;
+  // nilai basi di luar 4 status Proses (mis. dari cache) = anggap 'all'
+  // (sama seperti guard di renderKanban) agar angka tidak 0 palsu.
+  const st = (st0 && st0!=='all' && !PROSES_STATUSES.includes(st0)) ? 'all' : st0;
+  if(st && st!=='all') out = out.filter(d=>d.status===st);
+  return out;
+}
+function countProses(deadlineV, statusF){ return filterProses(deadlineV, statusF).length; }
 function teknisiOptionsHtml(current){
   // mode teknisi: hanya boleh oper ke diri sendiri / kembalikan ke Menunggu
   const base = isTeknisiMode()
@@ -4527,13 +4536,8 @@ function renderKanban(){
     document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=> b.classList.toggle('active', b.dataset.filter==='all'));
   }
   // Basis: 4 status yang tampil di tab Proses Service (Antri, Menunggu Konfirmasi, Dikerjakan, Menunggu Sparepart)
-  let filtered = data.filter(d=> PROSES_STATUSES.includes(d.status));
-  if(statusFilter!=='all') filtered=filtered.filter(d=>d.status===statusFilter);
-  if(pelangganFilter){
-      filtered=filtered.filter(d=> (d.nama+d.device+d.keluhan+(d.imei||'')+(d.wa||'')).toLowerCase().includes(pelangganFilter));
-   }
-   filtered = filtered.filter(passesDeadlineFilter);
-   filtered = applyTechFilter(filtered, techFilterVal('filterTeknisiProses'));
+  // + SEMUA filter aktif (status/deadline/search/teknisi) via filterProses agar list = angka tab.
+  let filtered = filterProses();
     // terbaru dulu (aktivitas terakhir di atas) biar habis klik langsung ketemu
     filtered.sort((a,b)=> String(b.updated_at||b.created_at||b.date||'').localeCompare(String(a.updated_at||a.created_at||a.date||'')) || String(b.id).localeCompare(String(a.id)));
     // pagination 10/halaman per sub-tab filter (reset ke hal 1 jika filter berubah)
@@ -4571,13 +4575,19 @@ function renderKanban(){
       <div class="card-actions"><button class="btn btn-ghost small" style="flex:none;padding:8px 10px;font-size:11px" onclick="openDetail('${escapeHtml(d.id)}')">Detail</button><button class="btn btn-ghost small" style="flex:none;background:#dcfce7;border-color:#bbf7d0;color:#166534" onclick="openWhatsApp('${escapeHtml(d.wa)}','${escapeHtml(d.nama)}','${escapeHtml(d.device)}','${escapeHtml(d.id)}','${escapeHtml(d.keluhan)}')" title="Direct WA">${WA_ICON}</button><select onchange="updateStatus('${escapeHtml(d.id)}', this.value)" style="flex:1;min-width:0;padding:8px;border-radius:10px;border:1px solid #ececec;font-size:12px"><option disabled selected>Ubah status</option>${opts}</select></div>
     </div>
   `}).join('') || `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8a8f98">Tidak ada service dengan status Antri / Menunggu Konfirmasi / Dikerjakan / Menunggu Sparepart</div>`;
-  // update hitungan tab hanya untuk tab filter di view-proses
+  // update hitungan tab view-proses: konjungsi SEMUA filter aktif (deadline+search+teknisi),
+  // sehingga angka tab SELALU sama dengan isi yang tampil (fix tab 7 vs kosong).
   document.querySelectorAll('#view-proses .tab[data-filter]').forEach(tab=>{
     const f=tab.dataset.filter;
-    const count = f==='all'? data.filter(d=> PROSES_STATUSES.includes(d.status)).length : data.filter(d=>d.status===f).length;
+    const count = countProses(deadlineFilter, f);
     const sp = tab.querySelector('span');
     if(sp) sp.textContent = count;
   });
+  // hitungan subtab deadline di view yang sama (termasuk status tab + search + teknisi aktif)
+  const cO = document.getElementById('countOverdue'); if(cO) cO.textContent = countProses('overdue', statusFilter);
+  const cT = document.getElementById('countToday'); if(cT) cT.textContent = countProses('today', statusFilter);
+  const cH = document.getElementById('countHarian'); if(cH) cH.textContent = countProses('harian', statusFilter);
+  const cM = document.getElementById('countMingguan'); if(cM) cM.textContent = countProses('mingguan', statusFilter);
   kanbanPagerDraw('kanbanPaginationInfo', 'kanbanPaginationBtns', filtered.length, currentPageKanban, 'setKanbanPage');
 }
 function renderMenungguTeknisiBlock(){
