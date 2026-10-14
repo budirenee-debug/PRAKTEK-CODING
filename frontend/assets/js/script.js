@@ -1661,6 +1661,19 @@ function setDeadlineFilter(v){
   renderKanban();
   renderSemuaService();
 }
+function resetProsesFilterForStat(){
+  // Klik kartu statistik deadline -> tampilkan SEMUA yang cocok di Proses Service.
+  // Bug: badge tulis 5 tapi kartu cuma 1 karena tab status/search/teknisi lama masih nyangkut.
+  // (pola sama seperti fix submit: reset filter dulu, baru terapkan filter deadline)
+  try{
+    statusFilter = 'all';
+    pelangganFilter = '';
+    currentPageKanban = 1;
+    ['globalSearch','searchSemua'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    const ftp = document.getElementById('filterTeknisiProses'); if(ftp) ftp.value = '';
+    document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all'));
+  }catch{}
+}
 function deadlineBadge(d){
   const sisa = d.sisa_hari;
   const dlRaw = d.deadline || '-';
@@ -2849,10 +2862,10 @@ function statGoMasuk(){ switchView('semua-service'); const s=document.getElement
 function statGoProses(){ switchView('proses'); setDeadlineFilter('all'); statusFilter='all'; document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all')); renderKanban(); }
 function statGoSukses(){ switchView('semua-service'); setTimeout(()=>{ const s=document.getElementById('filterStatusSemua'); if(s){ s.value='Service Sukses'; renderSemuaService(); }},80); }
 function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('transaksi-pendapatan'); }
-function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('overdue'),80); }
-function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
-function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
-function statGoMingguan(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('mingguan'),80); }
+function statGoOverdue(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('overdue'); },80); }
+function statGoToday(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('today'); },80); }
+function statGoHarian(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('harian'); },80); }
+function statGoMingguan(){ switchView('proses'); setTimeout(()=>{ resetProsesFilterForStat(); setDeadlineFilter('mingguan'); },80); }
 function statGoMenungguKonfirmasi(){
   switchView('proses');
   // set status filter Menunggu Konfirmasi di Proses Service
@@ -2898,11 +2911,14 @@ function updateStats(){
   document.getElementById('queueCount').textContent = data.length+' antrian';
   const badge = document.querySelector('.menu-item[data-view="semua-service"] .badge');
   if(badge) badge.textContent = data.length;
-  // deadline counts (client fallback)
-  const overdueCount = data.filter(d=>d.is_overdue).length;
-  const todayDl = data.filter(d=>d.deadline===todayISO() && !['Selesai','Service Sukses','Sudah Diambil','Dibatalkan'].includes(d.status)).length;
-  const hCount = data.filter(d=>d.deadline_type==='harian').length;
-  const mCount = data.filter(d=>d.deadline_type==='mingguan').length;
+  // deadline counts: samakan basis dengan yang ditampilkan view Proses (kanban =
+  // PROSES_STATUSES + filter deadline). Dulu ngitung seluruh data (termasuk
+  // Bisa Diambil/Failed/Garansi yang tampil di view lain) -> badge 5, kartu 1.
+  const _prosesBase = data.filter(d=>PROSES_STATUSES.includes(d.status));
+  const overdueCount = _prosesBase.filter(d=>d.is_overdue).length;
+  const todayDl = _prosesBase.filter(d=>d.deadline===todayISO()).length;
+  const hCount = _prosesBase.filter(d=>d.deadline_type==='harian').length;
+  const mCount = _prosesBase.filter(d=>d.deadline_type==='mingguan').length;
   const menungguKonfirmasiCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
   const elO = document.getElementById('stat-overdue'); if(elO) elO.textContent = overdueCount;
   const elT = document.getElementById('stat-deadline-today'); if(elT) elT.textContent = todayDl;
