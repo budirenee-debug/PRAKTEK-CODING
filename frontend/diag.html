@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diag Koneksi — B_gadget</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:16px}
+.card{max-width:720px;margin:0 auto;background:#1e293b;border-radius:12px;padding:20px}
+#status{font-size:22px;font-weight:800;padding:14px;border-radius:10px;text-align:center;margin:12px 0}
+.ok{background:#064e3b;color:#a7f3d0}.warn{background:#78350f;color:#fde68a}.err{background:#7f1d1d;color:#fecaca}.run{background:#1e3a8a;color:#bfdbfe}
+pre{background:#020617;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word;font-size:12px;max-height:50vh;overflow:auto}
+button{font-size:16px;font-weight:700;padding:12px 18px;border-radius:10px;border:0;cursor:pointer;margin:4px 4px 0 0}
+.b1{background:#10b981;color:#022c22}.b2{background:#334155;color:#fff}
+p{font-size:14px;color:#94a3b8}
+</style>
+</head>
+<body>
+<div class="card">
+<h2 style="margin:0">🔧 Diag Koneksi B_gadget</h2>
+<p>Buka halaman ini di <b>PC admin yang orange</b>. Hasil otomatis jalan — foto / salin hasilnya ke saya.</p>
+<div id="status" class="run">⏳ mengecek...</div>
+<div>
+<button class="b1" onclick="runDiag()">🔄 Cek Lagi</button>
+<button class="b2" onclick="copyOut()">📋 Salin Hasil</button>
+</div>
+<pre id="out">menyiapkan...</pre>
+</div>
+<script>
+function apiBase(){
+  try{
+    var s = localStorage.getItem('API_BASE');
+    if(s) return s;
+    if(location.protocol === 'file:') return 'http://127.0.0.1:8000/api';
+    if(location.hostname === 'localhost' || location.hostname === '127.0.0.1') return 'http://127.0.0.1:8000/api';
+    return location.origin + '/api';
+  }catch(e){ return location.origin + '/api'; }
+}
+async function tfetch(url, opts, ms){
+  var ctl = new AbortController();
+  var t = setTimeout(function(){ try{ctl.abort();}catch(e){} }, ms || 8000);
+  try{
+    var r = await fetch(url, Object.assign({}, opts || {}, {signal: ctl.signal, cache: 'no-store'}));
+    var txt = await r.text();
+    return {ok: r.ok, status: r.status, body: txt.slice(0, 300)};
+  }catch(e){ return {ok: false, status: 0, body: 'GAGAL: ' + (e && e.message || e)}; }
+  finally{ clearTimeout(t); }
+}
+async function runDiag(){
+  var out = [];
+  var L = function(s){ out.push(s); document.getElementById('out').textContent = out.join('\n'); };
+  var st = document.getElementById('status');
+  st.className = 'run'; st.textContent = '⏳ mengecek...';
+  document.getElementById('out').textContent = 'mengecek...';
+  out = [];
+  var base = apiBase();
+  var root = base.replace(/\/api$/, '');
+  L('halaman : ' + location.href);
+  L('API_BASE: ' + base);
+  L('browser online (navigator.onLine): ' + navigator.onLine);
+  var tok = null; try{ tok = localStorage.getItem('access_token'); }catch(e){}
+  L('token login: ' + (tok ? 'ADA (' + tok.length + ' char)' : 'TIDAK ADA -> wajib login ulang!'));
+  try{ L('active_store_id: ' + localStorage.getItem('active_store_id')); }catch(e){ L('active_store_id: ?'); }
+  var qlen = '?', q1 = '';
+  try{
+    var q = JSON.parse(localStorage.getItem('b_gadget_outbox_v1') || '[]');
+    qlen = Array.isArray(q) ? q.length : '?';
+    if(qlen > 0) q1 = ' | contoh: ' + JSON.stringify(q[0]).slice(0, 200);
+  }catch(e){}
+  L('antrean outbox: ' + qlen + q1);
+  var syncErr = 0, tmpN = 0;
+  try{
+    var d = JSON.parse(localStorage.getItem('servicell_data_v2') || '[]');
+    if(Array.isArray(d)) d.forEach(function(x){ if(x && x._syncError) syncErr++; if(x && String(x.id||'').indexOf('TMP-') === 0) tmpN++; });
+    L('baris gagal-sync: ' + syncErr + ' | baris TMP lokal: ' + tmpN);
+  }catch(e){ L('data lokal: tidak terbaca'); }
+
+  L('--- tes jaringan ---');
+  var h = await tfetch(root + '/health');
+  L('GET /health -> ' + h.status + ' ' + h.body);
+  var me = await tfetch(base + '/services?limit=1', {headers: tok ? {Authorization: 'Bearer ' + tok} : {}}, 10000);
+  L('GET /services?limit=1 -> ' + me.status + ' ' + me.body);
+  var stores = await tfetch(base + '/stores', {headers: tok ? {Authorization: 'Bearer ' + tok} : {}}, 10000);
+  L('GET /stores -> ' + stores.status + ' ' + stores.body.slice(0, 200));
+
+  L('--- KESIMPULAN ---');
+  var kesimpulan = '', cls = 'ok';
+  if(h.status === 0){ kesimpulan = '🔴 PUTUS TOTAL — browser tidak sampai ke server (tunnel/LAN/DNS). Cek kabel/wifi & tunnel.'; cls = 'err'; }
+  else if(me.status === 401){ kesimpulan = '🟠 DITOLAK 401 — sesi habis. Solusi: LOGOUT lalu LOGIN lagi, klik Sync.'; cls = 'warn'; }
+  else if(me.status === 403 || me.status === 404){ kesimpulan = '🟠 DITOLAK ' + me.status + ' — toko/store bermasalah (bukan anggota / nonaktif). Kirim hasil ini ke saya.'; cls = 'warn'; }
+  else if(me.status === 422){ kesimpulan = '🟠 DITOLAK 422 — validasi server. Kirim hasil ini ke saya.'; cls = 'warn'; }
+  else if(me.status === 200){ kesimpulan = qlen > 0 ? '🟠 SERVER OK tapi masih ada ' + qlen + ' antrean — klik Sync di dashboard.' : '🟢 SEMUA OK — server terima request. Hard refresh (Ctrl+Shift+R) dashboard.'; cls = qlen > 0 ? 'warn' : 'ok'; }
+  else { kesimpulan = '🟠 STATUS ' + me.status + ' — kirim hasil ini ke saya.'; cls = 'warn'; }
+  L(kesimpulan);
+  st.className = cls; st.textContent = kesimpulan;
+  window.__diagText = out.join('\n');
+}
+function copyOut(){
+  var t = window.__diagText || document.getElementById('out').textContent;
+  try{ navigator.clipboard.writeText(t).then(function(){ alert('Hasil tersalin, paste ke chat'); }); }
+  catch(e){
+    var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); alert('Hasil tersalin, paste ke chat'); }catch(e2){ alert('Gagal salin otomatis — blok manual dari kotak hasil'); }
+    document.body.removeChild(ta);
+  }
+}
+runDiag();
+</script>
+</body>
+</html>

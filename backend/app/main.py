@@ -550,7 +550,8 @@ if os.path.exists(FRONTEND_DIR):
 # /frontend/* tetap jalan (kompatibel run.bat/bookmark lama). Exact-path, tidak
 # menabrak /api/*, /health, /docs.
 _CLEAN_PAGES = ["index.html", "owner.html", "login.html", "login-owner.html",
-                "app.html", "lacak.html", "landing.html", "register.html", "dev.html"]
+                "app.html", "lacak.html", "landing.html", "register.html", "dev.html",
+                "diag.html"]
 if os.path.exists(FRONTEND_DIR):
     def _clean_page(page: str):
         def _serve():

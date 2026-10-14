@@ -992,7 +992,16 @@ async function flushOutbox(){
           done.push(entry.qid);
           markNetOk();
         } else if(entry.op === 'status'){
-          if(String(entry.invoice||'').startsWith('TMP-')){ continue; /* tunggu create naik dulu */ }
+          // Yatim (create-nya sudah tidak ada di antrean, mis. ditolak server):
+          // buang, jangan gantung selamanya (dulu bikin orange permanen "1 antrean").
+          if(String(entry.invoice||'').startsWith('TMP-')){
+            const menungguCreate = q.some(x => x && x.op === 'create' && x.clientTmp === entry.invoice && done.indexOf(x.qid) < 0);
+            if(menungguCreate){ continue; /* tunggu create naik dulu */ }
+            done.push(entry.qid);
+            try{ markRowSyncError(entry.invoice, 'Status yatim: service TMP tidak ada (create gagal/ditolak)'); }catch{}
+            console.warn('outbox drop status yatim:', entry.invoice);
+            continue;
+          }
           await apiFetch(`/services/${entry.invoice}/status?status=${encodeURIComponent(entry.status)}`, {method:'PUT'});
           done.push(entry.qid);
           markNetOk();
