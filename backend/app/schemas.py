@@ -465,6 +465,7 @@ class StatsOut(BaseModel):
     dikerjakan: int
     menunggu_sparepart: int
     selesai: int
+    menunggu_konfirmasi: int = 0
     overdue: int = 0
     deadline_hari_ini: int = 0
     harian: int = 0

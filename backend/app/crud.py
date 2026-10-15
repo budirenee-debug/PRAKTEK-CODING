@@ -468,24 +468,33 @@ def delete_service(db: Session, invoice: str, store_id=None, actor=None):
     return {"ok": True, "reason": "deleted", "cleaned": cleaned}
 
 def get_stats(db: Session, store_id=None):
+    PROSES = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart"]
+    # Pipeline aktif = definisi sama dengan frontend renderDashboard OPEN
+    # (agar kartu Estimasi tidak lompat saat API overwrite)
+    PIPELINE = ["Antri", "Menunggu Konfirmasi", "Dikerjakan", "Menunggu Sparepart",
+                "Bisa Diambil", "Service Sukses", "Selesai"]
     sq = db.query(models.Service)
     if store_id is not None:
         sq = sq.filter(models.Service.store_id == store_id)
     total = sq.count()
-    dalam_proses = sq.filter(models.Service.status.in_(["Antri","Menunggu Konfirmasi","Dikerjakan","Menunggu Sparepart"])).count()
+    dalam_proses = sq.filter(models.Service.status.in_(PROSES)).count()
     selesai_hari = sq.filter(models.Service.status.in_(["Selesai","Service Sukses"]), models.Service.date==date.today()).count()
-    pendapatan = sq.with_entities(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.date==date.today()).scalar() or 0
+    # Estimasi = pipeline aktif (bukan omzet hari ini) — selaras label "Pipeline aktif"
+    pendapatan = sq.with_entities(func.coalesce(func.sum(models.Service.biaya),0)).filter(models.Service.status.in_(PIPELINE)).scalar() or 0
     antri = sq.filter(models.Service.status=="Antri").count()
     dikerjakan = sq.filter(models.Service.status=="Dikerjakan").count()
     sparepart = sq.filter(models.Service.status=="Menunggu Sparepart").count()
     selesai = sq.filter(models.Service.status.in_(["Selesai","Service Sukses"])).count()
-    # deadline stats
-    all_svc = sq.all()
+    menunggu_konfirmasi = sq.filter(models.Service.status=="Menunggu Konfirmasi").count()
+    # deadline stats — KHUSUS PROSES saja, agar angka kartu = isi kanban saat diklik.
+    # Sebelumnya semua status ikut dihitung (termasuk Sudah Diambil/Sukses/Failed),
+    # sehingga kartu Overdue/Deadline/Harian beda dengan filterProses() di frontend.
+    proses_svc = sq.filter(models.Service.status.in_(PROSES)).all()
     overdue = 0
     deadline_hari_ini = 0
     harian = 0
     mingguan = 0
-    for s in all_svc:
+    for s in proses_svc:
         enrich_service(s)
         if getattr(s, 'is_overdue', False):
             overdue += 1
@@ -504,6 +513,7 @@ def get_stats(db: Session, store_id=None):
         "dikerjakan": dikerjakan,
         "menunggu_sparepart": sparepart,
         "selesai": selesai,
+        "menunggu_konfirmasi": menunggu_konfirmasi,
         "overdue": overdue,
         "deadline_hari_ini": deadline_hari_ini,
         "harian": harian,

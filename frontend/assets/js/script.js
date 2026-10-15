@@ -1368,8 +1368,10 @@ async function loadData(silent){
     return;
   }
   try{
-    // fetch semua (limit 200 = max backend lawas le=200) lalu filter client-side
-    const rows = await apiFetch(`/services?limit=200`);
+    // fetch semua (limit 5000 = max backend) lalu filter client-side.
+    // Penting: limit kecil (mis. 200) bikin data.length kepotong -> kartu dashboard
+    // lokal lebih kecil dari /api/stats (full DB). Ambil penuh agar selaras.
+    const rows = await apiFetch(`/services?limit=5000`);
     const mapped = rows.map(normalize);
     // FIX offline-hilang: JANGAN pernah timpa data lokal dengan hasil kosong.
     // Server scope salah / glitch sesaat return [] -> kalau ditimpa, inputan user "hilang".
@@ -2894,7 +2896,12 @@ function hl(text, kw){
 function updateStats(){
   document.getElementById('stat-masuk').textContent = data.length;
   document.getElementById('stat-proses').textContent = data.filter(d=>['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart'].includes(d.status)).length;
-  document.getElementById('stat-selesai').textContent = data.filter(d=>['Selesai','Service Sukses'].includes(d.status)).length;
+  // Label kartu = "Service Sukses Hari Ini" -> hitung yg date-nya hari ini saja,
+  // agar tidak kedip (sebelumnya all-time, lalu ditimpa API today).
+  try{
+    const _today = (typeof todayISO==='function') ? todayISO() : new Date().toISOString().slice(0,10);
+    document.getElementById('stat-selesai').textContent = data.filter(d=>['Selesai','Service Sukses'].includes(d.status) && String(d.date||'').slice(0,10)===_today).length;
+  }catch{ document.getElementById('stat-selesai').textContent = data.filter(d=>['Selesai','Service Sukses'].includes(d.status)).length; }
   document.getElementById('queueCount').textContent = data.length+' antrian';
   const badge = document.querySelector('.menu-item[data-view="semua-service"] .badge');
   if(badge) badge.textContent = data.length;
@@ -2942,6 +2949,12 @@ function updateStats(){
     if(sp) sp.textContent = cnt;
   });
   // jika API online, fetch stats real
+  // PENTING: kartu Overdue/Deadline/Harian + tab Proses SENGAJA tidak ditimpa API.
+  // Alasan: angka kartu dihitung via countProses() = konjungsi SEMUA filter aktif
+  // (basis PROSES + tab status + search + teknisi), sehingga SELALU sama dengan isi
+  // kanban saat kartu diklik. /api/stats tidak kenal search/teknisi/tab + scope teknisi
+  // beda, jadi overwrite justru bikin "angka kartu beda dengan isi" (bug yg dilaporkan).
+  // Backend get_stats() sudah diperbaiki ke scope PROSES agar konsisten untuk konsumen API.
   if(USE_API){
     apiFetch('/stats').then(s=>{
       document.getElementById('stat-masuk').textContent = s.total_masuk;
@@ -2949,15 +2962,7 @@ function updateStats(){
       document.getElementById('stat-selesai').textContent = s.selesai_hari_ini;
       const el = document.querySelector('.stat-card.dark h3');
       if(el) el.textContent = 'Rp ' + Number(s.estimasi_pendapatan).toLocaleString('id-ID');
-      if(elO) elO.textContent = s.overdue ?? overdueCount;
-      if(elT) elT.textContent = s.deadline_hari_ini ?? todayDl;
-      if(elH) elH.textContent = s.harian ?? hCount;
-      if(elM) elM.textContent = menungguKonfirmasiCount;
-      if(cO) cO.textContent = s.overdue ?? overdueCount;
-      if(cT) cT.textContent = s.deadline_hari_ini ?? todayDl;
-      if(cH) cH.textContent = s.harian ?? hCount;
-      const cM2=document.getElementById('countMingguan'); if(cM2) cM2.textContent = s.mingguan ?? mCount;
-      // sinkron sidebar badge Dalam Proses dari API
+      // sinkron sidebar badge Dalam Proses dari API (total unfiltered — benar)
       const bP2=document.getElementById('badge-proses'); if(bP2) bP2.textContent = s.dalam_proses;
     }).catch(()=>{});
   }
