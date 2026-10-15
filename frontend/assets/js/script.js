@@ -1053,7 +1053,7 @@ async function flushOutbox(){
         // token expired saat antrean mau naik (JWT 2 jam): jangan macet selamanya,
         // tendang ke login agar dapat token baru — antrean tetap aman di localStorage.
         if(/401|token tidak valid|belum login|unauthorized|expired|tidak sah/i.test(msg)){
-          try{ localStorage.removeItem('access_token'); }catch{}
+          try{ localStorage.removeItem('access_token'); localStorage.removeItem('login_at'); }catch{}
           try{ showToast('Sesi habis — login lagi untuk sync antrean'); }catch{}
           try{ setTimeout(()=>goLoginReplace(), 1200); }catch{}
           break;
@@ -1175,9 +1175,27 @@ function goLoginReplace(){
   try{ location.replace('login.html'); }catch(e){ location.href='login.html'; }
 }
 function enforceAuthOrRedirect(){
-  // dipakai guard awal + pageshow (bfcache Back/Forward)
+  // dipakai guard awal + pageshow (bfcache Back/Forward) + watcher berkala.
+  // Delegasi ke BOSAuth agar cek kedaluwarsa JWT + batas sesi 2 jam ikut tegak.
+  try{
+    if(window.BOSAuth && typeof window.BOSAuth.requireTokenOrRedirect==='function'){
+      return window.BOSAuth.requireTokenOrRedirect();
+    }
+  }catch(e){}
   if(!localStorage.getItem('access_token')){ goLoginReplace(); return false; }
   return true;
+}
+// Watcher sesi: tiap 60 detik pastikan token belum expired & sesi < 2 jam.
+// Kalau lewat → requireTokenOrRedirect membersihkan storage + balik ke login.
+function startSessionWatch(){
+  try{
+    setInterval(()=>{
+      try{
+        if(!localStorage.getItem('access_token')) return; // sudah di login / sudah logout
+        enforceAuthOrRedirect();
+      }catch(e){}
+    }, 60000);
+  }catch(e){}
 }
 // Back/Forward dari login setelah logout: halaman direstore dari bfcache
 // tanpa mengulang DOMContentLoaded — paksa cek ulang di sini.
@@ -1246,6 +1264,7 @@ async function apiFetch(path, opts={}, _retried){
         try{ locked = !!document.getElementById('lockModal')?.classList.contains('show'); }catch(e){}
         if(isDash && localStorage.getItem('access_token') && !locked){
           localStorage.removeItem('access_token');
+          try{ localStorage.removeItem('login_at'); }catch(e){}
           goLoginReplace();
         }
       }catch(e){}
@@ -1697,6 +1716,7 @@ function handleLogout(){
     localStorage.removeItem('foto');
     localStorage.removeItem('bos_stores');
     localStorage.removeItem('active_store_id');
+    localStorage.removeItem('login_at');
     showToast('Logout berhasil - mengalihkan...');
     // replace agar tombol Kembali tidak bisa buka dashboard cache sesudah logout
     setTimeout(()=> goLoginReplace(), 600);
@@ -2415,6 +2435,7 @@ async function unlockScreen(){
     const data=await res.json();
     if(!res.ok) throw new Error(data.detail||'Gagal buka kunci');
     localStorage.setItem('access_token', data.access_token);
+    try{ localStorage.setItem('login_at', String(Date.now())); }catch{} // unlock via password = login ulang, sesi 2 jam diperbarui
     if(data.role) localStorage.setItem('role', data.role);
     if(data.stores) localStorage.setItem('bos_stores', JSON.stringify(data.stores));
     if(data.primary_store_id) localStorage.setItem('active_store_id', String(data.primary_store_id));
@@ -2429,7 +2450,7 @@ async function unlockScreen(){
 }
 function lockLogout(){
   // keluar dari layar kunci (tanpa confirm) — balik ke login
-  ['access_token','username','role','nama','foto','bos_stores','active_store_id'].forEach(k=>{ try{ localStorage.removeItem(k); }catch{} });
+  ['access_token','username','role','nama','foto','bos_stores','active_store_id','login_at'].forEach(k=>{ try{ localStorage.removeItem(k); }catch{} });
   goLoginReplace();
 }
 
@@ -2445,6 +2466,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     const msg=String((e && e.message)||'');
     if(/belum login|token tidak valid|401|unauthor|expired/i.test(msg)){
       localStorage.removeItem('access_token');
+      try{ localStorage.removeItem('login_at'); }catch(e){}
       goLoginReplace(); return;
     }
   }
@@ -2474,6 +2496,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // jika ada antrean lama (mis. kemarin offline), langsung coba sync 1x
   try{ if(loadOutbox().length) setTimeout(()=>flushOutbox(), 1500); }catch{}
   startAutoLock();
+  startSessionWatch(); // paksa login ulang tiap 2 jam walau tab dibiarkan terbuka
   // polling inventory, alat & service tiap 8 detik agar 2 PC sinkron — hash compare, silent, anti-spam (fix P1-8)
   let lastServiceLen = data.length;
   let lastMenungguCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;

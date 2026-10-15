@@ -3,10 +3,21 @@
 (function (global) {
   'use strict';
 
+  function sanitizeApiBase(v) {
+    if (!v || typeof v !== 'string') return null;
+    v = v.trim();
+    if (!/^https?:\/\/.+\/api\/?$/.test(v)) return null;
+    if (/[<>"'`\s\\]/.test(v)) return null;
+    // hanya izinkan localhost / 127.0.0.1 / domain prod + trycloudflare (anti-racun localStorage)
+    if (!/(localhost|127\.0\.0\.1|reneepsl\.my\.id|trycloudflare\.com)/.test(v)) return null;
+    return v.replace(/\/+$/, '');
+  }
+
   function resolveApiBase() {
     try {
-      const stored = localStorage.getItem('API_BASE');
-      if (stored) return stored;
+      const clean = sanitizeApiBase(localStorage.getItem('API_BASE'));
+      if (clean) return clean;
+      else if (localStorage.getItem('API_BASE')) localStorage.removeItem('API_BASE');
     } catch (e) {}
     const proto = location.protocol;
     const host = location.hostname;
@@ -66,14 +77,51 @@
     try { location.replace('login.html'); } catch (e) { location.href = 'login.html'; }
   }
 
+  // Batas sesi keras: 2 jam sejak login. Selaras dengan
+  // backend ACCESS_TOKEN_EXPIRE_MINUTES=120. Unlock layar kunci via password
+  // dihitung login ulang (memperbarui login_at).
+  var SESSION_MAX_MS = 2 * 60 * 60 * 1000;
+
+  function getLoginAt() {
+    try {
+      const v = parseInt(localStorage.getItem('login_at') || '0', 10);
+      return isNaN(v) ? 0 : v;
+    } catch (e) { return 0; }
+  }
+
+  function isSessionExpired() {
+    try {
+      const at = getLoginAt();
+      if (!at) return false; // token lama sebelum ada login_at: andalkan exp JWT saja
+      return (Date.now() - at) >= SESSION_MAX_MS;
+    } catch (e) { return false; }
+  }
+
+  function isExpired(token) {
+    try {
+      const parts = String(token).split('.');
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp) return false;
+      return (payload.exp * 1000) < (Date.now() + 10000);
+    } catch (e) { return false; }
+  }
+
   function requireTokenOrRedirect() {
-    if (!getToken()) { goLoginReplace(); return false; }
+    const t = getToken();
+    if (!t || isExpired(t) || isSessionExpired()) {
+      if (t && (isExpired(t) || isSessionExpired())) logout(true);
+      else goLoginReplace();
+      if (t && (isExpired(t) || isSessionExpired())) goLoginReplace();
+      return false;
+    }
     return true;
   }
 
   // Simpan hasil login ke localStorage dengan bentuk konsisten.
   function saveLogin(data) {
     try {
+      localStorage.setItem('login_at', String(Date.now()));
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('username', data.username || '');
       localStorage.setItem('role', (data.role || '').toLowerCase());
@@ -103,17 +151,22 @@
 
   function logout(silent) {
     try {
-      ['access_token', 'username', 'role', 'nama', 'foto', 'bos_stores', 'active_store_id']
+      ['access_token', 'username', 'role', 'nama', 'foto', 'bos_stores', 'active_store_id', 'login_at']
         .forEach(function (k) { localStorage.removeItem(k); });
     } catch (e) {}
     if (!silent) goLoginReplace();
   }
 
   // Validasi sesi ke backend. 401 -> token mati, tendang ke login.
+  // Cek sesi 2 jam dulu (hemat request): kedaluwarsa -> langsung tendang.
   // 403 "belum jadi anggota" -> kembalikan {noStore:true} agar UI bisa kasih pesan.
   async function validateSession() {
     const token = getToken();
     if (!token) return { ok: false, reason: 'no-token' };
+    if (isExpired(token) || isSessionExpired()) {
+      logout(true);
+      return { ok: false, reason: 'expired' };
+    }
     try {
       const res = await fetch(API + '/auth/me', {
         headers: { 'Authorization': 'Bearer ' + token }
@@ -142,6 +195,10 @@
     canSeeFinance: canSeeFinance,
     goLoginReplace: goLoginReplace,
     requireTokenOrRedirect: requireTokenOrRedirect,
+    isExpired: isExpired,
+    isSessionExpired: isSessionExpired,
+    getLoginAt: getLoginAt,
+    SESSION_MAX_MS: SESSION_MAX_MS,
     saveLogin: saveLogin,
     landingFor: landingFor,
     redirectAfterLogin: redirectAfterLogin,

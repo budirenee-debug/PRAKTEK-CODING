@@ -45,7 +45,7 @@
       <div style="margin-top:14px;font-size:12px;color:#8a8f98;text-align:center"><a href="landing.html">← Beranda</a> • <a href="login.html">Login toko (kasir/teknisi)</a> • <a href="lacak.html">🔍 Lacak Service</a></div>
     </div>
   </div>
-  <script src="assets/js/auth.js?v=idx1"></script>
+  <script src="assets/js/auth.js?v=idx2-sess2h"></script>
   <script>
     const API = (window.BOSAuth ? window.BOSAuth.API : (() => {
       const stored = localStorage.getItem('API_BASE');
@@ -110,6 +110,7 @@
         // Simpan dulu agar myActiveRole (per-toko) bisa dihitung
         if(window.BOSAuth) window.BOSAuth.saveLogin(data);
         else {
+          localStorage.setItem('login_at', String(Date.now()));
           localStorage.setItem('access_token', data.access_token);
           localStorage.setItem('username', data.username);
           localStorage.setItem('role', data.role);

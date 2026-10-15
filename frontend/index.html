@@ -14,8 +14,32 @@
     // Penting untuk tombol Kembali (bfcache) yang tidak mengulang DOMContentLoaded.
     (function(){
       try{ document.documentElement.classList.add('guard-lock'); }catch(e){}
+      function tokenExpired(t){
+        try{
+          var parts = String(t).split('.');
+          if(parts.length !== 3) return false;
+          var payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if(!payload.exp) return false;
+          return (payload.exp * 1000) < (Date.now() + 10000);
+        }catch(e){ return false; }
+      }
+      function sessionExpired(){
+        try{
+          var at = parseInt(localStorage.getItem('login_at') || '0', 10);
+          if(!at) return false; // token lama: andalkan exp JWT saja
+          return (Date.now() - at) >= 2*60*60*1000;
+        }catch(e){ return false; }
+      }
       function needLogin(){
-        try{ return !localStorage.getItem('access_token'); }catch(e){ return true; }
+        try{
+          var t = localStorage.getItem('access_token');
+          if(!t) return true;
+          if(tokenExpired(t) || sessionExpired()){
+            try{ localStorage.removeItem('access_token'); localStorage.removeItem('login_at'); }catch(e){}
+            return true;
+          }
+          return false;
+        }catch(e){ return true; }
       }
       function guardReplace(){
         if(needLogin()){
@@ -1382,8 +1406,8 @@
     <!-- AREA CETAK NOTA (hanya ini yang keluar di kertas) -->
     <div id="printArea"></div>
 
-    <script src="assets/js/auth.js?v=idx1"></script>
-    <script src="assets/js/script.js?v=page25-dashfix1"></script>
+    <script src="assets/js/auth.js?v=idx2-sess2h"></script>
+    <script src="assets/js/script.js?v=page26-sess2h"></script>
     <script src="assets/js/engine.js?v=eng20"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
