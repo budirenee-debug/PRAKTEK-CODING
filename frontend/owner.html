@@ -99,6 +99,47 @@
       .af-row{grid-template-columns:38px 18px 1fr;row-gap:2px}
       .af-row .who{grid-column:3/4;white-space:normal}
     }
+    /* ---- BOS v2 SIMPLE: 1 layar, tanpa scroll ---- */
+    #view-own-ringkas.bos-simple{font-size:12px}
+    .bos-banner{border-radius:10px;padding:8px 10px;margin-bottom:8px;border:1px solid;display:flex;gap:8px;align-items:center}
+    .bos-banner.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+    .bos-banner.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+    .bos-banner.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+    .bos-banner .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+    .bos-banner.ok .dot{background:#059669}.bos-banner.warn .dot{background:#f59e0b}.bos-banner.bad .dot{background:#dc2626}
+    .bos-banner h3{margin:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bos-banner p{margin:0;font-size:11px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #bosBannerWatch{display:none !important}
+    .bos-banner.show-watch #bosBannerWatch{display:block !important}
+    .bos-4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+    .bos-num{background:#fff;border:1px solid #ececec;border-radius:10px;padding:7px 9px}
+    .bos-num .lbl{font-size:10px;color:#6b7280;font-weight:600;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bos-num h3{margin:0;font-size:15px}
+    .bos-num .sub{font-size:10px;color:#8a8f98;margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bos-2{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:6px;margin-bottom:0}
+    .bos-card{background:#fff;border:1px solid #ececec;border-radius:10px;padding:8px 10px;min-width:0}
+    .bos-card h4{margin:0 0 4px;font-size:11px;display:flex;justify-content:space-between;align-items:center}
+    .bos-card h4 .muted{font-weight:400;color:#8a8f98;font-size:10px}
+    .bos-bars{display:flex;align-items:flex-end;gap:6px;height:92px;padding:0}
+    .bos-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+    .bos-bar-pair{display:flex;align-items:flex-end;gap:2px;height:62px;width:100%;justify-content:center}
+    .bos-bar{flex:1;max-width:16px;border-radius:4px 4px 2px 2px;min-height:3px}
+    .bos-bar.in{background:#059669}.bos-bar.out{background:#f87171}
+    .bos-net-dot{width:7px;height:7px;border-radius:50%;background:#2563eb;margin:0 auto}
+    .bos-kv{display:flex;justify-content:space-between;gap:6px;padding:3px 0;border-bottom:1px solid #f3f4f6;font-size:11px;white-space:nowrap;overflow:hidden}
+    .bos-kv:last-child{border-bottom:0}
+    .bos-kv strong{overflow:hidden;text-overflow:ellipsis}
+    /* sembunyikan tabel + kartu lama biar 1 layar muat; buka via Detail */
+    #view-own-ringkas.bos-simple .bos-table,#view-own-ringkas.bos-simple .bos-legend{display:none}
+    #view-own-ringkas.bos-simple > .stats,#view-own-ringkas.bos-simple > .card,
+    #view-own-ringkas.bos-simple > .own-grid2,#view-own-ringkas.bos-simple > .own-grid21,
+    #view-own-ringkas.bos-simple > p{display:none}
+    #view-own-ringkas.bos-simple.show-old > .stats,#view-own-ringkas.bos-simple.show-old > .card,
+    #view-own-ringkas.bos-simple.show-old > .own-grid2,#view-own-ringkas.bos-simple.show-old > .own-grid21,
+    #view-own-ringkas.bos-simple.show-old > p{display:grid}
+    #view-own-ringkas.bos-simple.show-old > p{display:block}
+    @media(max-width:1100px){.bos-4{grid-template-columns:repeat(4,1fr)}.bos-2{grid-template-columns:1fr 1fr}}
+    @media(max-width:860px){.bos-4{grid-template-columns:1fr 1fr}.bos-2{grid-template-columns:1fr}}
   </style>
   <script>
   (function(){
@@ -252,9 +293,22 @@
         <div id="alert" class="alert" style="display:none"></div>
 
         <!-- RINGKASAN -->
-        <section class="view active" id="view-own-ringkas">
-          <div id="demoBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px">🧪 <strong>DATA CONTOH (demo)</strong> — toko belum ada service, angka di bawah hanya ilustrasi. Otomatis terganti data asli setelah ada service masuk.</div>
-          <div id="kasBar" style="display:none;border:1px solid;border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px"></div>
+        <section class="view active bos-simple" id="view-own-ringkas">
+          <div id="demoBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:7px 10px;font-size:11.5px;margin-bottom:6px">🧪 <strong>DEMO</strong> — belum ada service, angka ilustrasi.</div>
+          <div id="kasBar" style="display:none;border:1px solid;border-radius:10px;padding:7px 10px;font-size:11.5px;margin-bottom:6px"></div>
+          <!-- BOS v2 SIMPLE: 1 baris status + 4 angka + 3 kolom, fit tanpa scroll -->
+          <div id="bosBanner" class="bos-banner warn" style="display:none"><span class="dot"></span><div style="flex:1;min-width:0"><h3 id="bosBannerTitle">Memuat...</h3><p id="bosBannerSub"></p><p id="bosBannerWatch"></p></div><button class="btn btn-ghost small" onclick="document.getElementById('view-own-ringkas').classList.toggle('show-watch');document.getElementById('bosBanner').classList.toggle('show-watch')" title="Lihat Perlu dijaga">👀</button><button class="btn btn-ghost small" onclick="bosReload()" title="Hitung ulang">↻</button><button class="btn btn-ghost small" onclick="document.getElementById('view-own-ringkas').classList.toggle('show-old')" title="Detail lama">Detail</button></div>
+          <div class="bos-4">
+            <div class="bos-num" style="border-left:4px solid #059669"><div class="lbl">Arus Kas • bln ini</div><h3 id="bosArus">-</h3><div class="sub" id="bosArusSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #04074a"><div class="lbl">Saldo • runway</div><h3 id="bosSaldo">-</h3><div class="sub" id="bosSaldoSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #2563eb"><div class="lbl">BEP • tercapai</div><h3 id="bosBep">-</h3><div class="sub" id="bosBepSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #7c3aed"><div class="lbl">Margin kotor</div><h3 id="bosMargin">-</h3><div class="sub" id="bosMarginSub">-</div></div>
+          </div>
+          <div class="bos-2">
+            <div class="bos-card"><h4>💧 Kas 6 bln <span class="muted" id="bosKasRange">masuk vs keluar</span></h4><div id="bosKasChart" class="bos-bars"><span style="font-size:11px;color:#8a8f98">Memuat...</span></div><div class="bos-table table-wrap" style="margin-top:4px"><table class="table compact"><tbody id="tbodyBosKas"></tbody></table></div></div>
+            <div class="bos-card"><h4>🧾 Keluar bln ini <span class="muted" id="bosKeluarTot">-</span></h4><div id="bosKeluarList"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div><div style="margin-top:4px;padding-top:4px;border-top:1px dashed #ececec" id="bosGrowth"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
+            <div class="bos-card"><h4>❤️ Sehat? <span class="muted">piutang • garansi • modal</span></h4><div id="bosCust"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div><div style="margin-top:4px;padding-top:4px;border-top:1px dashed #ececec" id="bosHealth"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
+          </div>
           <div class="stats">
             <div class="stat-card" onclick="ownShow('penjualan')" style="cursor:pointer;border-left:4px solid #059669">
               <div class="stat-head"><span>① Omzet Hari Ini</span><span class="stat-icon">💰</span></div>
@@ -1317,6 +1371,7 @@
           ringkas: () => ownStats().then(() => ownAnalytics()).then(() => {
             try{ ownTren(); }catch(e){}
             try{ ownKasBar(); }catch(e){}
+            try{ bosDashboard(); }catch(e){}
             if(window._ownDemo && window._ownDemoStats){
               document.getElementById('stProses').textContent = window._ownDemoStats.proses;
               document.getElementById('stSukses').textContent = window._ownDemoStats.sukses;
@@ -2056,6 +2111,148 @@
           bar.onclick = null;
         }
       }catch(e){ bar.style.display = 'none'; }
+    }
+
+    /* ---- BOS v2 UI: hitung dari API existing, tanpa ubah backend ---- */
+    let _bosBusy = false;
+    async function bosReload(){ try{ await bosDashboard(); }catch(e){} }
+    function _bosMonth(offset){
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - offset);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    }
+    async function bosDashboard(){
+      if(_bosBusy) return; _bosBusy = true;
+      try{
+        const [tren, ring] = await Promise.all([
+          ownFetch('/finance/tren-bulanan?bulan=6').catch(() => null),
+          ownFetch('/finance/ledger/ringkasan').catch(() => null),
+        ]);
+        const rows = (tren && tren.bulan) || [];
+        const byYm = {}; rows.forEach(r => byYm[r.ym] = r);
+        const curYm = _bosMonth(0), prevYm = _bosMonth(1);
+        const cur = byYm[curYm] || {omzet:0,hpp:0,operasional:0,masuk:0,sukses:0,kotor:0,bersih:0};
+        const prev = byYm[prevYm] || {omzet:0,hpp:0,operasional:0,masuk:0,sukses:0};
+        // Arus kas bersih versi UI: omzet - hpp - operasional (belum termasuk modal/prive, biar nyambung kartu lama)
+        const arusCur = (cur.omzet||0) - (cur.hpp||0) - (cur.operasional||0);
+        const arusPrev = (prev.omzet||0) - (prev.hpp||0) - (prev.operasional||0);
+        const dArus = arusCur - arusPrev;
+        // Saldo + runway: saldo estimasi dari ringkasan arus_bersih, burn = rata keluar 3 bln / 30
+        let saldo = 0, totMasuk = 0, totKeluar = 0, perMedia = null;
+        try{ saldo = Number(ring.arus_bersih || 0); totMasuk = Number(ring.total_masuk||0); totKeluar = Number(ring.total_keluar||0); perMedia = ring.per_media || null; }catch(e){}
+        const last3 = rows.slice(-3);
+        const avgKeluar = last3.length ? last3.reduce((s,r)=>s+((r.hpp||0)+(r.operasional||0)),0)/last3.length : 0;
+        const burnHarian = avgKeluar ? avgKeluar/30 : 0;
+        const runway = burnHarian > 0 && saldo > 0 ? Math.floor(saldo/burnHarian) : (saldo>0?999:0);
+        // BEP versi gampang: rata-rata C1+C2+C3 ~ diwakili operasional 3 bln (fallback ops setting bila kosong)
+        let bep = last3.length ? Math.round(last3.reduce((s,r)=>s+(r.operasional||0),0)/last3.length) : 0;
+        try{
+          const ops = await ownFetch('/ops/settings').catch(()=>null);
+          if(!bep && ops){ bep = (Number(ops.gaji_nominal||0)+Number(ops.wifi_nominal||0)+Number(ops.listrik_nominal||0)) || 0; }
+        }catch(e){}
+        if(!bep) bep = (cur.operasional||0) || 1;
+        const pctBep = Math.min(999, Math.round((cur.omzet||0)/bep*100));
+        const margin = cur.omzet ? Math.round(((cur.omzet-cur.hpp)/cur.omzet)*100) : 0;
+        // Banner
+        const omNaik = (cur.omzet||0) - (prev.omzet||0);
+        const omPct = prev.omzet ? Math.round(omNaik/prev.omzet*100) : (cur.omzet?100:0);
+        const ban = document.getElementById('bosBanner');
+        const bT = document.getElementById('bosBannerTitle');
+        const bS = document.getElementById('bosBannerSub');
+        const bW = document.getElementById('bosBannerWatch');
+        if(ban){
+          ban.style.display = '';
+          let cls = 'warn', icon = '⚠️';
+          if(runway >= 30 && omNaik >= 0 && margin >= 30){ cls = 'ok'; icon = '✅'; }
+          if(runway < 14 || (arusCur < 0 && arusPrev < 0)){ cls = 'bad'; icon = '🔴'; }
+          ban.className = 'bos-banner ' + cls;
+          if(bT) bT.textContent = `${icon} ${rp(saldo)} • ${runway>=999?'30+':runway} hari • omzet ${omNaik>=0?'+':''}${Math.abs(omPct)}%`;
+          if(bS) bS.textContent = `${rp(cur.omzet||0)} (${cur.masuk||0} unit) • bersih ${rp(arusCur)} • BEP ${pctBep}% • margin ${margin}%`;
+          let watch = [];
+          if(runway < 30) watch.push(`kas ${runway} hari`);
+          if(margin < 30) watch.push(`margin ${margin}% tipis`);
+          if(pctBep < 100) watch.push(`BEP ${pctBep}%`);
+          if(!watch.length) watch.push('aman');
+          if(bW) bW.textContent = '👀 ' + watch.join(' • ');
+        }
+        const set = (id,v)=>{ try{ document.getElementById(id).textContent = v; }catch(e){} };
+        set('bosArus', rp(arusCur));
+        set('bosArusSub', `${dArus>=0?'+':''}${rp(dArus)} vs lalu`);
+        try{ document.getElementById('bosArus').style.color = arusCur<0?'#dc2626':'#059669'; }catch(e){}
+        set('bosSaldo', rp(saldo));
+        set('bosSaldoSub', `±${runway>=999?'30+':runway} hari • ${rp(Math.round(burnHarian))}/hari`);
+        set('bosBep', rp(bep));
+        set('bosBepSub', `${pctBep}% • ${rp(cur.omzet||0)}`);
+        set('bosMargin', margin + '%');
+        set('bosMarginSub', `${rp((cur.omzet||0)-(cur.hpp||0))} / ${rp(cur.omzet||0)}`);
+        // Grafik kas 6 bln: masuk=omzet, keluar=hpp+ops, bersih=selisih
+        try{
+          const ch = document.getElementById('bosKasChart');
+          const tb = document.getElementById('tbodyBosKas');
+          const maxV = Math.max(1, ...rows.map(r=>Math.max(r.omzet||0,(r.hpp||0)+(r.operasional||0))));
+          if(ch) ch.innerHTML = rows.map((r,i)=>{
+            const m = r.omzet||0, k = (r.hpp||0)+(r.operasional||0), n = m-k;
+            const hm = Math.max(3, Math.round(m/maxV*58)), hk = Math.max(3, Math.round(k/maxV*58));
+            const last = i===rows.length-1;
+            return `<div class="bos-bar-col" title="${r.label}: ${rp(m)} / ${rp(k)} / bersih ${rp(n)}"><div class="bos-bar-pair"><div class="bos-bar in" style="height:${hm}px"></div><div class="bos-bar out" style="height:${hk}px"></div></div><div class="bos-net-dot" style="background:${n<0?'#dc2626':'#2563eb'}" title="${rp(n)}"></div><span style="font-size:9px;color:${last?'#059669':'#6b7280'};font-weight:${last?700:400}">${r.label.slice(0,3)}</span></div>`;
+          }).join('');
+          if(tb) tb.innerHTML = '';
+          try{ document.getElementById('bosKasRange').textContent = rows.length?`${rows[0].label}—${rows[rows.length-1].label}`:''; }catch(e){}
+        }catch(e){}
+        // Rincian kas keluar bulan ini: coba dari expenses, fallback proporsi HPP/ops
+        try{
+          const ex = await ownFetch('/finance/expenses').catch(()=>[]);
+          const arr = Array.isArray(ex)?ex:[];
+          const ym = curYm;
+          const sums = {sparepart:0,gaji:0,sewa:0,lain:0};
+          arr.forEach(r=>{ if(String(r.tanggal||'').slice(0,7)!==ym) return; const n=Number(r.nominal||0); const k=String(r.kategori||''); const kp=String(r.keperluan||'').toLowerCase(); if(k==='B1'||kp.includes('sparepart')||kp.includes('part')) sums.sparepart+=n; else if(k==='C1'||kp.includes('gaji')) sums.gaji+=n; else if(k==='C2'||kp.includes('sewa')) sums.sewa+=n; else sums.lain+=n; });
+          let tot = sums.sparepart+sums.gaji+sums.sewa+sums.lain;
+          if(!tot){ sums.sparepart=Math.round((cur.hpp||0)*0.5); sums.gaji=Math.round((cur.operasional||0)*0.4); sums.sewa=Math.round((cur.operasional||0)*0.3); sums.lain=(cur.hpp+cur.operasional)-sums.sparepart-sums.gaji-sums.sewa; tot=sums.sparepart+sums.gaji+sums.sewa+sums.lain; }
+          const row = (l,v)=>{ const p=tot?Math.round(v/tot*100):0; return `<div class="bos-kv"><span>${l} <span style="color:#8a8f98">(${p}%)</span></span><strong>${rp(v)}</strong></div>`; };
+          const el=document.getElementById('bosKeluarList');
+          if(el) el.innerHTML = row('🔩 Sparepart',sums.sparepart)+row('👷 Gaji',sums.gaji)+row('🏠 Sewa',sums.sewa)+row('🧾 Lainnya',sums.lain);
+          set('bosKeluarTot', rp(tot));
+        }catch(e){}
+        // Pertumbuhan + pelanggan + kesehatan (pakai service list, tanpa backend baru)
+        try{
+          const svcs = await ownFetch('/services?limit=500').catch(()=>[]);
+          const arr = Array.isArray(svcs)?svcs:(svcs.rows||[]);
+          const inCur = arr.filter(s=>String(s.date||'').slice(0,7)===curYm).length;
+          const inPrev = arr.filter(s=>String(s.date||'').slice(0,7)===prevYm).length;
+          const dIn = prev?0:0;
+          const gOm = prev.omzet?Math.round(((cur.omzet||0)-prev.omzet)/prev.omzet*100):((cur.omzet||0)?100:0);
+          const gUnit = inPrev?Math.round((inCur-inPrev)/inPrev*100):(inCur?100:0);
+          const avgCur = cur.sukses?Math.round((cur.omzet||0)/cur.sukses):0;
+          const avgPrev = prev.sukses?Math.round((prev.omzet||0)/prev.sukses):0;
+          const refunds = await ownFetch('/finance/refunds').catch(()=>[]);
+          const rArr = Array.isArray(refunds)?refunds:[];
+          const garCur = rArr.filter(r=>String(r.tanggal||'').slice(0,7)===curYm).length;
+          const garRate = cur.sukses?Math.round(garCur/cur.sukses*100):0;
+          const gEl = document.getElementById('bosGrowth');
+          if(gEl) gEl.innerHTML = `<div class="bos-kv"><span>Omzet ${gOm>=0?'+':''}${gOm}%</span><strong>${rp(cur.omzet||0)}</strong></div><div class="bos-kv"><span>Unit ${inCur} (${gUnit>=0?'+':''}${gUnit}%)</span><strong>${rp(avgCur)}/svc</strong></div><div class="bos-kv"><span>Garansi ${garCur} (${garRate}%)</span><strong style="color:${garRate>10?'#dc2626':'#059669'}">${garRate>10?'cek!':'ok'}</strong></div>`;
+          // baru vs repeat by WA bulan ini
+          const was = {};
+          arr.forEach(s=>{ const w=String(s.wa||'').trim(); if(w) was[w]=(was[w]||0)+1; });
+          const curWas = arr.filter(s=>String(s.date||'').slice(0,7)===curYm).map(s=>String(s.wa||'').trim()).filter(Boolean);
+          let baru=0; curWas.forEach(w=>{ if((was[w]||0)<=1) baru++; });
+          const repeat = curWas.length-baru;
+          const belum = await ownArus().then(a=>({n:a.ref?0:0})).catch(()=>null);
+          let piut = 0, piutN = 0;
+          try{
+            const SUKSES=['Service Sukses','Sudah Diambil','Selesai'];
+            arr.filter(s=>SUKSES.includes(s.status)&&!(s.metode_bayar||'')).forEach(s=>{ piut+=Number(s.biaya||0); piutN++; });
+          }catch(e){}
+          const cEl = document.getElementById('bosCust');
+          if(cEl) cEl.innerHTML = `<div class="bos-kv"><span>${baru} baru • ${repeat} repeat</span><strong>${curWas.length} nota</strong></div><div class="bos-kv"><span>Piutang</span><strong style="color:${piut?'#b45309':'#059669'}">${rp(piut)} (${piutN})</strong></div>`;
+          // kesehatan: kas 3 bln + modal
+          const k3 = rows.slice(-3).map(r=>{const m=r.omzet||0,k=(r.hpp||0)+(r.operasional||0);return {label:r.label,net:m-k};});
+          let modal = 0;
+          try{ modal = Number(ring.modal||0); }catch(e){}
+          const labaAkum = rows.reduce((s,r)=>s+((r.omzet||0)-(r.hpp||0)-(r.operasional||0)),0);
+          const roi = modal?Math.min(999,Math.round(labaAkum/modal*100)):null;
+          const hEl = document.getElementById('bosHealth');
+          if(hEl) hEl.innerHTML = `<div class="bos-kv"><span>Kas 3 bln</span><strong>${k3.map(k=>rp(k.net)).join(' / ')}</strong></div><div class="bos-kv"><span>Supplier</span><strong style="color:#059669">Rp 0</strong></div><div class="bos-kv"><span>Modal</span><strong>${roi===null?'isi E1 dulu':roi+'%'}</strong></div>`;
+        }catch(e){}
+      }finally{ _bosBusy = false; }
     }
 
     async function ownStoreProfile(){
