@@ -230,8 +230,23 @@
 - **Minor:** `b_gadget.db` nyasar di root PC (4KB + WAL 1.8MB) -> dihapus + `/b_gadget.db*` masuk `.gitignore`. Restart app butuh +-10 detik (2 worker, migrasi jalan di tiap worker) -> cek health pakai loop.
 - **Deploy side-effect:** commit `672e4c5` (BOS v2 UI) ikut ke server karena push. Verifikasi: `bosDashboard` ada di `owner.html` server, semua halaman publik 200.
 
+## 5v. FIX WA KOSONG BEBAS + IDENTITAS IMEI (22 Okt 2026, sudah deploy `522cefa`)
+- **Bug yang ketemu pas smoke test:** `POST /api/customers` dengan WA kosong di toko yang sudah punya pelanggan tanpa WA -> **HTTP 400 "WA sudah terdaftar di toko ini"**. Jadi kasir tidak bisa menambah pelanggan walk-in. Akar: `customers` punya `UNIQUE(wa, store_id)` biasa, jadi WA kosong ikut terlimit (cuma 1 baris WA kosong per toko).
+- **Efek samping yang lebih besar:** 114 dari 197 service (58%) punya `wa` kosong, dan `crud.create_service` upsert customer by WA -> semuanya nempel ke **satu** baris customer (id 43, `wa=''`, nama ketimpa terus: cash/doni/abdula/friska). Efek: data pelanggan hancur + customer list ngandelin 1 baris nyasar.
+- **Putusan user:** WA memang **boleh kosong** (walk-in); identitas sebenarnya = **IMEI handphone**, bukan nomor WA.
+- **Fix:**
+  - `models.Customer`: kolom baru `imei`; `UNIQUE(wa,store_id)` -> **partial unique index** `uq_customer_wa_store ... WHERE wa IS NOT NULL AND TRIM(wa)<>''` (WA kosong bebas) + `uq_customer_imei_store ... WHERE imei IS NOT NULL AND TRIM(imei)<>''` (IMEI unik per toko).
+  - `routers/customers.py`: WA kosong tidak dicek sebagai duplikat; WA terisi tetap unik per toko (400); cek IMEI juga (400 "IMEI sudah terdaftar di toko ini"); response/list customer sekarang include `imei`.
+  - `crud.create_service`: identitas customer = WA -> kalau kosong pakai IMEI -> kalau dua-duanya kosong service **tanpa** customer (`customer_id` NULL, bukan numpuk di satu baris).
+  - `main.py` migrasi: rebuild `customers` (lepas constraint tabel, tambah kolom imei, buat 2 partial index), **idempotent** (deteksi state target dari kolom + index, bukan dari marker di SQL tabel). Constraint unik gagal -> rollback semua (biar tidak setengah jadi).
+  - Frontend: field "IMEI Handphone" opsional di form Tambah Pelanggan + kirim ke API; bump `script.js?v=page27-imei1`.
+- **Uji:** `tools/uji_migrasi_uniq.py` (5 kasus + kasus baru WA kosong & IMEI, semua LULUS), `tools/dryrun_migrasi_prodb.py` (salinan DB produksi: 80/6/197/381/1214 tetap utuh, semua cek LULUS), `tools/uji_api_customer.py` (baru, API level pake TestClient: 15 cek LULUS).
+- **Deploy:** backup dulu (cron sudah aktif) -> pull -> restart. Hasil: `customers` punya kolom `imei` + 2 partial index, `customers_new` tidak ada, data utuh, restart kedua **tidak** rebuild (idempotent), 5xx = 0.
+- **Smoke test produksi:** walk-in tanpa WA 201 (2x di toko sama), WA kembar 400, WA sama toko lain 201, IMEI kembar 400, IMEI sama toko lain 201, service walk-in -> `customer_id` NULL, service by IMEI -> nyambung ke customer yg imei itu. Semua data uji dibersihkan (balik ke 80 customer / 197 service).
+- **Sisa data lama (belum disentuh, aman):** 114 service historis masih nunjuk customer id 43 (nama `cash`, `wa=''`). Mau dipecah jadi customer per orang / dibersihkan = keputusan sendiri (tidak ada data yang hilang, cuma tampilan customer list).
+
 ## 6. NEXT (belum dikerjakan)
-- **BUG baru ketemu (22 Okt, belum fix):** 114 dari 197 service (58%) punya `wa` KOSONG -> semuanya nempel ke SATU baris customer (id 43, `wa=''`, nama ketimpa terus: cash/doni/abdula/friska). Efek: data pelanggan service tanpa WA hancur + **tracking lacak by WA gagal**. Akar: `crud.create_service` upsert customer by `wa` -> `wa=''` match baris yang sama. Fix: kalau `payload.wa` kosong -> jangan isi `customer_id` (biarkan NULL) + backfill `services.wa` dari customer historis.
 - **Uji browser BOS3->BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.
 - Nanti: laporan gabungan owner, paket/billing, root `/` -> landing (butuh edit `main.py`).
 - **Investigasi selisih tutup kas negatif** (10 Okt -6.918.500 / 16 Okt -309.000 / 19 Okt -1.167.000 / 20 Okt -1.167.000 - fisik selalu < sistem, 19 & 20 Okt nilainya identik -> indikasi input fisik di-copy).
+- **Opsional (kalau mau):** rapikan 114 service historis yang masih nunjuk customer id 43 (nama `cash`, WA kosong) -> pecah jadi customer per IMEI atau lepas `customer_id` (data tidak hilang, cuma customer list jadi bersih). Backfill `services.wa` juga belum ada (WA lama masih padded nol di sebagian baris).
