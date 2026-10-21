@@ -12,6 +12,11 @@ backend/*.db-journal
 *.db-shm
 *.db-wal
 
+# DB nyasar di root project (bikin-bikin waktu run dari root) - jangan commit
+/b_gadget.db
+/b_gadget.db-shm
+/b_gadget.db-wal
+
 # OS
 .DS_Store
 Thumbs.db
