@@ -545,14 +545,22 @@ def _migrate_harga_part_auto():
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
-            ecols = [row[1] for row in conn.execute(text("PRAGMA table_info(service_engine)")).fetchall()]
-            if "harga_part_manual" not in ecols:
-                conn.execute(text("ALTER TABLE service_engine ADD COLUMN harga_part_manual INTEGER DEFAULT 0"))
-                print("migrated: service_engine.harga_part_manual")
-            ccols = [row[1] for row in conn.execute(text("PRAGMA table_info(commission_ledgers)")).fetchall()]
-            if "hpp_rp" not in ccols:
-                conn.execute(text("ALTER TABLE commission_ledgers ADD COLUMN hpp_rp INTEGER DEFAULT 0"))
-                print("migrated: commission_ledgers.hpp_rp")
+            def _add_col(table, col, ddl):
+                # 2 worker start bareng -> satu bisa ALTER duluan, almond dapat "duplicate column"
+                cols = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+                if col in cols:
+                    return
+                try:
+                    conn.execute(text(ddl))
+                    print(f"migrated: {table}.{col}")
+                except Exception as e:
+                    print(f"migrate {table}.{col} skip (worker lain?): {e}")
+                conn.commit()
+
+            _add_col("service_engine", "harga_part_manual",
+                     "ALTER TABLE service_engine ADD COLUMN harga_part_manual INTEGER DEFAULT 0")
+            _add_col("commission_ledgers", "hpp_rp",
+                     "ALTER TABLE commission_ledgers ADD COLUMN hpp_rp INTEGER DEFAULT 0")
             # nilai lama = nilai manual (biaya lama tidak diubah, forward-only)
             conn.execute(text(
                 "UPDATE service_engine SET harga_part_manual = harga_part_up "
