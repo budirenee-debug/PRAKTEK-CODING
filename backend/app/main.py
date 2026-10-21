@@ -536,6 +536,64 @@ def _migrate_sparepart_index():
 _migrate_sparepart_index()
 
 
+def _migrate_harga_part_auto():
+    """Harga part otomatis KELUAR dari basis komisi teknisi (23 Okt 2026).
+    - service_engine.harga_part_manual: override manual owner, terpisah dari nilai efektif.
+      (nilai efektif = max(override manual, total harga part yang dipakai)).
+    - commission_ledgers.hpp_rp: harga part yang dikeluarkan, buat info di kartu Gajian.
+    Idempotent: cek PRAGMA table_info dulu."""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            ecols = [row[1] for row in conn.execute(text("PRAGMA table_info(service_engine)")).fetchall()]
+            if "harga_part_manual" not in ecols:
+                conn.execute(text("ALTER TABLE service_engine ADD COLUMN harga_part_manual INTEGER DEFAULT 0"))
+                print("migrated: service_engine.harga_part_manual")
+            ccols = [row[1] for row in conn.execute(text("PRAGMA table_info(commission_ledgers)")).fetchall()]
+            if "hpp_rp" not in ccols:
+                conn.execute(text("ALTER TABLE commission_ledgers ADD COLUMN hpp_rp INTEGER DEFAULT 0"))
+                print("migrated: commission_ledgers.hpp_rp")
+            # nilai lama = nilai manual (biaya lama tidak diubah, forward-only)
+            conn.execute(text(
+                "UPDATE service_engine SET harga_part_manual = harga_part_up "
+                "WHERE (harga_part_manual IS NULL OR harga_part_manual = 0) "
+                "AND (harga_part_up IS NOT NULL AND harga_part_up > 0)"))
+            conn.commit()
+    except Exception as e:
+        print("migrate harga part auto fail:", e)
+
+    # Backfill: service yang MASIH PENDING (belum cair, belum dibayar) -> harga part
+    # otomatis keluar dari basis komisi. Yang sudah 'cair' TIDAK disentuh (forward-only).
+    try:
+        from sqlalchemy.orm import sessionmaker
+        from . import engine_logic as _el
+        _Session = sessionmaker(bind=engine)
+        _db = _Session()
+        try:
+            rows = _db.query(models.ServiceEngine).filter(
+                models.ServiceEngine.komisi_status != "cair").all()
+            n = 0
+            for se in rows:
+                if not _el.part_up_total(_db, se.invoice):
+                    continue
+                svc = _db.query(models.Service).filter(
+                    models.Service.invoice == se.invoice).first()
+                if not svc:
+                    continue
+                before = (se.harga_part_up, se.jasa_bersih, se.komisi_teknisi)
+                _el.sync_harga_part(_db, svc, se)
+                if before != (se.harga_part_up, se.jasa_bersih, se.komisi_teknisi):
+                    n += 1
+            if n:
+                _db.commit()
+                print(f"harga part: sinkron {n} baris pending (belum cair)")
+        finally:
+            _db.close()
+    except Exception as e:
+        print("backfill harga part pending fail:", e)
+_migrate_harga_part_auto()
+
+
 def _migrate_engine():
     """Business Engine Fase 1: kolom level + tabel engine auto-create via create_all.
     Backfill: settings default per toko, level junior, service_engine untuk service lama."""

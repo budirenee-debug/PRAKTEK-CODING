@@ -270,7 +270,8 @@ class ServiceEngine(Base):
     invoice = Column(String(20), ForeignKey("services.invoice"), primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
     kategori = Column(String(20), default="ringan")  # berat / ringan (manual + default auto)
-    harga_part_up = Column(Integer, default=0)  # harga UP yg dilihat teknisi (pajak toko)
+    harga_part_up = Column(Integer, default=0)  # harga UP yg dilihat teknisi (pajak toko) - nilai EFEKTIF
+    harga_part_manual = Column(Integer, default=0)  # override manual owner (kalau part ga dicatat via "Pakai Part")
     modal_asli = Column(Integer, default=0)  # rahasia owner only
     jasa_bersih = Column(Integer, default=0)  # auto = biaya - harga_part_up
     komisi_teknisi = Column(Integer, default=0)  # auto % senior/junior
@@ -453,6 +454,7 @@ class CommissionLedger(Base):
     tipe = Column(String(30), nullable=False, index=True)  # komisi_cair / allowance / potongan_cicilan / hutang_baru / toleransi_toko
     masuk_rp = Column(Integer, default=0)
     keluar_rp = Column(Integer, default=0)
+    hpp_rp = Column(Integer, default=0)  # harga part yang dikeluarkan dari basis komisi (info kartu gajian)
     sisa_hutang_saat_itu = Column(Integer, default=0)
     keterangan = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())

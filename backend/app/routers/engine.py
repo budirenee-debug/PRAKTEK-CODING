@@ -218,6 +218,8 @@ def _kas_summary(db: Session, store_id: int, technician_id: int):
     allowance = sum((l.masuk_rp or 0) for l in leds if l.tipe == "allowance")
     potong = sum((l.keluar_rp or 0) for l in leds if l.tipe == "potongan_cicilan")
     refund = sum((l.keluar_rp or 0) for l in leds if l.tipe == "refund_balik")
+    # harga part yang dikeluarkan dari basis komisi (pajak toko) - INFO, tidak mengurangi
+    hpp = sum((l.hpp_rp or 0) for l in leds)
     # komisi_cair di ledger sudah NET dari cicilan hutang (masuk = komisi - potong).
     # Jadi komisi_bruto = komisi + cicilan; potongan = cicilan + refund balik.
     potongan = potong + refund
@@ -245,11 +247,12 @@ def _kas_summary(db: Session, store_id: int, technician_id: int):
     return {"komisi_cair": komisi, "komisi_bruto": komisi_bruto,
             "allowance": allowance, "potongan_cicilan": potong,
             "potongan_refund": refund, "potongan": potongan,
+            "potongan_hpp": hpp,
             "total_diterima": komisi + allowance, "netto": netto,
             "sisa_hutang": sisa,
             "pending_count": len(mypend), "pending": mypend,
             "riwayat": [{"id": l.id, "tanggal": l.tanggal, "invoice": l.invoice, "tipe": l.tipe,
-                         "masuk": l.masuk_rp, "keluar": l.keluar_rp,
+                         "masuk": l.masuk_rp, "keluar": l.keluar_rp, "hpp": l.hpp_rp or 0,
                          "sisa_hutang": l.sisa_hutang_saat_itu, "ket": l.keterangan}
                         for l in sorted(leds, key=lambda x: x.id or 0, reverse=True)[:100]]}
 
@@ -462,7 +465,8 @@ def update_part(invoice: str, payload: dict = Body(...), store_id: Optional[int]
     harga = int(harga or 0)
     if harga < 0:
         raise HTTPException(status_code=400, detail="harga_part_up >= 0")
-    se.harga_part_up = harga
+    # override MANUAL owner. Nilai efektif = max(manual, total harga part yang dipakai)
+    se.harga_part_manual = harga
     if "modal_asli" in payload and payload["modal_asli"] is not None:
         if role not in ["superadmin", "owner"]:
             raise HTTPException(status_code=403, detail="modal_asli hanya owner")
@@ -473,16 +477,11 @@ def update_part(invoice: str, payload: dict = Body(...), store_id: Optional[int]
             se.kategori = kat
     # hitung ulang jasa + komisi (masih pending)
     from .. import engine_logic as _el
-    sett = _el.get_settings(db, se.store_id or (store.id if store else None))
-    jasa = max(0, int(svc.biaya or 0) - harga)
-    lvl = _el.tech_level(db, se.store_id, svc.teknisi)
-    pct = (sett.komisi_senior if lvl == "senior" else sett.komisi_junior) or 0
-    se.jasa_bersih = jasa
-    se.komisi_teknisi = jasa * pct // 100
+    _el.sync_harga_part(db, svc, se)
     db.commit()
     db.refresh(se)
     log_action(db, "engine.set_part", target=invoice,
-               detail=f"part_up={harga} jasa={jasa} komisi={se.komisi_teknisi}",
+               detail=f"part_up={se.harga_part_up} manual={harga} jasa={se.jasa_bersih} komisi={se.komisi_teknisi}",
                actor=current, store_id=se.store_id)
     return {"invoice": invoice, "kategori": se.kategori, "harga_part_up": se.harga_part_up,
             "jasa_bersih": se.jasa_bersih, "komisi_teknisi": se.komisi_teknisi,

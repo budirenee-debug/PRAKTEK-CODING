@@ -111,7 +111,7 @@ function setLapTekTab(t){
   if(t==='kas') renderKasTeknisi();
 }
 function kasRowHtml(l){
-  const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', refund_balik:'↩️ Refund dibalik', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko'}[l.tipe]||l.tipe;
+  const tipe = {komisi_cair:'💰 Komisi', allowance:'🕘 Hadir', potongan_cicilan:'✂️ Cicilan', refund_balik:'↩️ Refund dibalik', hutang_baru:'⚠️ Hutang', toleransi_toko:'🛡️ Toko', potongan_hpp:'🔧 HPP part'}[l.tipe]||l.tipe;
   return `<tr><td>${_esc(l.tanggal||'')}</td><td>${_esc(l.invoice||'-')}</td><td>${tipe}</td><td style="text-align:right;color:#059669;font-weight:700">${l.masuk?_rp(l.masuk):''}</td><td style="text-align:right;color:#dc2626">${l.keluar?_rp(l.keluar):''}</td><td style="font-size:11px">${_esc(l.ket||'')}</td></tr>`;
 }
 async function renderKasTeknisi(){
@@ -126,7 +126,7 @@ async function renderKasTeknisi(){
     if(!sel?.value) { if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center">Belum ada teknisi</td></tr>'; return; }
     const j = await apiFetch(`/engine/kas/teknisi/${sel.value}`);
     document.getElementById('kasKomisi').textContent = _rp(j.komisi_cair);
-    document.getElementById('kasKomisiSub').textContent = `${j.nama} (${j.level}) • potongan ${_rp(j.potongan||0)} • diterima ${_rp(j.netto ?? j.total_diterima)}`;
+    document.getElementById('kasKomisiSub').textContent = `${j.nama} (${j.level}) • potongan ${_rp(j.potongan||0)} • diterima ${_rp(j.netto ?? j.total_diterima)}${j.potongan_hpp?(' • HPP part '+_rp(j.potongan_hpp)):''}`;
     document.getElementById('kasAllowance').textContent = _rp(j.allowance);
     document.getElementById('kasHutang').textContent = _rp(j.sisa_hutang);
     document.getElementById('kasPending').textContent = `${j.pending_count} pending • komisi bruto ${_rp(j.komisi_bruto ?? j.komisi_cair)}`;
@@ -812,12 +812,13 @@ async function renderGajian(){
       try{ j=await apiFetch('/engine/kas/teknisi/'+t.id); }catch(e){ j=null; }
       if(!j) continue;
       const rows=(j.riwayat||[]).filter(r=>{ const d=String(r.tanggal||'').slice(0,10); return d>=w.start&&d<=w.end; });
-      let kom=0, hdr=0, cic=0, rfb=0, nSvc=0, nHdr=0;
+      let kom=0, hdr=0, cic=0, rfb=0, hpp=0, nSvc=0, nHdr=0;
       rows.forEach(r=>{ const mi=Number(r.masuk)||0, ko=Number(r.keluar)||0;
         if(r.tipe==='komisi_cair'){ kom+=mi; nSvc++; }
         else if(r.tipe==='allowance'){ hdr+=mi; nHdr++; }
         else if(r.tipe==='potongan_cicilan') cic+=ko;
         else if(r.tipe==='refund_balik') rfb+=ko;
+        hpp+=Number(r.hpp)||0;
       });
       const bersih=kom+hdr-rfb;
       total+=bersih;
@@ -839,7 +840,7 @@ async function renderGajian(){
         +'<div class="stat-card"><div class="stat-head"><span>Hadir ('+nHdr+' hari)</span></div><h3>'+_rp(hdr)+'</h3></div>'
         +'<div class="stat-card"><div class="stat-head"><span>Bersih</span></div><h3 style="color:#2563eb">'+_rp(bersih)+'</h3></div>'
         +'</div>'
-        +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' • Potong refund '+_rp(rfb)+' • Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' • '+j.pending_count+' komisi pending'):'')+'</p>'
+        +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' • Potong refund '+_rp(rfb)+' • Potong HPP (harga part) '+_rp(hpp)+' • Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' • '+j.pending_count+' komisi pending'):'')+'</p>'
         +(pd?'<p style="font-size:11px;color:#059669;margin-bottom:10px">'+paidNote+'</p>':'')
         +'<div style="display:flex;gap:8px"><button class="btn '+(pd?'btn-ghost':'btn-dark')+' small" style="flex:1" onclick="gajiTogglePaid('+t.id+')">'+(pd?'↩️ Batalkan tanda':'✅ Tandai Sudah Dibayar')+'</button></div>'
         +'</div>'

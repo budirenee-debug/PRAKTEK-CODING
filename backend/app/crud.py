@@ -764,7 +764,27 @@ def pakai_part(db: Session, sp, svc, qty: int = 1, actor=None):
             pass
         print("ledger pakai_part skip:", e)
     sp = db.query(models.Sparepart).filter(models.Sparepart.id == sp.id).first()
+    _sync_harga_part(db, svc)
     return sp, part, None
+
+
+def _sync_harga_part(db: Session, svc):
+    """Harga part yang dipakai dikeluarkan dari basis komisi teknisi (pajak toko).
+    Forward-only: service yang sudah 'cair' tidak disentuh."""
+    try:
+        from . import engine_logic as _el
+        se = db.query(models.ServiceEngine).filter(
+            models.ServiceEngine.invoice == svc.invoice).first()
+        if not se:
+            return
+        _el.sync_harga_part(db, svc, se)
+        db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("sync_harga_part skip:", e)
 
 
 def kembalikan_part(db: Session, part, actor=None):
@@ -773,6 +793,7 @@ def kembalikan_part(db: Session, part, actor=None):
     if part is None:
         return False
     nama, qty = part.nama_snapshot, int(part.qty or 1)
+    inv = part.invoice
     sp = None
     if part.sparepart_id:
         sp = db.query(models.Sparepart).filter(models.Sparepart.id == part.sparepart_id).first()
@@ -786,7 +807,7 @@ def kembalikan_part(db: Session, part, actor=None):
     db.delete(part)
     catat_mutasi_plain(db, part.sparepart_id, part.store_id, nama, "batal", qty,
                        (sp.stok if sp is not None else 0), (sp.stok + qty if sp is not None else qty),
-                       ref=part.invoice, actor=actor)
+                       ref=inv, actor=actor)
     # batal pakai = HPP yang terbentuk ikut batal
     try:
         from . import models as _m
@@ -796,6 +817,13 @@ def kembalikan_part(db: Session, part, actor=None):
     except Exception as e:
         print("ledger kembalikan skip:", e)
     db.commit()
+    # harga part keluar dari basis komisi -> komisi naik lagi (kalau svc belum cair)
+    try:
+        svc = db.query(models.Service).filter(models.Service.invoice == inv).first()
+        if svc:
+            _sync_harga_part(db, svc)
+    except Exception as e:
+        print("sync_harga_part kembalikan skip:", e)
     return True
 
 

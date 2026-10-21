@@ -1,5 +1,6 @@
 """Business Engine core: kategori auto, kuota 2:1, cair komisi + cicilan 20%."""
 import datetime
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from . import models
@@ -119,6 +120,52 @@ def check_quota(db: Session, store, teknisi_nama: str, kategori: str):
             detail=f"Kuota ringan habis (2:1 harian). {teknisi_nama} berat={berats}, ringan={ringans}. Ambil kasus berat dulu.")
 
 
+def part_up_total(db: Session, invoice: str) -> int:
+    """Total harga UP (harga jual ke pelanggan) part yang dipakai x qty."""
+    if not invoice:
+        return 0
+    total = db.query(func.coalesce(func.sum(
+        models.ServicePart.harga_up_snapshot * models.ServicePart.qty), 0)).filter(
+        models.ServicePart.invoice == invoice).scalar()
+    return int(total or 0)
+
+
+def part_modal_total(db: Session, invoice: str) -> int:
+    """Total modal asli (HPP) part yang dipakai x qty."""
+    if not invoice:
+        return 0
+    total = db.query(func.coalesce(func.sum(
+        models.ServicePart.modal_asli_snapshot * models.ServicePart.qty), 0)).filter(
+        models.ServicePart.invoice == invoice).scalar()
+    return int(total or 0)
+
+
+def sync_harga_part(db: Session, svc, se=None):
+    """Harga part yang dipakai TIDAK jadi komisi teknisi (pajak toko).
+    Nilai efektif service_engine.harga_part_up = max(override manual owner, total harga part).
+    Sekalian hitung ulang jasa + komisi. Row yang sudah 'cair' TIDAK disentuh (forward-only)."""
+    if not svc or not getattr(svc, "invoice", None):
+        return 0
+    if se is None:
+        se = db.query(models.ServiceEngine).filter(
+            models.ServiceEngine.invoice == svc.invoice).first()
+    if not se:
+        return 0
+    if (se.komisi_status or "") == "cair":
+        return int(se.harga_part_up or 0)
+    manual = int(getattr(se, "harga_part_manual", 0) or 0)
+    auto = part_up_total(db, svc.invoice)
+    efektif = max(manual, auto)
+    se.harga_part_up = efektif
+    sett = get_settings(db, svc.store_id)
+    jasa = max(0, int(svc.biaya or 0) - efektif)
+    lvl = tech_level(db, svc.store_id, svc.teknisi)
+    pct = (sett.komisi_senior if lvl == "senior" else sett.komisi_junior) or 0
+    se.jasa_bersih = jasa
+    se.komisi_teknisi = jasa * pct // 100
+    return efektif
+
+
 def ensure_engine_row(db: Session, svc: models.Service, kategori_manual, harga_up: int, modal: int):
     sett = get_settings(db, svc.store_id)
     kategori = (kategori_manual or "").lower() if kategori_manual else suggest_kategori(svc.keluhan, sett)
@@ -126,22 +173,19 @@ def ensure_engine_row(db: Session, svc: models.Service, kategori_manual, harga_u
         kategori = "ringan"
     harga_up = int(harga_up or 0)
     modal = int(modal or 0)
-    jasa = max(0, int(svc.biaya or 0) - harga_up)
-    lvl = tech_level(db, svc.store_id, svc.teknisi)
-    pct = (sett.komisi_senior if lvl == "senior" else sett.komisi_junior) or 0
-    komisi = jasa * pct // 100
     row = db.query(models.ServiceEngine).filter(models.ServiceEngine.invoice == svc.invoice).first()
     if not row:
         row = models.ServiceEngine(invoice=svc.invoice, store_id=svc.store_id)
         db.add(row)
     row.kategori = kategori
-    row.harga_part_up = harga_up
+    # harga_up dari form = override manual owner; nilai efektif ikut part yang dipakai
+    row.harga_part_manual = harga_up
     row.modal_asli = modal
-    row.jasa_bersih = jasa
-    row.komisi_teknisi = komisi
     # status pending untuk baru; yg lama tetap (backfill sudah cair)
     if not row.komisi_status:
         row.komisi_status = "pending"
+    db.flush()
+    sync_harga_part(db, svc, row)
     db.commit()
     db.refresh(row)
     return row
@@ -220,6 +264,8 @@ def cairkan(db: Session, svc: models.Service, actor=None):
     if (row.komisi_status or "") == "cair":
         return row
     sett = get_settings(db, svc.store_id)
+    # harga part yang dipakai keluar dari basis komisi (pajak toko) - forward only
+    sync_harga_part(db, svc, row)
     # hitung ulang dari snapshot terakhir
     jasa = max(0, int(svc.biaya or 0) - int(row.harga_part_up or 0))
     lvl = tech_level(db, svc.store_id, svc.teknisi)
@@ -227,9 +273,17 @@ def cairkan(db: Session, svc: models.Service, actor=None):
     komisi = jasa * pct // 100
     row.jasa_bersih = jasa
     row.komisi_teknisi = komisi
+    hpp_part = int(row.harga_part_up or 0)
     tid = tech_id(db, svc.store_id, svc.teknisi)
     if not tid or komisi <= 0:
         # Sukses TANPA komisi: omzet jasa tetap terbentuk di buku besar.
+        if tid and hpp_part > 0:
+            # info: harga part tetap jadi pajak toko, bukan komisi teknisi
+            db.add(models.CommissionLedger(
+                store_id=svc.store_id, technician_id=tid, tanggal=datetime.date.today(),
+                invoice=svc.invoice, tipe="potongan_hpp", masuk_rp=0, keluar_rp=0,
+                hpp_rp=hpp_part, sisa_hutang_saat_itu=0,
+                keterangan=f"{svc.invoice} harga part Rp{hpp_part} tidak jadi komisi"))
         _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "masuk", "A1",
                           f"Service {svc.invoice}: {svc.device or ''}",
                           max(0, int(svc.biaya or 0)), _svc_media(svc),
@@ -263,8 +317,10 @@ def cairkan(db: Session, svc: models.Service, actor=None):
         db.add(models.CommissionLedger(
             store_id=svc.store_id, technician_id=tid, tanggal=today, invoice=svc.invoice,
             tipe="komisi_cair", masuk_rp=komisi - potong_total, keluar_rp=0,
+            hpp_rp=hpp_part,
             sisa_hutang_saat_itu=sisa_sesudah,
-            keterangan=f"{svc.invoice} {row.kategori} {pct}%"))
+            keterangan=f"{svc.invoice} {row.kategori} {pct}%"
+                       + (f" (harga part Rp{hpp_part} tidak jadi komisi)" if hpp_part else "")))
     if potong_total > 0:
         db.add(models.CommissionLedger(
             store_id=svc.store_id, technician_id=tid, tanggal=today, invoice=svc.invoice,

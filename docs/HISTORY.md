@@ -245,6 +245,26 @@
 - **Smoke test produksi:** walk-in tanpa WA 201 (2x di toko sama), WA kembar 400, WA sama toko lain 201, IMEI kembar 400, IMEI sama toko lain 201, service walk-in -> `customer_id` NULL, service by IMEI -> nyambung ke customer yg imei itu. Semua data uji dibersihkan (balik ke 80 customer / 197 service).
 - **Sisa data lama (belum disentuh, aman):** 114 service historis masih nunjuk customer id 43 (nama `cash`, `wa=''`). Mau dipecah jadi customer per orang / dibersihkan = keputusan sendiri (tidak ada data yang hilang, cuma tampilan customer list).
 
+## 5w. FIX HARGA PART KELUAR DARI KOMISI + "POTONG HPP" DI KARTU GAJIAN (23 Okt 2026)
+- **Pertanyaan user:** "di gajian sabtu ada kartu per teknisi, kenapa hasilnya belum dipotong HPP? atau dipotongnya pas nanti sabtu hari gajian?"
+- **Audit (kode + data produksi):**
+  - Tidak ada router payroll terpisah; semua logika Gajian di `routers/engine.py` (`gajian_paid` :597, `gajian_bayar` :614, `gajian_batal` :664) + `engine_logic.py`.
+  - `POST /api/engine/gajian/bayar` = **cash-out murni**: nominal dikirim dari browser, backend cuma tulis 1 baris ledger C1 (`pengaruh_kas=True`, `masuk_laba=False`). **Tidak ada hitungan/potong apa pun saat bayar gajian.**
+  - Potongan yang memang ada: `potongan_cicilan` (hutang nomombok, max 20%/service) dipotong **saat service "cair"** dan sudah net di dalam angka "Komisi"; `refund_balik` (komisi dibalik proporsional) dipotong saat refund dan mengurangi angka **"Bersih"**.
+  - **Akar masalah "HPP belum dipotong":** `service_engine.harga_part_up` = **0 di semua 199 row**, padahal ada 43 baris `service_parts` (harga part UP 4.175.380, HPP modal 3.845.500). Karena `harga_part_up`=0 -> `jasa_bersih = biaya` **penuh** -> komisi = % x seluruh tagihan **termasuk harga part**. Part cuma masuk B1 toko sebagai HPP, tak pernah masuk hitungan teknisi. `harga_part_up` cuma bisa diisi manual lewat `PUT /engine/service/{invoice}/part` dan di produksi **tidak pernah dipanggil** - padahal `crud.pakai_part` sudah menyimpan `harga_up_snapshot` per part.
+  - Dampak: 145 service yang sudah cair -> komisi 6.832.000; kalau part dikeluarkan -> 5.383.232. Selisih **1.448.768** "bocor" ke teknisi (contoh RPL-2026-0192: tagihan 170.000, harga part 111.000 -> komisi tole 59.500, seharusnya 20.650).
+- **Putusan user:** (1) aturan = **part dikeluarkan dari basis komisi** (komisi = % x (biaya - harga_part_up)) + tampil di kartu gajian; (2) data lama **cuma ke depan** - 145 service yang sudah cair + 4 gajian yang sudah dibayar (17 Okt: tole 1.417.500, apud 791.000, budirn 320.000, angdedi 175.000) tidak diubah, tidak ada uang yang perlu dikoreksi.
+- **Fix (forward-only):**
+  - `models.ServiceEngine`: kolom baru `harga_part_manual` (override manual owner) - nilai efektif `harga_part_up` = max(manual, total harga part yang dipakai).
+  - `models.CommissionLedger`: kolom baru `hpp_rp` = harga part yang dikeluarkan dari komisi (INFO, **tidak** mengurangi saldo teknisi).
+  - `engine_logic.sync_harga_part()`: isi `harga_part_up` dari `service_parts` (harga_up x qty) + hitung ulang jasa/komisi. Baris `komisi_status='cair'` **tidak disentuh**.
+  - `engine_logic.cairan()`: sinkron sebelum hitung komisi; baris `komisi_cair` di ledger tetap **net** (komisi - cicilan) + `hpp_rp` + keterangan "harga part RpX tidak jadi komisi".
+  - `crud.pakai_part` / `crud.kembalikan_part`: harga part langsung masuk/keluar dari basis komisi (komisi naik lagi kalau part dikembalikan).
+  - `routers/engine.py`: `PUT /engine/service/{invoice}/part` simpan override ke `harga_part_manual` (efektif tetap max(manual, total part)); `_kas_summary` nambah `potongan_hpp` + `hpp` per baris riwayat.
+  - `main.py` migrasi idempotent: ALTER 2 kolom + backfill `harga_part_manual` + sinkron baris **pending** saja (produksi: 1 baris, RPL-2026-0149 komisi 98.000 -> 48.860).
+  - Frontend: kartu Gajian Sabtu nambah baris "Potong HPP (harga part)"; label tipe baru `potongan_hpp`; bump `engine.js?v=eng21-hpp1`.
+- **Uji:** `tools/uji_harga_part.py` (baru, TestClient: 20 cek LULUS - harga part auto, part dikembalikan, override manual max(), CAIR + hpp_rp, forward-only baris cair tidak berubah, kas teknisi punya `potongan_hpp`) + `tools/dryrun_migrasi_prodb.py` (salinan DB produksi: 145 `komisi_cair` & baris 'cair' **tetap sama** 6.832.000, hanya 1 baris pending yang disinkron) + `tools/uji_api_customer.py` & `tools/uji_migrasi_uniq.py` tetap LULUS.
+
 ## 6. NEXT (belum dikerjakan)
 - **Uji browser BOS3->BOS6:** profil toko, metode bayar + tab Pembayaran, laporan Harian/Mingguan/Bulanan + export CSV, tema navy di semua halaman, nota digital WA (preview/kirim/cetak) + cetak Thermal 58/80 & A4 + keterangan/kondisi awal.
 - Nanti: laporan gabungan owner, paket/billing, root `/` -> landing (butuh edit `main.py`).
