@@ -79,6 +79,8 @@ class CustomerBase(BaseModel):
     nama: str = Field(..., min_length=2, max_length=120)
     # WA boleh kosong (pelanggan tanpa nomor) — hanya divalidasi jika diisi
     wa: str = Field(default="", max_length=20)
+    # IMEI handset = identitas device (WA boleh kosong). Unik per toko.
+    imei: Optional[str] = Field(default="", max_length=30)
 
     @field_validator('wa')
     @classmethod
@@ -90,6 +92,13 @@ class CustomerBase(BaseModel):
         if not cleaned.isdigit():
             raise ValueError('No WA harus angka')
         return v
+
+    @field_validator('imei')
+    @classmethod
+    def imei_optional(cls, v):
+        if v is None:
+            return ""
+        return str(v).strip()
 
 class CustomerCreate(CustomerBase):
     pass

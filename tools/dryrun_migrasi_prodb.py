@@ -67,7 +67,12 @@ c = con.cursor()
 sqls = {r[0]: r[1] for r in c.execute("SELECT name, sql FROM sqlite_master WHERE type='table'")}
 idxs = {r[0]: r[1] for r in c.execute("SELECT name, sql FROM sqlite_master WHERE type='index'")}
 chk("customers_new hilang", 'customers_new' not in sqls)
-chk("customers UNIQUE komposit", 'uq_customer_wa_store' in (sqls.get('customers') or ''))
+chk("customers punya index partial WA", 'uq_customer_wa_store' in idxs, idxs.get('uq_customer_wa_store'))
+chk("customers punya index partial IMEI", 'uq_customer_imei_store' in idxs, idxs.get('uq_customer_imei_store'))
+chk("index partial WA punya WHERE (WA kosong bebas)", 'WHERE' in (idxs.get('uq_customer_wa_store') or '').upper())
+chk("index partial IMEI punya WHERE (IMEI kosong bebas)", 'WHERE' in (idxs.get('uq_customer_imei_store') or '').upper())
+chk("constraint tabel UNIQUE(wa,store_id) dicabut", 'UNIQUE (WA, STORE_ID)' not in ' '.join((sqls.get('customers') or '').upper().split()))
+chk("kolom imei ada di customers", 'imei' in [r[1] for r in c.execute('PRAGMA table_info(customers)')])
 chk("technicians UNIQUE komposit", 'uq_technician_nama_store' in (sqls.get('technicians') or ''))
 chk("ix_customers_wa bukan UNIQUE global", 'UNIQUE' not in (idxs.get('ix_customers_wa') or ''), idxs.get('ix_customers_wa'))
 chk("ix_technicians_nama bukan UNIQUE global", 'UNIQUE' not in (idxs.get('ix_technicians_nama') or ''), idxs.get('ix_technicians_nama'))
@@ -93,6 +98,30 @@ try:
     con.rollback()
 except Exception as e:
     chk("WA sama toko lain BOLEH", False, e)
+
+# WA KOSONG di toko sama -> BOLEH (bug 400 "WA sudah terdaftar")
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,store_id) VALUES (99998,'TES-KOSONG-1','',?)", (st0,))
+    c.execute("INSERT INTO customers (id,nama,wa,store_id) VALUES (99997,'TES-KOSONG-2','',?)", (st0,))
+    chk("WA kosong di toko sama BOLEH (walk-in)", True)
+    con.rollback()
+except Exception as e:
+    chk("WA kosong di toko sama BOLEH (walk-in)", False, e)
+
+# IMEI sama di toko sama -> DITOLAK; di toko lain -> BOLEH
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (99996,'TES-IMEI-1','089990000001','356938035643809',?)", (st0,))
+    chk("customer dengan IMEI baru BOLEH", True)
+    con.rollback()
+except Exception as e:
+    chk("customer dengan IMEI baru BOLEH", False, e)
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (99996,'TES-IMEI-1','089990000001','356938035643809',?)", (st0,))
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (99995,'TES-IMEI-2','089990000002','356938035643809',?)", (st0,))
+    chk("IMEI sama toko SAMA DITOLAK", False, "tidak ditolak!")
+    con.rollback()
+except Exception:
+    chk("IMEI sama toko SAMA DITOLAK", True)
 con.close()
 
 print()

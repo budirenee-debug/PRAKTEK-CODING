@@ -233,9 +233,11 @@ _migrate_profil()
 
 def _migrate_unique_per_store():
     """BOS Fase 2: UNIQUE global -> komposit per toko.
-    customers.wa UNIQUE -> UNIQUE(wa, store_id); technicians.nama UNIQUE -> UNIQUE(nama, store_id).
+    customers: WA unik per toko TAPI WA KOSONG bebas (partial unique index),
+               identitas device = IMEI (partial unique index per toko).
+    technicians.nama UNIQUE -> UNIQUE(nama, store_id).
     SQLite tidak bisa DROP CONSTRAINT, jadi rebuild tabel (copy id tetap, FK aman).
-    Atomic (engine.begin) + idempotent (skip kalau constraint komposit sudah ada).
+    Atomic (engine.begin) + idempotent (skip kalau state target sudah tercapai).
 
     FIX 21 Okt 2026: sisa tabel {t}_new dari run yang crash dulu bikin migrasi
     GAGAL SELALU ("table customers_new already exists") -> UNIQUE per toko tak
@@ -244,7 +246,14 @@ def _migrate_unique_per_store():
       - {t}_new ada datanya & {t} kosong/hilang -> promote {t}_new jadi {t}
         (crash setelah DROP TABLE, sebelum RENAME; create_all bikin {t} kosong)
     Plus: constraint baru dicek dulu ke data, kalau ada duplikat rebuild DIBATASI
-    (skip tabel itu) supaya data lama tidak hilang."""
+    (skip tabel itu) supaya data lama tidak hilang.
+
+    FIX 22 Okt 2026: customers.wa jadi PARTIAL unique index (WA terisi saja).
+    Sebelumnya UNIQUE(wa, store_id) biasa => pelanggan walk-in tanpa WA kedua
+    di toko sama ditolak 400 "WA sudah terdaftar di toko ini". Partial index +
+    kolom imei (identitas device) -> WA kosong bebas, IMEI yang unik per toko.
+    Idempotensi dicek dari KONDISI TABEL (kolom imei + ada index partial),
+    bukan dari marker di SQL tabel (marker index tidak ada di SQL tabel)."""
     specs = {
         "customers": {
             "create": """CREATE TABLE customers_new (
@@ -252,17 +261,26 @@ def _migrate_unique_per_store():
                 store_id INTEGER REFERENCES stores(id),
                 nama VARCHAR(120) NOT NULL,
                 wa VARCHAR(20) NOT NULL,
+                imei VARCHAR(30),
                 created_at DATETIME,
-                updated_at DATETIME,
-                CONSTRAINT uq_customer_wa_store UNIQUE (wa, store_id)
+                updated_at DATETIME
             )""",
-            "cols": "id, store_id, nama, wa, created_at, updated_at",
+            "cols": "id, store_id, nama, wa, imei, created_at, updated_at",
             "indexes": ["CREATE INDEX ix_customers_wa ON customers (wa)",
                         "CREATE INDEX ix_customers_nama ON customers (nama)",
                         "CREATE INDEX ix_customers_store_id ON customers (store_id)",
-                        "CREATE INDEX ix_customers_id ON customers (id)"],
-            "marker": "uq_customer_wa_store",
-            "uniq": "wa, store_id",
+                        "CREATE INDEX ix_customers_id ON customers (id)",
+                        "CREATE INDEX ix_customers_imei ON customers (imei)"],
+            # index partial: WA/IMEI KOSONG dibebas, yang terisi saja dibatasi
+            "unique_indexes": [
+                "CREATE UNIQUE INDEX uq_customer_wa_store ON customers (wa, store_id) "
+                "WHERE wa IS NOT NULL AND TRIM(wa) <> ''",
+                "CREATE UNIQUE INDEX uq_customer_imei_store ON customers (imei, store_id) "
+                "WHERE imei IS NOT NULL AND TRIM(imei) <> ''",
+            ],
+            "uniqs": [("wa, store_id", "WHERE wa IS NOT NULL AND TRIM(wa) <> ''"),
+                      ("imei, store_id", "WHERE imei IS NOT NULL AND TRIM(imei) <> ''")],
+            "kind": "customers",
         },
         "technicians": {
             "create": """CREATE TABLE technicians_new (
@@ -279,10 +297,32 @@ def _migrate_unique_per_store():
             "indexes": ["CREATE INDEX ix_technicians_nama ON technicians (nama)",
                         "CREATE INDEX ix_technicians_store_id ON technicians (store_id)",
                         "CREATE INDEX ix_technicians_id ON technicians (id)"],
-            "marker": "uq_technician_nama_store",
-            "uniq": "nama, store_id",
+            "uniqs": [("nama, store_id", "")],
+            "kind": "technicians",
         },
     }
+
+    def _is_target(conn, table, kind):
+        """Cek apakah tabel sudah di state final (biar migrasi idempotent)."""
+        cols = {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+        r = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name=:t"),
+                         {"t": table}).fetchone()
+        tsql = (r[0] if r and r[0] else "") or ""
+        if kind == "customers":
+            if "imei" not in cols:
+                return False
+            up = " ".join(tsql.upper().split())
+            if "UNIQUE (WA, STORE_ID)" in up:
+                return False  # constraint tabel lama masih nempel -> harus rebuild
+            for idx in ("uq_customer_wa_store", "uq_customer_imei_store"):
+                ri = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='index' AND name=:n"),
+                                  {"n": idx}).fetchone()
+                if not ri or not ri[0] or "WHERE" not in ri[0].upper():
+                    return False
+            return True
+        # technicians: constraint komposit ada di SQL tabel
+        return "uq_technician_nama_store" in tsql
+
     try:
         from sqlalchemy import text
         with engine.begin() as conn:
@@ -312,11 +352,11 @@ def _migrate_unique_per_store():
                         row = _tbl(table)
                         leftover = None
 
-                if row and row[0] and spec["marker"] in row[0]:
+                if row and _is_target(conn, table, spec["kind"]):
                     if leftover:
                         conn.execute(text(f"DROP TABLE IF EXISTS {newtbl}"))
                         print(f"multistore: bersihkan sisa {newtbl} (constraint sudah komposit)")
-                    continue  # sudah komposit
+                    continue  # sudah di state final
 
                 if not row or not row[0]:
                     continue  # tabel tidak ada, dilewati
@@ -327,22 +367,29 @@ def _migrate_unique_per_store():
                     print(f"multistore: buang sisa {newtbl} ({cnt} baris) - copy diulang dari {table}")
 
                 # safety: constraint baru hanya bisa satisfied kalau tidak ada duplikat
-                try:
-                    dup = conn.execute(text(
-                        f"SELECT COUNT(*) FROM (SELECT {spec['uniq']}, COUNT(*) c "
-                        f"FROM {table} GROUP BY {spec['uniq']} HAVING c>1)")).fetchone()[0]
-                except Exception as edup:
-                    print(f"multistore cek duplikat {table} skip:", edup)
-                    dup = 0
-                if dup:
-                    print(f"multistore: SKIP rebuild {table} - ada {dup} duplikat "
-                          f"({spec['uniq']}), constraint komposit belum bisa dipasang")
+                old_cols = [r[1] for r in conn.execute(
+                    text(f"PRAGMA table_info({table})")).fetchall()]
+                for uniq_cols, uniq_where in spec.get("uniqs", []):
+                    need = [c.strip() for c in uniq_cols.split(",")]
+                    if any(c not in old_cols for c in need):
+                        continue  # kolom belum ada di tabel lama -> tidak mungkin duplikat
+                    try:
+                        dup = conn.execute(text(
+                            f"SELECT COUNT(*) FROM (SELECT {uniq_cols}, COUNT(*) c "
+                            f"FROM {table} {uniq_where} GROUP BY {uniq_cols} HAVING c>1)")).fetchone()[0]
+                    except Exception as edup:
+                        print(f"multistore cek duplikat {table} skip:", edup)
+                        dup = 0
+                    if dup:
+                        print(f"multistore: SKIP rebuild {table} - ada {dup} duplikat "
+                              f"({uniq_cols}), constraint komposit belum bisa dipasang")
+                        row = None  # stop proses tabel ini
+                        break
+                if row is None:
                     continue
 
                 # introspeksi kolom lama agar rebuild aman untuk DB lawas
                 # (mis. technicians lama belum punya kolom level/store_id)
-                old_cols = [r[1] for r in conn.execute(
-                    text(f"PRAGMA table_info({table})")).fetchall()]
                 want = [c.strip() for c in spec["cols"].split(",")]
                 sel_parts = []
                 for c in want:
@@ -360,6 +407,9 @@ def _migrate_unique_per_store():
                         conn.execute(text(idx))
                     except Exception as eidx:
                         print(f"multistore index skip ({table}):", eidx)
+                for idx in spec.get("unique_indexes", []):
+                    # index unik gagal = constraint tak bisa dipasang -> ROLLBACK semua
+                    conn.execute(text(idx))
                 print(f"multistore: rebuild {table} OK")
             conn.execute(text("PRAGMA foreign_keys=ON"))
     except Exception as e:

@@ -2,7 +2,7 @@
 Models - SQLAlchemy ORM
 B_gadget POS Service HP
 """
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, func, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, func, Boolean, UniqueConstraint, Index, text
 from sqlalchemy.orm import relationship
 from .database import Base
 import datetime
@@ -24,12 +24,23 @@ class Technician(Base):
 
 class Customer(Base):
     __tablename__ = "customers"
-    __table_args__ = (UniqueConstraint("wa", "store_id", name="uq_customer_wa_store"),)
+    # Unik per toko, tapi WA KOSONG HARUS BEBAS (pelanggan tanpa nomor / walk-in).
+    # Kalau pakai UNIQUE biasa, pelanggan kedua tanpa WA di toko sama ditolak
+    # ("WA sudah terdaftar di toko ini") - bug 22 Okt 2026.
+    # Partial index: hanya baris dengan WA terisi yang dibatasi -> WA kosong
+    # tidak pernah bentrok. Identitas device dipakai IMEI handset (bukan WA).
+    __table_args__ = (
+        Index("uq_customer_wa_store", "wa", "store_id", unique=True,
+              sqlite_where=text("wa IS NOT NULL AND TRIM(wa) <> ''")),
+        Index("uq_customer_imei_store", "imei", "store_id", unique=True,
+              sqlite_where=text("imei IS NOT NULL AND TRIM(imei) <> ''")),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)  # multi-toko BOS
     nama = Column(String(120), nullable=False, index=True)
-    wa = Column(String(20), nullable=False, index=True)  # unik per toko (composite)
+    wa = Column(String(20), nullable=False, index=True)  # boleh kosong (opsional)
+    imei = Column(String(30), nullable=True, index=True)  # identitas device, unik per toko
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

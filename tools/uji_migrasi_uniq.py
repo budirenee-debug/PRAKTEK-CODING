@@ -1,4 +1,4 @@
-"""Uji migrasi UNIQUE per toko (reBUG customers_new) - DB temp, tanpa menyentuh DB asli."""
+"""Uji migrasi UNIQUE per toko + WA kosong bebas + IMEI unik per toko (DB temp, tanpa menyentuh DB asli)."""
 import os, sqlite3, sys, tempfile, shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +16,7 @@ def _dispose():
     except Exception:
         pass
 
-def build_db(with_leftover=True, drop_main=False, dup=False):
+def build_db(with_leftover=True, drop_main=False, dup=False, blank_wa=False):
     _dispose()
     if os.path.exists(DB):
         os.remove(DB)
@@ -34,10 +34,14 @@ def build_db(with_leftover=True, drop_main=False, dup=False):
     c.execute("CREATE INDEX ix_customers_nama ON customers (nama)")
     c.execute("CREATE INDEX ix_customers_id ON customers (id)")
     if not dup:
-        # DB lama: UNIQUE GLOBAL di wa (index unik terpisah, bukan constraint di DDL)
         c.execute("CREATE UNIQUE INDEX ix_customers_wa ON customers (wa)")
     c.execute("INSERT INTO customers VALUES (1,'Andi','081200000001',NULL,NULL,1)")
     c.execute("INSERT INTO customers VALUES (2,'Budi','081200000002',NULL,NULL,1)")
+    if blank_wa:
+        # pelanggan tanpa WA (walk-in). DB lama punya UNIQUE GLOBAL wa, jadi
+        # hanya boleh 1 baris WA kosong -> 1 Guest1 saja (Guest2 diuji
+        # SETELAH migrasi, harusnya boleh)
+        c.execute("INSERT INTO customers VALUES (3,'Guest1','',NULL,NULL,1)")
     if dup:
         # duplikat (wa, store_id) - harus bikin rebuild di-SKIP, data tetap utuh
         c.execute("INSERT INTO customers VALUES (3,'Andi2','081200000001',NULL,NULL,1)")
@@ -79,8 +83,9 @@ def snapshot():
     cnt_c = c.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
     cnt_t = c.execute("SELECT COUNT(*) FROM technicians").fetchone()[0]
     rows_c = c.execute("SELECT id,nama,wa,store_id FROM customers ORDER BY id").fetchall()
+    cols_c = [r[1] for r in c.execute("PRAGMA table_info(customers)")]
     con.close()
-    return sqls, idxs, cnt_c, cnt_t, rows_c
+    return sqls, idxs, cnt_c, cnt_t, rows_c, cols_c
 
 def check(label, cond, extra=""):
     print(("  LULUS  " if cond else "  GAGAL  ") + label + ((" | " + str(extra)) if extra else ""))
@@ -91,9 +96,16 @@ ok = True
 print("=== KASUS 1: leftover customers_new (0 baris) + UNIQUE global ===")
 build_db(with_leftover=True)
 run_migration()
-sqls, idxs, cnt_c, cnt_t, rows_c = snapshot()
+sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
 ok &= check("customers_new hilang", "customers_new" not in sqls)
-ok &= check("customers punya constraint komposit", "uq_customer_wa_store" in (sqls.get("customers") or ""))
+ok &= check("kolom imei ada di customers", "imei" in cols_c, cols_c)
+ok &= check("index partial uq_customer_wa_store ada", "uq_customer_wa_store" in idxs,
+            idxs.get("uq_customer_wa_store"))
+ok &= check("index partial uq_customer_imei_store ada", "uq_customer_imei_store" in idxs,
+            idxs.get("uq_customer_imei_store"))
+ok &= check("index WA punya WHERE (WA kosong bebas)", "WHERE" in (idxs.get("uq_customer_wa_store") or "").upper())
+ok &= check("index IMEI punya WHERE (IMEI kosong bebas)", "WHERE" in (idxs.get("uq_customer_imei_store") or "").upper())
+ok &= check("constraint tabel UNIQUE(wa,store_id) DICABUT", "UNIQUE (WA, STORE_ID)" not in " ".join((sqls.get("customers") or "").upper().split()))
 ok &= check("teknicians punya constraint komposit", "uq_technician_nama_store" in (sqls.get("technicians") or ""))
 ok &= check("ix_customers_wa bukan UNIQUE global", "UNIQUE" not in (idxs.get("ix_customers_wa") or ""), idxs.get("ix_customers_wa"))
 ok &= check("ix_technicians_nama bukan UNIQUE global", "UNIQUE" not in (idxs.get("ix_technicians_nama") or ""), idxs.get("ix_technicians_nama"))
@@ -114,16 +126,42 @@ try:
     ok &= check("WA sama toko SAMA DITOLAK", False, "tidak ditolak!")
 except Exception:
     ok &= check("WA sama toko SAMA DITOLAK", True)
+con.rollback()
+con.close()
+
+print()
+print("=== KASUS 1b: WA KOSONG bebas (walk-in) + IMEI unik per toko ===")
+build_db(with_leftover=False, blank_wa=True)
+run_migration()
+sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
+ok &= check("data tetap 3 (2 walk-in ikut)", cnt_c == 3, cnt_c)
+con = sqlite3.connect(DB)
+c = con.cursor()
 try:
-    c.execute("INSERT INTO technicians (id,nama,is_active,store_id,level) VALUES (99,'TOLE',1,2,'junior')")
-    ok &= check("nama teknisi sama toko berbeda BOLEH", True)
+    c.execute("INSERT INTO customers (id,nama,wa,store_id) VALUES (90,'Guest3','',1)")
+    ok &= check("WA kosong di toko sama BOLEH (tidak lagi 400)", True)
 except Exception as e:
-    ok &= check("nama teknisi sama toko berbeda BOLEH", False, e)
+    ok &= check("WA kosong di toko sama BOLEH (tidak lagi 400)", False, e)
 try:
-    c.execute("INSERT INTO technicians (id,nama,is_active,store_id,level) VALUES (98,'TOLE',1,1,'junior')")
-    ok &= check("nama teknisi sama toko SAMA DITOLAK", False, "tidak ditolak!")
+    c.execute("INSERT INTO customers (id,nama,wa,store_id) VALUES (91,'Guest4','',1)")
+    ok &= check("WA kosong tambahan BOLEH", True)
+except Exception as e:
+    ok &= check("WA kosong tambahan BOLEH", False, e)
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (92,'Budi2','081200000009','356938035643809',1)")
+    ok &= check("customer baru dengan IMEI BOLEH", True)
+except Exception as e:
+    ok &= check("customer baru dengan IMEI BOLEH", False, e)
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (93,'Budi3','081200000010','356938035643809',1)")
+    ok &= check("IMEI sama toko SAMA DITOLAK", False, "tidak ditolak!")
 except Exception:
-    ok &= check("nama teknisi sama toko SAMA DITOLAK", True)
+    ok &= check("IMEI sama toko SAMA DITOLAK", True)
+try:
+    c.execute("INSERT INTO customers (id,nama,wa,imei,store_id) VALUES (94,'Budi4','081200000011','356938035643809',2)")
+    ok &= check("IMEI sama toko BERBEDA BOLEH", True)
+except Exception as e:
+    ok &= check("IMEI sama toko BERBEDA BOLEH", False, e)
 con.rollback()
 con.close()
 
@@ -131,10 +169,13 @@ print()
 print("=== KASUS 2: idempotent (jalan 2x, 3x) ===")
 for i in range(2):
     run_migration()
-    sqls, idxs, cnt_c, cnt_t, rows_c = snapshot()
+    sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
     ok &= check(f"run ulang #{i+1}: customers_new tak muncul", "customers_new" not in sqls)
-    ok &= check(f"run ulang #{i+1}: data tetap 2/2", cnt_c == 2 and cnt_t == 2, f"{cnt_c}/{cnt_t}")
-    ok &= check(f"run ulang #{i+1}: constraint tetap komposit", "uq_customer_wa_store" in (sqls.get("customers") or ""))
+    ok &= check(f"run ulang #{i+1}: data tetap 3/2", cnt_c == 3 and cnt_t == 2, f"{cnt_c}/{cnt_t}")
+    ok &= check(f"run ulang #{i+1}: index partial tetap ada",
+                "uq_customer_wa_store" in idxs and "uq_customer_imei_store" in idxs)
+    ok &= check(f"run ulang #{i+1}: tak ada rebuild ulang (ix_customers_wa non-unique)",
+                "UNIQUE" not in (idxs.get("ix_customers_wa") or ""))
 
 print()
 print("=== KASUS 3: crash setelah DROP TABLE (customers hilang, customers_new ada) ===")
@@ -147,29 +188,29 @@ c.execute("INSERT INTO technicians VALUES (3,'SISA',NULL,1,NULL,1,'junior')")
 con.commit()
 con.close()
 run_migration()
-sqls, idxs, cnt_c, cnt_t, rows_c = snapshot()
+sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
 ok &= check("customers dipromote balik", "customers" in sqls)
 ok &= check("customers_new hilang", "customers_new" not in sqls)
 ok &= check("data sisa terpromote (1)", cnt_c == 1, rows_c)
-ok &= check("constraint komposit terpasang", "uq_customer_wa_store" in (sqls.get("customers") or ""))
+ok &= check("index partial terpasang", "uq_customer_wa_store" in idxs and "uq_customer_imei_store" in idxs)
 
 print()
 print("=== KASUS 4: duplikat -> rebuild SKIP, data tetap utuh ===")
 build_db(with_leftover=False, dup=True)
 run_migration()
-sqls, idxs, cnt_c, cnt_t, rows_c = snapshot()
+sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
 ok &= check("customers tetap ada (tidak dihapus)", "customers" in sqls)
 ok &= check("data duplikat utuh (3)", cnt_c == 3, cnt_c)
 ok &= check("constraint global tetap (belum komposit)",
-            "uq_customer_wa_store" not in (sqls.get("customers") or ""))
+            "uq_customer_wa_store" not in idxs)
 
 print()
 print("=== KASUS 5: DB sudah komposit -> idempotent, tak ada error ===")
 build_db(with_leftover=False)
 run_migration()
 run_migration()
-sqls, idxs, cnt_c, cnt_t, rows_c = snapshot()
-ok &= check("tetap komposit", "uq_customer_wa_store" in (sqls.get("customers") or ""))
+sqls, idxs, cnt_c, cnt_t, rows_c, cols_c = snapshot()
+ok &= check("tetap komposit", "uq_customer_wa_store" in idxs)
 ok &= check("data utuh", cnt_c == 2 and cnt_t == 2)
 
 shutil.rmtree(WORK, ignore_errors=True)

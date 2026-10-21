@@ -5777,10 +5777,11 @@ async function handleCustomerSubmit(e){
   e.preventDefault();
   const nama=document.getElementById('c-nama').value.trim();
   const wa=document.getElementById('c-wa').value.trim();
+  const imei=(document.getElementById('c-imei')?.value||'').trim();
   const note=document.getElementById('c-note').value.trim();
   if(!nama) return showToast('Nama wajib!');
   if(wa && !/^[0-9+\- ]+$/.test(wa)) return showToast('No WA harus angka');
-  const _cPayload = {nama, wa: wa || ""};
+  const _cPayload = {nama, wa: wa || "", imei: imei || ""};
   try{
     await apiFetch('/customers', {method:'POST', body: JSON.stringify(_cPayload)});
     markNetOk();

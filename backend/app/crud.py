@@ -279,19 +279,35 @@ def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, s
         if existing:
             return enrich_service(existing)
     invoice = generate_invoice(db, store)
-    # upsert customer berdasarkan WA di toko yang sama
-    cq = db.query(models.Customer).filter(models.Customer.wa == payload.wa)
-    if store_id is not None:
-        cq = cq.filter(models.Customer.store_id == store_id)
-    customer = cq.first()
-    if not customer:
-        customer = models.Customer(nama=payload.nama, wa=payload.wa, store_id=store_id)
+    # Identitas customer di toko yang sama: WA dulu, kalau kosong pakai IMEI
+    # handset. Kalau dua-duanya kosong (walk-in) -> TANPA customer, jangan
+    # ditumpuk ke satu baris customer (dulu 114 service nempel ke customer
+    # id 43 wa='' dan namanya ketimpa terus).
+    wa = (getattr(payload, "wa", "") or "").strip()
+    imei = (getattr(payload, "imei", "") or "").strip()
+    customer = None
+    if wa:
+        cq = db.query(models.Customer).filter(models.Customer.wa == wa)
+        if store_id is not None:
+            cq = cq.filter(models.Customer.store_id == store_id)
+        customer = cq.first()
+    if customer is None and imei:
+        iq = db.query(models.Customer).filter(models.Customer.imei == imei)
+        if store_id is not None:
+            iq = iq.filter(models.Customer.store_id == store_id)
+        customer = iq.first()
+    if customer is None and (wa or imei):
+        customer = models.Customer(nama=payload.nama, wa=wa, imei=imei or None,
+                                   store_id=store_id)
         db.add(customer)
         db.flush()  # dapat id
-    else:
+    elif customer is not None:
         # update nama jika berubah
         if customer.nama != payload.nama:
             customer.nama = payload.nama
+        # lengkapi IMEI kalau customer lama belum punya
+        if imei and not (customer.imei or "").strip():
+            customer.imei = imei
 
     # cari technician_id jika nama teknisi diberikan (di toko yang sama)
     tech_id = None
@@ -309,12 +325,12 @@ def create_service(db: Session, payload: schemas.ServiceCreate, store_id=None, s
     svc = models.Service(
         invoice=invoice,
         store_id=store_id,
-        customer_id=customer.id,
+        customer_id=customer.id if customer is not None else None,
         technician_id=tech_id,
         nama=payload.nama,
-        wa=payload.wa,
+        wa=wa,
         device=payload.device,
-        imei=payload.imei,
+        imei=imei or None,
         keluhan=payload.keluhan,
         keterangan=payload.keterangan,
         kelengkapan=kelengkapan_to_str(payload.kelengkapan),

@@ -42,6 +42,7 @@ def list_customers(
             "id": c.id,
             "nama": c.nama,
             "wa": c.wa,
+            "imei": c.imei,
             "total_service": total,
             "terakhir_service": last.date if last else None,
             "last_device": last.device if last else None,
@@ -70,6 +71,7 @@ def get_customer(
         "id": c.id,
         "nama": c.nama,
         "wa": c.wa,
+        "imei": c.imei,
         "total_service": total,
         "terakhir_service": last.date if last else None,
         "created_at": c.created_at,
@@ -88,13 +90,25 @@ def create_customer(
     if store is None:
         from ..store_ctx import default_store
         store = default_store(db)
-    cq = db.query(models.Customer).filter(models.Customer.wa==payload.wa)
-    if store is not None:
-        cq = cq.filter(models.Customer.store_id == store.id)
-    exists = cq.first()
-    if exists:
-        raise HTTPException(status_code=400, detail="WA sudah terdaftar di toko ini")
-    c = models.Customer(nama=payload.nama, wa=payload.wa, store_id=store.id if store else None)
+    # WA kosong itu SAH (walk-in) -> jangan dianggap duplikat.
+    # WA terisi -> tetap unik per toko.
+    wa = (payload.wa or "").strip()
+    imei = (payload.imei or "").strip()
+    if wa:
+        cq = db.query(models.Customer).filter(models.Customer.wa == wa)
+        if store is not None:
+            cq = cq.filter(models.Customer.store_id == store.id)
+        if cq.first():
+            raise HTTPException(status_code=400, detail="WA sudah terdaftar di toko ini")
+    # IMEI = identitas device, unik per toko (WA boleh kosong)
+    if imei:
+        iq = db.query(models.Customer).filter(models.Customer.imei == imei)
+        if store is not None:
+            iq = iq.filter(models.Customer.store_id == store.id)
+        if iq.first():
+            raise HTTPException(status_code=400, detail="IMEI sudah terdaftar di toko ini")
+    c = models.Customer(nama=payload.nama, wa=wa, imei=imei or None,
+                        store_id=store.id if store else None)
     db.add(c)
     db.commit()
     db.refresh(c)
