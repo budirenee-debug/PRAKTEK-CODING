@@ -235,7 +235,16 @@ def _migrate_unique_per_store():
     """BOS Fase 2: UNIQUE global -> komposit per toko.
     customers.wa UNIQUE -> UNIQUE(wa, store_id); technicians.nama UNIQUE -> UNIQUE(nama, store_id).
     SQLite tidak bisa DROP CONSTRAINT, jadi rebuild tabel (copy id tetap, FK aman).
-    Atomic (engine.begin) + idempotent (skip jika constraint komposit sudah ada)."""
+    Atomic (engine.begin) + idempotent (skip kalau constraint komposit sudah ada).
+
+    FIX 21 Okt 2026: sisa tabel {t}_new dari run yang crash dulu bikin migrasi
+    GAGAL SELALU ("table customers_new already exists") -> UNIQUE per toko tak
+    pernah apply, error tiap restart. Sekarang leftovers ditangani:
+      - {t}_new kosong        -> buang, copy diulang dari {t}
+      - {t}_new ada datanya & {t} kosong/hilang -> promote {t}_new jadi {t}
+        (crash setelah DROP TABLE, sebelum RENAME; create_all bikin {t} kosong)
+    Plus: constraint baru dicek dulu ke data, kalau ada duplikat rebuild DIBATASI
+    (skip tabel itu) supaya data lama tidak hilang."""
     specs = {
         "customers": {
             "create": """CREATE TABLE customers_new (
@@ -250,8 +259,10 @@ def _migrate_unique_per_store():
             "cols": "id, store_id, nama, wa, created_at, updated_at",
             "indexes": ["CREATE INDEX ix_customers_wa ON customers (wa)",
                         "CREATE INDEX ix_customers_nama ON customers (nama)",
-                        "CREATE INDEX ix_customers_store_id ON customers (store_id)"],
+                        "CREATE INDEX ix_customers_store_id ON customers (store_id)",
+                        "CREATE INDEX ix_customers_id ON customers (id)"],
             "marker": "uq_customer_wa_store",
+            "uniq": "wa, store_id",
         },
         "technicians": {
             "create": """CREATE TABLE technicians_new (
@@ -266,8 +277,10 @@ def _migrate_unique_per_store():
             )""",
             "cols": "id, store_id, nama, foto, is_active, level, created_at",
             "indexes": ["CREATE INDEX ix_technicians_nama ON technicians (nama)",
-                        "CREATE INDEX ix_technicians_store_id ON technicians (store_id)"],
+                        "CREATE INDEX ix_technicians_store_id ON technicians (store_id)",
+                        "CREATE INDEX ix_technicians_id ON technicians (id)"],
             "marker": "uq_technician_nama_store",
+            "uniq": "nama, store_id",
         },
     }
     try:
@@ -275,13 +288,57 @@ def _migrate_unique_per_store():
         with engine.begin() as conn:
             conn.execute(text("PRAGMA foreign_keys=OFF"))
             for table, spec in specs.items():
-                row = conn.execute(text(
-                    "SELECT sql FROM sqlite_master WHERE type='table' AND name=:t"),
-                    {"t": table}).fetchone()
-                if not row or not row[0]:
-                    continue
-                if spec["marker"] in row[0]:
+                newtbl = f"{table}_new"
+
+                def _tbl(name, _conn=conn):
+                    return _conn.execute(text(
+                        "SELECT sql FROM sqlite_master WHERE type='table' AND name=:t"),
+                        {"t": name}).fetchone()
+
+                row = _tbl(table)
+                leftover = _tbl(newtbl)
+
+                # sisa lama tapi tabel utama hilang = crash setelah DROP, sebelum RENAME
+                # (atau tabel utama cuma dibikin kosong oleh create_all) -> promote yg punya data
+                if leftover:
+                    n_leftover = conn.execute(text(f"SELECT COUNT(*) FROM {newtbl}")).fetchone()[0]
+                    n_main = 0
+                    if row:
+                        n_main = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).fetchone()[0]
+                    if n_leftover > 0 and n_main == 0:
+                        conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+                        conn.execute(text(f"ALTER TABLE {newtbl} RENAME TO {table}"))
+                        print(f"multistore: promote sisa {newtbl} -> {table} ({n_leftover} baris)")
+                        row = _tbl(table)
+                        leftover = None
+
+                if row and row[0] and spec["marker"] in row[0]:
+                    if leftover:
+                        conn.execute(text(f"DROP TABLE IF EXISTS {newtbl}"))
+                        print(f"multistore: bersihkan sisa {newtbl} (constraint sudah komposit)")
                     continue  # sudah komposit
+
+                if not row or not row[0]:
+                    continue  # tabel tidak ada, dilewati
+
+                if leftover:
+                    cnt = conn.execute(text(f"SELECT COUNT(*) FROM {newtbl}")).fetchone()[0]
+                    conn.execute(text(f"DROP TABLE IF EXISTS {newtbl}"))
+                    print(f"multistore: buang sisa {newtbl} ({cnt} baris) - copy diulang dari {table}")
+
+                # safety: constraint baru hanya bisa satisfied kalau tidak ada duplikat
+                try:
+                    dup = conn.execute(text(
+                        f"SELECT COUNT(*) FROM (SELECT {spec['uniq']}, COUNT(*) c "
+                        f"FROM {table} GROUP BY {spec['uniq']} HAVING c>1)")).fetchone()[0]
+                except Exception as edup:
+                    print(f"multistore cek duplikat {table} skip:", edup)
+                    dup = 0
+                if dup:
+                    print(f"multistore: SKIP rebuild {table} - ada {dup} duplikat "
+                          f"({spec['uniq']}), constraint komposit belum bisa dipasang")
+                    continue
+
                 # introspeksi kolom lama agar rebuild aman untuk DB lawas
                 # (mis. technicians lama belum punya kolom level/store_id)
                 old_cols = [r[1] for r in conn.execute(
@@ -292,11 +349,12 @@ def _migrate_unique_per_store():
                     sel_parts.append(c if c in old_cols else
                         ("'junior'" if c == "level" else ("NULL" if c == "store_id" else "NULL")))
                 print(f"multistore: rebuild {table} -> UNIQUE komposit per toko...")
+                conn.execute(text(f"DROP TABLE IF EXISTS {newtbl}"))
                 conn.execute(text(spec["create"]))
                 conn.execute(text(
-                    f"INSERT INTO {table}_new ({', '.join(want)}) SELECT {', '.join(sel_parts)} FROM {table}"))
+                    f"INSERT INTO {newtbl} ({', '.join(want)}) SELECT {', '.join(sel_parts)} FROM {table}"))
                 conn.execute(text(f"DROP TABLE {table}"))
-                conn.execute(text(f"ALTER TABLE {table}_new RENAME TO {table}"))
+                conn.execute(text(f"ALTER TABLE {newtbl} RENAME TO {table}"))
                 for idx in spec["indexes"]:
                     try:
                         conn.execute(text(idx))
