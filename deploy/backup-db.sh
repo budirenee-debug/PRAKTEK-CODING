@@ -33,7 +33,7 @@ warn() { printf '[%s] ⚠  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
 die()  { printf '[%s] ✖ FATAL: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; exit 1; }
 
 list_backups() {
-  ls -1t "${BACKUP_DIR}"/b_gadget-*.db.gz 2>/dev/null || true
+  ls -1t "${BACKUP_DIR}"/"${APP_NAME}"-*.db.gz 2>/dev/null || true
 }
 
 do_backup() {
