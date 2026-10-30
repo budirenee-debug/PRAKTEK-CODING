@@ -999,7 +999,7 @@
             <section class="view" id="view-gajian">
                 <div class="card"><div class="card-head toolbar">
                     <div class="toolbar-left"><h3>💰 Gajian Sabtu</h3><span class="count-pill" id="gajiSummary">-</span></div>
-                    <div class="toolbar-right"><button class="btn btn-ghost small" onclick="gajiWeekShift(-7)">‹ Minggu lalu</button><strong id="gajiRange" style="font-size:12px;white-space:nowrap">-</strong><button class="btn btn-ghost small" onclick="gajiWeekShift(7)">Minggu depan ›</button><button class="btn btn-dark small" onclick="gajiWeekReset()">Minggu ini</button><button class="btn btn-ghost small" onclick="renderGajian()">↻</button></div>
+                    <div class="toolbar-right"><button class="btn btn-ghost small" onclick="gajiWeekShift(-7)">‹ Minggu lalu</button><strong id="gajiRange" style="font-size:12px;white-space:nowrap">-</strong><button class="btn btn-ghost small" onclick="gajiWeekShift(7)">Minggu depan ›</button><button class="btn btn-dark small" onclick="gajiWeekReset()">Minggu ini</button><button class="btn btn-ghost small" onclick="renderGajian()">↻</button><button class="btn btn-dark small" style="background:#7c3aed;border-color:#7c3aed" onclick="wcOpen()">Tutup Buku Minggu</button></div>
                 </div>
                 <p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Periode <strong>Senin–Sabtu</strong>, dibayar Sabtu malam. Komisi + uang hadir − potong refund = <strong>bersih</strong>. Tanda ✅ tersimpan di HP ini per minggu.</p>
                 <div id="gajiCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
@@ -1380,6 +1380,16 @@
         </div>
     </div>
 
+    <!-- TUTUP BUKU MINGGU: gajian teknisi + setor sisa kas ke owner -->
+    <div class="modal" id="wcModal">
+        <div class="modal-box" style="max-width:820px">
+            <button class="modal-close" onclick="wcClose()">x</button>
+            <h3 style="margin-bottom:4px">Tutup Buku Minggu</h3>
+            <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Sabtu malam: bayar jatah teknisi, lalu setor sisa kas ke owner. Senin saldo kembali nol.</p>
+            <div id="wcBody">Memuat...</div>
+        </div>
+    </div>
+
     <!-- MODAL KUNCI OTOMATIS (10 menit tanpa aktivitas → minta password) -->
     <div class="modal" id="lockModal" style="z-index:50">
         <div class="modal-box" style="max-width:380px;text-align:center">
@@ -1409,7 +1419,7 @@
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
     <script src="assets/js/script.js?v=page27-imei1"></script>
-    <script src="assets/js/engine.js?v=eng21-hpp1"></script>
+    <script src="assets/js/engine.js?v=eng22-tutupbuku"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
 </html>

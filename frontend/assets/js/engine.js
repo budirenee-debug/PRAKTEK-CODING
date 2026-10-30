@@ -852,6 +852,139 @@ async function renderGajian(){
     if(wrap) wrap.innerHTML='<p style="color:#dc2626">Gagal: '+_esc(e.message).slice(0,150)+'</p>';
   }
 }
+// ---------- Tutup Buku Minggu: gajian semua teknisi + setor sisa kas ----------
+const WC_MEDIA = [['kas_utama', 'Kas Utama (laci)'], ['kas_kecil', 'Kas Kecil'], ['bank', 'Bank'], ['qris', 'QRIS / E-Wallet']];
+let _wcData = null;
+function wcClose(){ const m = document.getElementById('wcModal'); if(m) m.classList.remove('show'); }
+async function wcOpen(){
+  const w = _gajiWeek();
+  const box = document.getElementById('wcModal');
+  if(box) box.classList.add('show');
+  const body = document.getElementById('wcBody');
+  if(body) body.innerHTML = '<p style="color:#8a8f98;font-size:12px">Menghitung tutup buku...</p>';
+  try{
+    _wcData = await apiFetch('/finance/weekly-close/preview?tanggal=' + encodeURIComponent(w.start));
+    wcRender(_wcData);
+  }catch(e){
+    if(body) body.innerHTML = '<p style="color:#dc2626">Gagal: ' + _esc(String((e && e.message) || e)).slice(0, 180) + '</p>';
+  }
+}
+function wcKeepVal(m){
+  const el = document.getElementById('wcKeep_' + m);
+  return Math.max(0, Math.round(Number(el && el.value) || 0));
+}
+function wcCalc(){
+  if(!_wcData) return;
+  const bayar = !!document.getElementById('wcBayar')?.checked;
+  const setor = !!document.getElementById('wcSetor')?.checked && _wcData.aktif;
+  const totalBayar = bayar ? (_wcData.teknisi || []).reduce((s, t) => s + (Number(t.sisa) || 0), 0) : 0;
+  const saldoSetelah = (m) => (Number((_wcData.kas || {})[m]) || 0) - (m === 'kas_utama' ? totalBayar : 0);
+  let totalSetor = 0;
+  WC_MEDIA.forEach(([m]) => {
+    const keluar = setor ? Math.max(0, saldoSetelah(m) - wcKeepVal(m)) : 0;
+    totalSetor += keluar;
+    const el = document.getElementById('wcOut_' + m);
+    if(el) el.textContent = _rp(keluar);
+  });
+  const akhir = WC_MEDIA.reduce((s, [m]) => s + (setor ? Math.min(saldoSetelah(m), wcKeepVal(m)) : saldoSetelah(m)), 0);
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  set('wcTotalBayar', _rp(totalBayar));
+  set('wcTotalSetor', _rp(totalSetor));
+  set('wcSaldoAkhir', _rp(akhir));
+  const kurang = Number(_wcData.kurang_gajian) || 0;
+  const takCukup = bayar && kurang > 0;
+  const runBtn = document.getElementById('wcRunBtn');
+  if(runBtn) runBtn.disabled = !_wcData.boleh_proses || takCukup;
+  const warnEl = document.getElementById('wcKurang');
+  if(warnEl) warnEl.style.display = takCukup ? '' : 'none';
+}
+function wcRender(d){
+  const body = document.getElementById('wcBody');
+  if(!body) return;
+  const rows = Array.isArray(d.teknisi) ? d.teknisi : [];
+  const aktif = !!d.aktif;
+  const bisa = !!d.boleh_proses;
+  const rp = _rp;
+  const tr = rows.length ? rows.map(t =>
+    '<tr>'
+    + '<td><strong>' + _esc(t.nama) + '</strong><br><span style="font-size:10px;color:#8a8f98">' + _esc(t.level) + '</span></td>'
+    + '<td style="text-align:right">' + rp(t.komisi) + '</td>'
+    + '<td style="text-align:right">' + rp(t.hadir) + '</td>'
+    + '<td style="text-align:right;color:' + (t.refund ? '#dc2626' : '#6b7280') + '">' + (t.refund ? '-' + rp(t.refund) : '-') + '</td>'
+    + '<td style="text-align:right"><strong>' + rp(t.netto) + '</strong></td>'
+    + '<td style="text-align:right;color:#059669">' + rp(t.sudah_dibayar) + '</td>'
+    + '<td style="text-align:right;color:' + (t.tunggakan ? '#b45309' : '#6b7280') + '">' + rp(t.tunggakan) + '</td>'
+    + '<td style="text-align:right;font-weight:800;color:' + (t.sisa ? '#b45309' : '#059669') + '">' + rp(t.sisa) + '</td>'
+    + '</tr>').join('')
+    : '<tr><td colspan="8" style="text-align:center;color:#8a8f98;padding:14px">Tidak ada jatah teknisi minggu ini</td></tr>';
+  const mediaRows = WC_MEDIA.map(([m, label]) => {
+    const saldo = Number((d.kas || {})[m]) || 0;
+    return '<tr>'
+      + '<td>' + label + '</td>'
+      + '<td style="text-align:right"><strong>' + rp(saldo) + '</strong></td>'
+      + '<td style="text-align:right"><input id="wcKeep_' + m + '" type="number" min="0" value="0" oninput="wcCalc()" style="width:120px;padding:6px 8px;border-radius:8px;border:1px solid #e5e7eb;text-align:right"></td>'
+      + '<td style="text-align:right;color:#7c3aed;font-weight:700" id="wcOut_' + m + '">' + rp(0) + '</td>'
+      + '</tr>';
+  }).join('');
+  const note = d.sudah_ditutup
+    ? '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px;font-size:11.5px;margin-bottom:10px">Sudah pernah ditutup ' + _esc(String(d.sudah_ditutup.created_at || '').slice(0, 16)) + ' oleh ' + _esc(d.sudah_ditutup.ditutup_oleh || '-') + ' • gajian ' + rp(d.sudah_ditutup.total_gajian || 0) + ' • setor ' + rp(d.sudah_ditutup.total_prive || 0) + '. Bisa dijalankan ulang untuk koreksi.</div>'
+    : '';
+  const kurang = Number(d.kurang_gajian) || 0;
+  const kurangTotal = Number(d.kurang_total) || 0;
+  const warn = (!bisa ? '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#b91c1c;margin-bottom:10px">Minggu ini belum selesai / belum berjalan. Tutup buku hanya bisa diproses mulai Sabtu.</div>' : '')
+    + (!aktif ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#92400e;margin-bottom:10px">Minggu lama: setor kas otomatis dimatikan agar kas minggu berjalan tidak ikut tersapu.</div>' : '')
+    + (kurang ? '<div id="wcKurang" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#b91c1c;margin-bottom:10px">Kas utama kurang <strong>' + rp(kurang) + '</strong> untuk membayar semua tunggakan. Total semua media <strong>' + rp(d.kas_tersedia || 0) + '</strong>' + (kurangTotal ? ', masih kurang <strong>' + rp(kurangTotal) + '</strong> walau semua kas dipakai.' : ', cukup jika dipindah ke kas utama.') + ' Setor dana ke kas utama dulu, atau hilangkan centang bayar gajian. Sistem menolak tutup buku jika kas utama kurang.</div>' : '');
+  body.innerHTML = note + warn
+    + '<div class="table-wrap"><table class="table compact"><thead><tr><th>Teknisi</th><th style="text-align:right">Komisi</th><th style="text-align:right">Hadir</th><th style="text-align:right">Refund</th><th style="text-align:right">Bersih</th><th style="text-align:right">Dibayar</th><th style="text-align:right">Tunggakan</th><th style="text-align:right">Bayar Skrg</th></tr></thead><tbody>' + tr + '</tbody></table></div>'
+    + '<p style="font-size:11px;color:#8a8f98;margin:6px 0 0">Tunggakan = sisa minggu lalu yang ikut dibayar. "Bayar Skrg" = total yang keluar dari kas untuk teknisi itu.</p>'
+    + '<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:12.5px"><input id="wcBayar" type="checkbox" checked onchange="wcCalc()"> Bayar gajian + tunggakan teknisi (<strong id="wcTotalBayar">' + rp(d.total_sisa) + '</strong>)</label>'
+    + '<div style="border-top:1px solid #f3f4f6;margin:10px 0;padding-top:10px"><strong style="font-size:13px">Sisa kas toko</strong> <span style="font-size:11px;color:#8a8f98">— isi "Sisakan" jika ingin meninggalkan uang di laci</span></div>'
+    + '<div class="table-wrap"><table class="table compact"><thead><tr><th>Media</th><th style="text-align:right">Saldo</th><th style="text-align:right">Sisakan</th><th style="text-align:right">Disetor</th></tr></thead><tbody>' + mediaRows + '</tbody></table></div>'
+    + '<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:12.5px"><input id="wcSetor" type="checkbox" ' + (aktif ? 'checked' : 'disabled') + ' onchange="wcCalc()"> Setor sisa kas ke owner / Prive (<strong id="wcTotalSetor">' + rp(0) + '</strong>)</label>'
+    + '<div class="field"><label>Catatan (opsional)</label><input id="wcCatatan" placeholder="contoh: tutup buku Sabtu malam"></div>'
+    + '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;background:#f9fafb;border-radius:10px;padding:9px 11px;font-size:12px">'
+    + '<span>Kas setelah tutup: <strong id="wcSaldoAkhir" style="color:#7c3aed">' + rp(0) + '</strong></span><span style="flex:1"></span>'
+    + '<button class="btn btn-ghost" onclick="wcClose()">Batal</button>'
+    + '<button class="btn btn-dark" id="wcRunBtn" ' + (bisa ? '' : 'disabled') + ' style="background:#7c3aed;border-color:#7c3aed" onclick="wcRun()">Proses Tutup Buku</button>'
+    + '</div>';
+  wcCalc();
+}
+async function wcRun(){
+  if(!_wcData) return;
+  const bayar = !!document.getElementById('wcBayar')?.checked;
+  const setor = !!document.getElementById('wcSetor')?.checked && _wcData.aktif;
+  const totalBayar = bayar ? (_wcData.teknisi || []).reduce((s, t) => s + (Number(t.sisa) || 0), 0) : 0;
+  const kurang = Number(_wcData.kurang_gajian) || 0;
+  if(bayar && kurang > 0) return (window.showToast || alert)('Kas utama kurang ' + _rp(kurang) + ' untuk membayar tunggakan. Setor dana ke kas utama dulu.');
+  const sisakan = {};
+  let totalSetor = 0;
+  WC_MEDIA.forEach(([m]) => {
+    sisakan[m] = wcKeepVal(m);
+    const saldo = (Number((_wcData.kas || {})[m]) || 0) - (m === 'kas_utama' ? totalBayar : 0);
+    if(setor) totalSetor += Math.max(0, saldo - sisakan[m]);
+  });
+  if(!totalBayar && !totalSetor) return (window.showToast || alert)('Tidak ada gajian/saldo yang perlu diproses');
+  if(!confirm('Tutup buku minggu ' + _wcData.week_start + ' s/d ' + _wcData.week_end + '?\n\n'
+    + 'Gajian dibayar: ' + _rp(totalBayar) + '\nSisa kas disetor ke owner: ' + _rp(totalSetor))) return;
+  const btn = document.getElementById('wcRunBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Memproses...'; }
+  try{
+    const r = await apiFetch('/finance/weekly-close', {method:'POST', body: JSON.stringify({
+      tanggal: _wcData.week_start, bayar_gajian: bayar, setor_kas: setor,
+      sisakan: sisakan, catatan: document.getElementById('wcCatatan')?.value || ''
+    })});
+    try{ (window.showToast || alert)('✅ Tutup buku selesai • gajian ' + _rp(r.total_gajian || 0) + ' • setor ' + _rp(r.total_prive || 0)); }catch(e){}
+    wcClose();
+    try{ renderGajian(); }catch(e){}
+    try{ if(typeof kasTutupTokoLoad === 'function') kasTutupTokoLoad(); }catch(e){}
+    try{ if(typeof kasBarToko === 'function') kasBarToko(); }catch(e){}
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = 'Proses Tutup Buku'; }
+    try{ (window.showToast || alert)('Gagal: ' + String((e && e.message) || e).replace(/^HTTP \d+:\s*/, '').slice(0, 180)); }catch(_){}
+  }
+}
+if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcClose; window.wcRun = wcRun; window.wcCalc = wcCalc; }
+
 // hook ke switchView lama
 (function(){
   const orig = window.switchView;

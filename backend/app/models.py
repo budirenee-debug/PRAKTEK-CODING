@@ -506,6 +506,25 @@ class CashClose(Base):
     created_at = Column(DateTime, default=func.now())
 
 
+class WeeklyClose(Base):
+    """TUTUP BUKU MINGGUAN (Sabtu malam): gajian teknisi + setor sisa kas ke owner.
+    Hasilnya Senin saldo kas kembali nol (kecuali sisa yang sengaja ditinggal)."""
+    __tablename__ = "weekly_closes"
+    __table_args__ = (UniqueConstraint("store_id", "week_start", name="uq_weekly_close_store_week"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    week_start = Column(Date, nullable=False, index=True)  # Senin
+    week_end = Column(Date, nullable=False)                # Sabtu
+    total_gajian = Column(Integer, default=0)              # total gajian minggu itu
+    total_prive = Column(Integer, default=0)               # total kas disetor ke owner
+    saldo_akhir = Column(Integer, default=0)               # kas yang ditinggal (target 0)
+    detail_json = Column(Text, nullable=True)              # rincian per teknisi/media
+    catatan = Column(String(255), nullable=True)
+    ditutup_oleh = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
 class CashConfig(Base):
     """Konfigurasi kas per toko: limit Kas Kecil (petty cash mentor)."""
     __tablename__ = "cash_configs"

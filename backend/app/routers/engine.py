@@ -650,7 +650,7 @@ def gajian_bayar(payload: dict = Body(...), store_id: Optional[int] = Query(None
                       f"Gajian {tech.nama} {week_start} (komisi+hadir)",
                       nominal, media, ref_type="gajian", ref_id=tech_id,
                       oleh=getattr(current, "username", None),
-                      masuk_laba=False, pengaruh_kas=True)
+                      masuk_laba=False, pengaruh_kas=True, skip_dup=True)
     db.commit()
     db.refresh(row)
     log_action(db, "engine.gajian_bayar", target=tech.nama,

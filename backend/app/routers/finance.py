@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from typing import Optional
 import datetime
+import json
+import re
 
 from ..database import get_db
 from .. import models
@@ -242,16 +244,17 @@ def close_accident(acc_id: int, db: Session = Depends(get_db), current=Depends(g
 
 def _ledger_add(db, store_id, tanggal, jenis, kategori, keterangan, nominal,
                 media, media_tujuan=None, ref_type=None, ref_id=None, oleh=None,
-                subkategori=None, masuk_laba=True, pengaruh_kas=True):
+                subkategori=None, masuk_laba=True, pengaruh_kas=True, skip_dup=False):
     """Tambah 1 baris buku besar (tanpa commit — caller yang commit).
-    Guard duplikat dual-write via (ref_type, ref_id).
+    Guard duplikat dual-write via (ref_type, ref_id). Untuk gajian (ref_id=teknisi
+    dipakai tiap minggu) guard ini dilewati; idempotensi dicek per week_start.
     Prinsip mentor: masuk_laba=False = persediaan (belum HPP); pengaruh_kas=False = tanpa gerak kas."""
     err = lm.validate_entry(kategori, jenis, nominal, media, media_tujuan)
     if err:
         raise HTTPException(status_code=400, detail=err)
     if kategori == "D" and (subkategori or "") not in lm.SUB_D:
         raise HTTPException(status_code=400, detail="kategori D wajib subkategori: " + "/".join(lm.SUB_D))
-    if ref_type and ref_id is not None:
+    if not skip_dup and ref_type and ref_id is not None:
         dup = db.query(models.LedgerEntry).filter(
             models.LedgerEntry.store_id == store_id,
             models.LedgerEntry.ref_type == ref_type,
@@ -290,6 +293,313 @@ def _parse_tgl(v):
         return datetime.datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
     except Exception:
         raise HTTPException(status_code=400, detail="tanggal harus format YYYY-MM-DD")
+
+
+# ================= SATU MESIN HITUNG KEUANGAN =================
+#_owner.html punya 3 tampilan arus kas yang dulu dihitung 3 rumus beda (ownArus, tren-bulanan,
+# ringkasan). Semua sekarang lewat _agregat_ledger() supaya tidak bisa melenceng sendiri.
+#
+# DUA DIMENSI, jangan dicampur:
+#   KAS  = uang benar-benar bergerak. Cuma baris pengaruh_kas=True. Inilah yang
+#          dibandingkan fisik saat Tutup Kas.
+#   LABA = hasil usaha. Cuma baris masuk_laba=True.
+# Contoh yang bedanya nyata: komisi teknisi sudah jadi HPP (LABA) sejak service cair,
+# tapi uangnya belum keluar sampai gajian (pengaruh_kas=False).
+# Belanja stok: uang keluar (KAS) tapi bukan beban — baru jadi HPP saat part terpakai
+# (masuk_laba=False saat beli, rudanya posts servicepart dengan masuk_laba=True).
+_REF_PENJUALAN = ("sale", "sale_jasa")
+_REF_HPP_BARANG = ("sale_hpp", "servicepart")
+
+
+def _agregat_ledger(rows):
+    """Agregasi baris buku besar jadi blok KAS dan blok LABA terpisah."""
+    g = {
+        # --- KAS: uang yang benar-benar masuk/keluar laci/bank ---
+        "kas_masuk": 0, "kas_keluar": 0,
+        "masuk_service": 0, "masuk_penjualan": 0, "masuk_modal": 0, "masuk_lain": 0,
+        "keluar_gajian": 0, "keluar_operasional": 0, "keluar_belanja": 0,
+        "keluar_refund": 0, "keluar_lain": 0,
+        # --- LABA: hasil usaha ---
+        "omzet_service": 0, "omzet_penjualan": 0, "omzet_lain": 0, "refund_omzet": 0,
+        "hpp_komisi": 0, "hpp_modal_barang": 0, "hpp_part": 0, "hpp_beban": 0,
+        "ops_biaya": 0, "ops_hadir": 0,
+        "modal": 0, "prive": 0, "aset": 0, "non_masuk": 0, "non_keluar": 0,
+        # --- Persediaan (belanja = aset, bukan beban) ---
+        "persediaan": 0, "persediaan_per_kat": {"B1": 0, "B2": 0, "B3": 0},
+        "transfer": 0,
+    }
+    for e in rows:
+        n = int(e.nominal or 0)
+        if not n:
+            continue
+        kat = e.kategori or ""
+        kel = lm.kelompok_of(kat)
+        ref = (e.ref_type or "manual")
+        masuk = e.jenis == "masuk"
+        keluar = e.jenis == "keluar"
+        kas = True if e.pengaruh_kas is None else bool(e.pengaruh_kas)
+        laba = True if e.masuk_laba is None else bool(e.masuk_laba)
+
+        if e.jenis == "transfer":
+            g["transfer"] += n  # F1 pindah media: bukan omzet, bukan biaya
+            continue
+
+        # ---------- dimensi KAS ----------
+        if kas:
+            if masuk:
+                if ref == "service":
+                    g["masuk_service"] += n
+                elif ref in _REF_PENJUALAN:
+                    g["masuk_penjualan"] += n
+                elif kel == "owner":
+                    g["masuk_modal"] += n      # E1 modal owner: masuk kas, bukan omzet
+                else:
+                    g["masuk_lain"] += n
+                g["kas_masuk"] += n
+            elif keluar:
+                if ref == "gajian":
+                    g["keluar_gajian"] += n
+                elif ref == "refund" or kel == "omzet":
+                    g["keluar_refund"] += n
+                elif kel == "hpp":
+                    g["keluar_belanja"] += n   # B1/B2 expense = beli stok, uang jadi keluar
+                elif kel == "operasional":
+                    g["keluar_operasional"] += n
+                else:
+                    g["keluar_lain"] += n      # prive / aset / beban langsung
+                g["kas_keluar"] += n
+
+        # ---------- dimensi LABA ----------
+        if not laba:
+            # masuk_laba=False: belanja barang. Kas keluar (kalau pengaruh_kas) tapi
+            # belum beban — jadi persediaan, HPP-nya terbentuk saat terjual/terpakai.
+            if keluar and kel == "hpp":
+                g["persediaan"] += n
+                if kat in g["persediaan_per_kat"]:
+                    g["persediaan_per_kat"][kat] += n
+            continue
+
+        if masuk:
+            if kel == "omzet":
+                if ref == "service":
+                    g["omzet_service"] += n
+                elif ref in _REF_PENJUALAN:
+                    g["omzet_penjualan"] += n
+                else:
+                    g["omzet_lain"] += n
+            elif kel == "owner":
+                g["modal"] += n
+            elif kel == "non":
+                g["non_masuk"] += n
+        elif keluar:
+            if kel == "hpp":
+                if ref == "service_komisi":
+                    g["hpp_komisi"] += n
+                elif ref == "servicepart":
+                    g["hpp_part"] += n
+                elif ref in _REF_HPP_BARANG:
+                    g["hpp_modal_barang"] += n
+                else:
+                    g["hpp_beban"] += n
+            elif kel == "omzet":
+                g["refund_omzet"] += n      # refund = pengurang omzet
+            elif kel == "operasional":
+                if ref == "allowance":
+                    g["ops_hadir"] += n
+                else:
+                    g["ops_biaya"] += n
+            elif kel == "aset":
+                g["aset"] += n
+            elif kel == "owner":
+                g["prive"] += n
+            elif kel == "non":
+                g["non_keluar"] += n
+
+    g["kas_bersih"] = g["kas_masuk"] - g["kas_keluar"]
+    g["omzet"] = (g["omzet_service"] + g["omzet_penjualan"] + g["omzet_lain"]
+                  - g["refund_omzet"])
+    g["hpp"] = g["hpp_komisi"] + g["hpp_modal_barang"] + g["hpp_part"] + g["hpp_beban"]
+    g["operasional"] = g["ops_biaya"] + g["ops_hadir"]
+    g["laba_kotor"] = g["omzet"] - g["hpp"]
+    g["laba_bersih"] = g["laba_kotor"] - g["operasional"]
+    return g
+
+
+def _saldo_media(rows):
+    """Saldo kumulatif per media (transfer menggeser kedua sisi). Hanya pengaruh_kas."""
+    saldo = {m: 0 for m in lm.MEDIA}
+    for e in rows:
+        if e.pengaruh_kas is False:
+            continue
+        n = int(e.nominal or 0)
+        if e.jenis == "masuk" and e.media in saldo:
+            saldo[e.media] += n
+        elif e.jenis == "keluar" and e.media in saldo:
+            saldo[e.media] -= n
+        elif e.jenis == "transfer":
+            if e.media in saldo:
+                saldo[e.media] -= n
+            if (e.media_tujuan or "") in saldo:
+                saldo[e.media_tujuan] += n
+    return saldo
+
+
+MEDIA_UANG = [m for m in lm.MEDIA if m != "stok"]
+
+
+def _week_bounds(tgl):
+    """Minggu gajian = Senin..Sabtu. Hari Minggu masuk minggu yang baru tutup
+    (sama dengan _gajiWeek() di frontend)."""
+    if isinstance(tgl, datetime.datetime):
+        tgl = tgl.date()
+    wd = tgl.weekday()  # Senin=0 .. Minggu=6
+    if wd == 6:
+        start = tgl - datetime.timedelta(days=6)
+    else:
+        start = tgl - datetime.timedelta(days=wd)
+    return start, start + datetime.timedelta(days=5)
+
+
+def _gajian_week_of(row):
+    """Ambil week_start (Senin) dari keterangan 'Gajian <nama> YYYY-MM-DD ...'."""
+    m = re.search(r"(\d{4}-\d{2}-\d{2})", row.keterangan or "")
+    if not m:
+        return None
+    try:
+        return datetime.date.fromisoformat(m.group(1))
+    except Exception:
+        return None
+
+
+def _weekly_tech_rows(db, store_id, week_start, week_end):
+    """Jatah minggu Senin..Sabtu + tunggakan lama per teknisi.
+
+    `sisa` = total yang harus dibayar sekarang (tunggakan minggu lalu + jatah
+    minggu ini - payout minggu ini). Ini yang membuat saldo teknisi nol setelah
+    tutup buku, bukan hanya minggu berjalan.
+    """
+    techs = db.query(models.Technician).filter(
+        models.Technician.store_id == store_id).order_by(models.Technician.nama).all()
+    out = []
+    for t in techs:
+        # --- tampilan minggu ini ---
+        leds = db.query(models.CommissionLedger).filter(
+            models.CommissionLedger.store_id == store_id,
+            models.CommissionLedger.technician_id == t.id,
+            models.CommissionLedger.tanggal >= week_start,
+            models.CommissionLedger.tanggal <= week_end).all()
+        komisi = sum(int(l.masuk_rp or 0) for l in leds if l.tipe == "komisi_cair")
+        cicilan = sum(int(l.keluar_rp or 0) for l in leds if l.tipe == "potongan_cicilan")
+        hadir = sum(int(l.masuk_rp or 0) for l in leds if l.tipe == "allowance")
+        refund = sum(int(l.keluar_rp or 0) for l in leds if l.tipe == "refund_balik")
+        hpp = sum(int(l.hpp_rp or 0) for l in leds)
+        netto = komisi + hadir - refund
+
+        # --- akumulasi s/d akhir minggu (termasuk minggu-minggu lalu) ---
+        all_leds = db.query(models.CommissionLedger).filter(
+            models.CommissionLedger.store_id == store_id,
+            models.CommissionLedger.technician_id == t.id,
+            models.CommissionLedger.tanggal <= week_end).all()
+        prev_leds = [l for l in all_leds if l.tanggal < week_start]
+        def _acc(rows):
+            h = sum(int(l.masuk_rp or 0) for l in rows if l.tipe == "komisi_cair")
+            r = sum(int(l.keluar_rp or 0) for l in rows if l.tipe == "refund_balik")
+            o = sum(int(l.masuk_rp or 0) for l in rows if l.tipe == "allowance")
+            return max(0, h - r) + max(0, o)
+        accrued_all = _acc(all_leds)
+        accrued_prev = _acc(prev_leds)
+
+        # --- payout: pisahkan minggu ini vs minggu sebelumnya ---
+        all_payouts = db.query(models.LedgerEntry).filter(
+            models.LedgerEntry.store_id == store_id,
+            models.LedgerEntry.ref_type == "gajian",
+            models.LedgerEntry.ref_id == t.id).all()
+        paid_week = paid_prev = 0
+        paid_rows = []
+        for p in all_payouts:
+            w = _gajian_week_of(p)
+            if w == week_start:
+                paid_week += int(p.nominal or 0)
+                paid_rows.append(p)
+            elif w is not None and w < week_start:
+                paid_prev += int(p.nominal or 0)
+            elif w is None and p.tanggal and p.tanggal <= week_end:
+                paid_prev += int(p.nominal or 0)
+        tunggakan = max(0, accrued_prev - paid_prev)
+        sisa = max(0, accrued_all - paid_prev - paid_week)
+
+        debts = db.query(models.TechDebt).filter(
+            models.TechDebt.technician_id == t.id,
+            models.TechDebt.status == "belum").all()
+        hutang = sum(int(d.sisa or 0) for d in debts)
+        if netto == 0 and paid_week == 0 and tunggakan == 0 and sisa == 0 and hutang == 0:
+            continue
+        out.append({
+            "technician_id": t.id, "nama": t.nama, "level": t.level or "junior",
+            "komisi": komisi, "cicilan": cicilan, "hadir": hadir,
+            "refund": refund, "hpp": hpp, "netto": netto,
+            "sudah_dibayar": paid_week, "total_dibayar": paid_prev + paid_week,
+            "tunggakan": tunggakan, "sisa": sisa,
+            "kelebihan": max(0, paid_prev + paid_week - accrued_all),
+            "sisa_hutang": hutang,
+            "payout": [{"id": p.id, "tanggal": p.tanggal, "nominal": p.nominal,
+                        "media": p.media, "oleh": p.dibuat_oleh}
+                       for p in paid_rows],
+        })
+    return out
+
+
+def _weekly_cash(db, store_id):
+    sist = _sistem_media(db, store_id)
+    return {m: int(sist.get(m, 0)) for m in MEDIA_UANG}
+
+
+def _nempel_teknisi(db, store_id, d0=None, d1=None):
+    """Utang gajian yang BELUM dibayar (bukan cuma baris kas=False).
+
+    Sumbernya CommissionLedger seperti slip Gajian Sabtu:
+      hpp = komisi_cair (sudah net cicilan) - refund_balik
+      ops = uang hadir
+      dikurangi payout gajian (LedgerEntry ref_type=gajian).
+    Part terpakai & beban kecelakaan TIDAK ikut — itu bukan utang ke teknisi.
+    """
+    q = db.query(models.CommissionLedger).filter(
+        models.CommissionLedger.store_id == store_id)
+    if d0:
+        q = q.filter(models.CommissionLedger.tanggal >= d0)
+    if d1:
+        q = q.filter(models.CommissionLedger.tanggal <= d1)
+    per = {}
+    for l in q.all():
+        t = per.setdefault(l.technician_id, {"hpp": 0, "ops": 0, "paid": 0})
+        if l.tipe == "komisi_cair":
+            t["hpp"] += int(l.masuk_rp or 0)
+        elif l.tipe == "refund_balik":
+            t["hpp"] -= int(l.keluar_rp or 0)
+        elif l.tipe == "allowance":
+            t["ops"] += int(l.masuk_rp or 0)
+    pq = db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store_id,
+        models.LedgerEntry.ref_type == "gajian")
+    if d0:
+        pq = pq.filter(models.LedgerEntry.tanggal >= d0)
+    if d1:
+        pq = pq.filter(models.LedgerEntry.tanggal <= d1)
+    for p in pq.all():
+        t = per.setdefault(p.ref_id, {"hpp": 0, "ops": 0, "paid": 0})
+        t["paid"] += int(p.nominal or 0)
+    out_hpp = out_ops = 0
+    for t in per.values():
+        hpp = max(0, t["hpp"])
+        ops = max(0, t["ops"])
+        total = hpp + ops
+        sisa = max(0, total - t["paid"])
+        if not sisa or not total:
+            continue
+        bagian_hpp = int(round(sisa * hpp / total))
+        out_hpp += bagian_hpp
+        out_ops += sisa - bagian_hpp
+    return {"hpp": out_hpp, "operasional": out_ops}
 
 
 # ================= REFUND DANA =================
@@ -733,70 +1043,133 @@ def get_kategori(current=Depends(get_current_user)):
 @router.get("/ledger/ringkasan")
 def ringkasan_ledger(store_id: Optional[int] = Query(None),
                      db: Session = Depends(get_db), current=Depends(get_current_user)):
-    """5 angka mentor dari buku besar: omzet − HPP = laba kotor − operasional = laba bersih.
+    """Semua masa lalu, dari buku besar. Lihat /ledger/periode untuk rentang tertentu.
     Prinsip mentor: hanya baris masuk_laba yang hitung laba (persediaan dikecualikan);
-    omzet = masuk − pengurang (refund); arus/media hanya yang pengaruh_kas."""
+    hanya baris pengaruh_kas yang gerakkan kas (transfer tidak masuk omzet/biaya)."""
     store, _ = _ctx_read(db, current, store_id)
     rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id).all()
-    g = {"omzet": 0, "hpp": 0, "operasional": 0, "aset": 0,
-         "modal": 0, "prive": 0, "non_masuk": 0, "non_keluar": 0,
-         "total_masuk": 0, "total_keluar": 0, "persediaan": 0,
-         "persediaan_per_kat": {"B1": 0, "B2": 0, "B3": 0}}
-    for e in rows:
-        n = int(e.nominal or 0)
-        kel = lm.kelompok_of(e.kategori or "")
-        laba = e.masuk_laba is not False
-        kas = e.pengaruh_kas is not False
-        if e.jenis == "transfer":
-            continue  # F1 pindah media, bukan omzet/biaya
-        if e.jenis == "masuk":
-            if kas:
-                g["total_masuk"] += n
-            if not laba:
-                continue
-            if kel == "omzet":
-                g["omzet"] += n
-            elif kel == "owner":
-                g["modal"] += n
-            elif kel == "non":
-                g["non_masuk"] += n
-        elif e.jenis == "keluar":
-            if kas:
-                g["total_keluar"] += n
-            if kel == "hpp" and not laba:
-                g["persediaan"] += n  # beli barang: kas keluar, stok bertambah, BELUM HPP
-                if (e.kategori or "") in g["persediaan_per_kat"]:
-                    g["persediaan_per_kat"][e.kategori] += n
-                continue
-            if not laba:
-                continue
-            if kel == "hpp":
-                g["hpp"] += n
-            elif kel == "omzet":
-                g["omzet"] -= n  # refund: pengurang omzet
-            elif kel == "operasional":
-                g["operasional"] += n
-            elif kel == "aset":
-                g["aset"] += n
-            elif kel == "owner":
-                g["prive"] += n
-            elif kel == "non":
-                g["non_keluar"] += n
-    kotor = g["omzet"] - g["hpp"]
-    return {**g, "laba_kotor": kotor, "laba_bersih": kotor - g["operasional"],
-            "arus_bersih": g["total_masuk"] - g["total_keluar"],
-            "per_media": _sistem_media(db, store.id), "count": len(rows)}
+    g = _agregat_ledger(rows)
+    nempel = _nempel_teknisi(db, store.id)
+    return {
+        "omzet": g["omzet"], "hpp": g["hpp"], "operasional": g["operasional"],
+        "aset": g["aset"], "modal": g["modal"], "prive": g["prive"],
+        "non_masuk": g["non_masuk"], "non_keluar": g["non_keluar"],
+        "total_masuk": g["kas_masuk"], "total_keluar": g["kas_keluar"],
+        "arus_bersih": g["kas_bersih"],
+        "laba_kotor": g["laba_kotor"], "laba_bersih": g["laba_bersih"],
+        "persediaan": g["persediaan"], "persediaan_per_kat": g["persediaan_per_kat"],
+        "nempel_hpp": nempel["hpp"], "nempel_ops": nempel["operasional"],
+        "per_media": {m: v for m, v in _sistem_media(db, store.id).items() if m in MEDIA_UANG},
+        "count": len(rows),
+    }
+
+
+@router.get("/ledger/periode")
+def ringkasan_periode(dari: Optional[str] = Query(None), sampai: Optional[str] = Query(None),
+                      bulan: Optional[str] = Query(None, description="YYYY-MM, ringkas 1 bulan"),
+                      store_id: Optional[int] = Query(None),
+                      db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Ringkasan KAS + LABA untuk satu rentang tanggal. INI sumber angka tunggal untuk
+    kartu Arus Kas / Laba-Rugi owner.
+
+    Para: agar Tutup Kas dan kartu Kas tidak pernah beda, keduanya wajib pakai fungsi ini
+    (atau /ledger/ringkasan untuk saldo kumulatif) — jangan hitung ulang di frontend.
+
+    - Tanpa parameter -> semua masa lalu.
+    - ?bulan=YYYY-MM -> 1 bulan penuh.
+    - ?dari=&sampai= -> rentang bebas (sampai opsional).
+    Return `saldo_awal` = saldo per media SEBELUM tanggal mulai, jadi `saldo_akhir` bisa
+    dipakai langsung membandingkan fisik Tutup Kas.
+    """
+    store, _ = _ctx_read(db, current, store_id)
+    today = datetime.date.today()
+    d0 = _parse_tgl(dari) if dari else None
+    d1 = _parse_tgl(sampai) if sampai else None
+    if bulan:
+        try:
+            y, m = int(str(bulan)[:4]), int(str(bulan)[5:7])
+            d0 = datetime.date(y, m, 1)
+            d1 = (datetime.date(y + 1, 1, 1) - datetime.timedelta(days=1)) if m == 12 \
+                else datetime.date(y, m + 1, 1) - datetime.timedelta(days=1)
+        except Exception:
+            raise HTTPException(status_code=400, detail="bulan harus format YYYY-MM")
+    if d1 and d0 and d1 < d0:
+        d0, d1 = d1, d0
+    if d1 and d1 > today:
+        d1 = today
+
+    allrows = db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id).order_by(
+        models.LedgerEntry.tanggal, models.LedgerEntry.id).all()
+
+    def _d(e):
+        v = e.tanggal
+        if isinstance(v, datetime.datetime):
+            return v.date()
+        if isinstance(v, str):
+            try:
+                return datetime.datetime.strptime(v[:10], "%Y-%m-%d").date()
+            except Exception:
+                return None
+        return v
+
+    if d0:
+        awal = [e for e in allrows if (_d(e) or today) < d0]
+        rows = [e for e in allrows if d0 <= (_d(e) or today) <= (d1 or today)]
+    else:
+        awal = []
+        rows = allrows
+
+    g = _agregat_ledger(rows)
+    nempel = _nempel_teknisi(db, store.id, d0, d1)
+    # saldo_awal = posisi laci SEBELUM rentang; saldo_akhir = posisi s/d batas akhir.
+    # Bandingkan saldo_akhir dengan fisik saat Tutup Kas tanggal tersebut.
+    if d0:
+        saldo_awal = _saldo_media(awal)
+        saldo_akhir = _saldo_media(awal + rows)
+    else:
+        saldo_awal = {m: 0 for m in lm.MEDIA}
+        saldo_akhir = _saldo_media(allrows)
+
+    return {
+        "store_id": store.id,
+        "dari": d0, "sampai": d1 or today, "bulan": (d0.strftime("%Y-%m") if d0 else None),
+        "jumlah_baris": len(rows),
+        "kas": {
+            "masuk": g["kas_masuk"], "keluar": g["kas_keluar"], "bersih": g["kas_bersih"],
+            "masuk_service": g["masuk_service"], "masuk_penjualan": g["masuk_penjualan"],
+            "masuk_modal": g["masuk_modal"], "masuk_lain": g["masuk_lain"],
+            "keluar_gajian": g["keluar_gajian"], "keluar_operasional": g["keluar_operasional"],
+            "keluar_belanja": g["keluar_belanja"], "keluar_refund": g["keluar_refund"],
+            "keluar_lain": g["keluar_lain"],
+        },
+        "laba": {
+            "omzet": g["omzet"], "hpp": g["hpp"], "kotor": g["laba_kotor"],
+            "operasional": g["operasional"], "bersih": g["laba_bersih"],
+            "omzet_service": g["omzet_service"], "omzet_penjualan": g["omzet_penjualan"],
+            "omzet_lain": g["omzet_lain"], "refund": g["refund_omzet"],
+            "hpp_komisi": g["hpp_komisi"], "hpp_modal_barang": g["hpp_modal_barang"],
+            "hpp_part": g["hpp_part"], "hpp_beban": g["hpp_beban"],
+            "ops_biaya": g["ops_biaya"], "ops_hadir": g["ops_hadir"],
+            "modal": g["modal"], "prive": g["prive"], "aset": g["aset"],
+        },
+        "nempel": nempel,
+        "persediaan": g["persediaan"], "persediaan_per_kat": g["persediaan_per_kat"],
+        "saldo_awal": {m: (saldo_awal or {}).get(m, 0) for m in MEDIA_UANG},
+        "saldo_akhir": {m: (saldo_akhir or {}).get(m, 0) for m in MEDIA_UANG},
+    }
 
 
 @router.get("/tren-bulanan")
 def tren_bulanan(store_id: Optional[int] = Query(None), bulan: int = Query(6, ge=2, le=12),
                  db: Session = Depends(get_db), current=Depends(get_current_user)):
-    """Tren N bulan terakhir untuk Owner Space: omzet/laba + volume per bulan.
+    """Tren N bulan terakhir untuk Owner Space: omzet/hpp/operasional dari BUKU BESAR
+    (sumber angka yang sama dengan kartu Arus Kas — lihat /ledger/periode), plus volume
+    unit per bulan yang tetap dibaca dari tabel (tidak ada di ledger).
 
-    Rumus SAMA dengan kartu Ringkasan (ownArus, tabel-based agar angkanya nyambung):
-    omzet = service cair + penjualan − refund; HPP = komisi + modal barang + beban toko;
-    operasional = pengeluaran + uang hadir. Act-date service = diambil_at/updated_at/date
-    (slice mentah, persis perilaku frontend).
+    Dulu rumus tren dihitung terpisah dari tabel Service/Sale/Expense, sehingga
+    belanja stok ikut terhitung operasional dan HPP part terpakai hilang. Sekarang
+    semua lewat _agregat_ledger() per bulan.
     """
     store, _ = _ctx_read(db, current, store_id)
     n = max(2, min(12, int(bulan or 6)))
@@ -812,46 +1185,50 @@ def tren_bulanan(store_id: Optional[int] = Query(None), bulan: int = Query(6, ge
     NAMA_BLN = ["", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
     b = {ym: {"ym": ym, "label": f"{NAMA_BLN[int(ym[5:7])]} {ym[2:4]}",
               "omzet": 0, "hpp": 0, "operasional": 0, "kotor": 0, "bersih": 0,
+              "kas_masuk": 0, "kas_keluar": 0, "kas_bersih": 0,
               "masuk": 0, "sukses": 0, "struk": 0} for ym in yms}
+
+    # --- angka uang: dari buku besar, dikelompokkan per bulan ---
+    def _ym_of(v):
+        if isinstance(v, datetime.datetime):
+            return v.strftime("%Y-%m")
+        if isinstance(v, str):
+            return v[:7]
+        if v:
+            return v.strftime("%Y-%m")
+        return None
+
+    led = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id).all()
+    per_bulan = {ym: [] for ym in yms}
+    for e in led:
+        ym = _ym_of(e.tanggal)
+        if ym in per_bulan:
+            per_bulan[ym].append(e)
+    for ym, rows_ in per_bulan.items():
+        if not rows_:
+            continue
+        g = _agregat_ledger(rows_)
+        b[ym]["omzet"] = g["omzet"]
+        b[ym]["hpp"] = g["hpp"]
+        b[ym]["operasional"] = g["operasional"]
+        b[ym]["kas_masuk"] = g["kas_masuk"]
+        b[ym]["kas_keluar"] = g["kas_keluar"]
+        b[ym]["kas_bersih"] = g["kas_bersih"]
+
+    # --- volume unit: dari tabel (ledger tidak nyimpan "unit") ---
     SUKSES = {"Service Sukses", "Sudah Diambil", "Selesai"}
     for s in db.query(models.Service).filter(models.Service.store_id == store.id).all():
-        ym_in = str(s.date or "")[:7]
+        ym_in = _ym_of(s.date)
         if ym_in in b:
             b[ym_in]["masuk"] += 1
         if (s.status or "") in SUKSES:
-            ym_ac = str(s.diambil_at or s.updated_at or s.date or "")[:7]
+            ym_ac = _ym_of(s.diambil_at or s.updated_at or s.date)
             if ym_ac in b:
-                b[ym_ac]["omzet"] += int(s.biaya or 0)
                 b[ym_ac]["sukses"] += 1
     for sl in db.query(models.Sale).filter(models.Sale.store_id == store.id).all():
-        ym = str(sl.tanggal or "")[:7]
+        ym = _ym_of(sl.tanggal)
         if ym in b:
-            b[ym]["omzet"] += int(sl.total or 0)
-            b[ym]["hpp"] += max(0, int(sl.total or 0) - int(sl.profit or 0))
             b[ym]["struk"] += 1
-    for r in db.query(models.Refund).filter(models.Refund.store_id == store.id).all():
-        ym = str(r.tanggal or "")[:7]
-        if ym in b:
-            b[ym]["omzet"] -= int(r.nominal or 0)
-    for a in db.query(models.WorkAccident).filter(models.WorkAccident.store_id == store.id).all():
-        ym = str(a.tanggal or "")[:7]
-        if ym in b:
-            b[ym]["hpp"] += int(a.beban_toko or 0)
-    for e in db.query(models.Expense).filter(models.Expense.store_id == store.id).all():
-        ym = str(e.tanggal or "")[:7]
-        if ym in b:
-            b[ym]["operasional"] += int(e.nominal or 0)
-    for c in db.query(models.CommissionLedger).filter(models.CommissionLedger.store_id == store.id).all():
-        ym = str(c.tanggal or "")[:7]
-        if ym not in b:
-            continue
-        masuk = int(c.masuk_rp or 0)
-        if not masuk:
-            continue
-        if (c.tipe or "") == "allowance":
-            b[ym]["operasional"] += masuk
-        elif (c.tipe or "") != "hutang_baru":
-            b[ym]["hpp"] += masuk
     out = []
     for ym in yms:
         r = b[ym]
@@ -866,28 +1243,51 @@ def list_ledger(store_id: Optional[int] = Query(None), kategori: Optional[str] =
                 jenis: Optional[str] = Query(None), media: Optional[str] = Query(None),
                 subkategori: Optional[str] = Query(None),
                 masuk_laba: Optional[bool] = Query(None),
-                since: Optional[str] = Query(None), limit: int = Query(300, le=1000),
+                since: Optional[str] = Query(None), sampai: Optional[str] = Query(None),
+                q: Optional[str] = Query(None, description="cari keterangan"),
+                page: Optional[int] = Query(None, ge=1, description="1 = mode ber halaman"),
+                per_page: int = Query(50, ge=10, le=200),
                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Buku besar. Tanpa `page` -> array (perilaku lama, kompat).
+    Dengan `page` -> {items, total, page, per_page, total_halaman} supaya tabel owner
+    tidak diam-diam memotong di 300 baris.
+    `since` = mulai tanggal, `sampai` = akhir tanggal (sebelumnya cuma ada since)."""
     store, _ = _ctx_read(db, current, store_id)
-    q = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id)
+    qy = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store.id)
     if kategori:
-        q = q.filter(models.LedgerEntry.kategori == kategori)
+        qy = qy.filter(models.LedgerEntry.kategori == kategori)
     if subkategori:
-        q = q.filter(models.LedgerEntry.subkategori == subkategori)
+        qy = qy.filter(models.LedgerEntry.subkategori == subkategori)
     if masuk_laba is not None:
-        q = q.filter(models.LedgerEntry.masuk_laba == masuk_laba)
+        qy = qy.filter(models.LedgerEntry.masuk_laba == masuk_laba)
     if jenis:
-        q = q.filter(models.LedgerEntry.jenis == jenis)
+        qy = qy.filter(models.LedgerEntry.jenis == jenis)
     if media:
-        q = q.filter(models.LedgerEntry.media == media)
+        qy = qy.filter(models.LedgerEntry.media == media)
     if since:
         try:
             d0 = datetime.datetime.strptime(since[:10], "%Y-%m-%d").date()
-            q = q.filter(models.LedgerEntry.tanggal >= d0)
+            qy = qy.filter(models.LedgerEntry.tanggal >= d0)
         except Exception:
             raise HTTPException(status_code=400, detail="since harus YYYY-MM-DD")
-    rows = q.order_by(models.LedgerEntry.tanggal.desc(), models.LedgerEntry.id.desc()).limit(limit).all()
-    return [_ledger_row(e) for e in rows]
+    if sampai:
+        try:
+            d1 = datetime.datetime.strptime(sampai[:10], "%Y-%m-%d").date()
+            qy = qy.filter(models.LedgerEntry.tanggal <= d1)
+        except Exception:
+            raise HTTPException(status_code=400, detail="sampai harus YYYY-MM-DD")
+    if q:
+        qy = qy.filter(models.LedgerEntry.keterangan.like("%" + q.strip() + "%"))
+
+    qy = qy.order_by(models.LedgerEntry.tanggal.desc(), models.LedgerEntry.id.desc())
+    if page is None:
+        rows = qy.limit(300).all()
+        return [_ledger_row(e) for e in rows]
+    total = qy.count()
+    total_hal = max(1, -(-total // per_page))
+    rows = qy.limit(per_page).offset((page - 1) * per_page).all()
+    return {"items": [_ledger_row(e) for e in rows], "total": total, "page": page,
+            "per_page": per_page, "total_halaman": total_hal}
 
 
 @router.post("/ledger")
@@ -946,24 +1346,29 @@ def delete_ledger(led_id: int, store_id: Optional[int] = Query(None),
 
 
 def _sistem_media(db, store_id: int):
-    """Saldo sistem per media dari buku besar (transfer menggeser kedua sisi).
+    """Saldo sistem per media dari buku besar s/d HARI INI (transfer menggeser kedua sisi).
     Hanya baris pengaruh_kas (HPP terbentuk tanpa gerak kas dikecualikan)."""
-    saldo = {m: 0 for m in lm.MEDIA.keys()}
     rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store_id).all()
+    return _saldo_media(rows)
+
+
+def _sistem_media_sampai(db, store_id: int, sampai):
+    """Saldo sistem per media s/d tanggal tertentu — untuk Tutup Kas tanggal lama,
+    supaya kolom 'Sistem' bukan lagi saldo hari ini."""
+    rows = db.query(models.LedgerEntry).filter(models.LedgerEntry.store_id == store_id).all()
+    upto = []
     for e in rows:
-        if e.pengaruh_kas is False:
-            continue
-        n = int(e.nominal or 0)
-        if e.jenis == "masuk" and e.media in saldo:
-            saldo[e.media] += n
-        elif e.jenis == "keluar" and e.media in saldo:
-            saldo[e.media] -= n
-        elif e.jenis == "transfer":
-            if e.media in saldo:
-                saldo[e.media] -= n
-            if (e.media_tujuan or "") in saldo:
-                saldo[e.media_tujuan] += n
-    return saldo
+        v = e.tanggal
+        if isinstance(v, datetime.datetime):
+            v = v.date()
+        if isinstance(v, str):
+            try:
+                v = datetime.datetime.strptime(v[:10], "%Y-%m-%d").date()
+            except Exception:
+                continue
+        if v and v <= sampai:
+            upto.append(e)
+    return _saldo_media(upto)
 
 
 @router.get("/cash/config")
@@ -1003,7 +1408,11 @@ def put_cash_config(payload: dict = Body(...), store_id: Optional[int] = Query(N
 @router.get("/cash/close")
 def get_cash_close(tanggal: Optional[str] = Query(None), store_id: Optional[int] = Query(None),
                    db: Session = Depends(get_db), current=Depends(get_current_user)):
-    """Ambil tutup kas tanggal tertentu + snapshot sistem per media saat ini."""
+    """Tutup kas tanggal tertentu + snapshot sistem per media S/D TANGGAL ITU.
+
+    Penting: 'sistem' dulu selalu dihitung s/d HARI INI, jadi buka tanggal lama
+    menampilkan angka hari ini (Rp4 juta selisih buat data 9 Okt). Sekarang as-of tanggal.
+    """
     store, _ = _ctx_read(db, current, store_id)
     tgl = _parse_tgl(tanggal) if tanggal else datetime.date.today()
     c = db.query(models.CashClose).filter(models.CashClose.store_id == store.id,
@@ -1015,30 +1424,86 @@ def get_cash_close(tanggal: Optional[str] = Query(None), store_id: Optional[int]
                "fisik": {"kas_utama": c.kas_utama_fisik, "kas_kecil": c.kas_kecil_fisik,
                "bank": c.bank_fisik, "qris": c.qris_fisik},
                "selisih": c.selisih, "catatan": c.catatan, "ditutup_oleh": c.ditutup_oleh}
-    return {"tanggal": tgl, "tutup": out, "sistem": _sistem_media(db, store.id)}
+    # Hanya media uang — samakan bentuknya dengan POST /cash/close yang menghitung
+    # selisih dari MEDIA_UANG. 'stok' bukan tempat uang (selalu 0, bukan kas fisik).
+    sistem = {m: v for m, v in _sistem_media_sampai(db, store.id, tgl).items() if m in MEDIA_UANG}
+    return {"tanggal": tgl, "tutup": out, "sistem": sistem}
+
+
+@router.get("/cash/close/riwayat")
+def riwayat_tutup_kas(limit: int = Query(30, ge=1, le=365),
+                      store_id: Optional[int] = Query(None),
+                      db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Daftar tutup kas terakhir + statistik disiplin (berapa hari telat / sering selisih).
+
+    Tanpa ini tidak ada cara lihat "toko ini rutin selisih atau tidak" — ritual yang
+    tidak dipantau tidak pernah dikerjakan.
+    """
+    store, _ = _ctx_read(db, current, store_id)
+    rows = (db.query(models.CashClose)
+              .filter(models.CashClose.store_id == store.id)
+              .order_by(models.CashClose.tanggal.desc())
+              .limit(limit).all())
+    today = datetime.date.today()
+    items = []
+    for c in rows:
+        f = sum(int(x or 0) for x in (c.kas_utama_fisik, c.kas_kecil_fisik, c.bank_fisik, c.qris_fisik))
+        items.append({
+            "tanggal": c.tanggal, "fisik": f, "selisih": int(c.selisih or 0),
+            "sistem": sum(int(x or 0) for x in (c.kas_utama_sistem, c.kas_kecil_sistem,
+                                                c.bank_sistem, c.qris_sistem)),
+            "catatan": c.catatan, "ditutup_oleh": c.ditutup_oleh,
+        })
+    n = len(items)
+    bersih = sum(1 for i in items if i["selisih"] == 0)
+    # hari tanpa tutup kas dalam 30 hari terakhir
+    ada = {i["tanggal"] for i in items}
+    bolong = []
+    for k in range(1, 31):
+        d = today - datetime.timedelta(days=k)
+        if d not in ada:
+            bolong.append(d)
+    return {
+        "items": items, "jumlah": n, "selisih_nol": bersih,
+        "persen_bersih": round(bersih * 100 / n) if n else 0,
+        "rata_selisih": round(sum(abs(i["selisih"]) for i in items) / n) if n else 0,
+        "hari_bolong_30": len(bolong),
+        "bolong_contoh": sorted(bolong, reverse=True)[:10],
+        "hari_ini_sudah": today in ada,
+    }
 
 
 @router.post("/cash/close")
 def post_cash_close(payload: dict = Body(...), store_id: Optional[int] = Query(None),
                     db: Session = Depends(get_db), current=Depends(get_current_user)):
     """Ritual TUTUP KAS malam: cocokkan fisik vs sistem per media. Selisih target Rp0.
-    Tulis: owner/admin/kasir (kasir tutup kasirannya malam ini)."""
+    Tulis: owner/admin/kasir (kasir tutup kasirannya malam ini).
+    Sistem dihitung AS-OF tanggal yang dipilih, bukan s/d hari ini."""
     store, _ = _ctx_write(db, current, store_id)
     tgl = _parse_tgl(payload.get("tanggal"))
     fisik = payload.get("fisik") or {}
     try:
-        f = {m: int(fisik.get(m) or 0) for m in lm.MEDIA.keys()}
+        # cuma media uang — 'stok' bukan tempat uang, jangan ikut dijumlahkan
+        f = {m: int(fisik.get(m) or 0) for m in MEDIA_UANG}
     except Exception:
         raise HTTPException(status_code=400, detail="fisik harus angka per media")
     if any(v < 0 for v in f.values()):
         raise HTTPException(status_code=400, detail="fisik tidak boleh negatif")
-    sist = _sistem_media(db, store.id)
+    sist_all = _sistem_media_sampai(db, store.id, tgl)
+    sist = {m: int(sist_all.get(m, 0)) for m in MEDIA_UANG}
     selisih = sum(f.values()) - sum(sist.values())
     c = db.query(models.CashClose).filter(models.CashClose.store_id == store.id,
                                           models.CashClose.tanggal == tgl).first()
+    baru = c is None
     if not c:
         c = models.CashClose(store_id=store.id, tanggal=tgl)
         db.add(c)
+    elif (int(c.selisih or 0) or 0) != selisih:
+        # koreksi tutup kas sebelumnya = jejak, jangan ditimpa diam-diam
+        log_action(db, "finance.tutup_kas_koreksi", target=str(tgl),
+                   detail=f"selisih {c.selisih} -> {selisih}; fisik lama "
+                          f"{sum(int(x or 0) for x in (c.kas_utama_fisik, c.kas_kecil_fisik, c.bank_fisik, c.qris_fisik))} -> {sum(f.values())}",
+                   actor=current, store_id=store.id)
     c.kas_utama_sistem = sist["kas_utama"]
     c.kas_kecil_sistem = sist["kas_kecil"]
     c.bank_sistem = sist["bank"]
@@ -1053,10 +1518,212 @@ def post_cash_close(payload: dict = Body(...), store_id: Optional[int] = Query(N
     db.commit()
     db.refresh(c)
     log_action(db, "finance.tutup_kas", target=str(tgl),
-               detail=f"selisih={selisih} fisik={sum(f.values())} sistem={sum(sist.values())}",
+               detail=f"{'buat' if baru else 'koreksi'} selisih={selisih} "
+                      f"fisik={sum(f.values())} sistem={sum(sist.values())}",
                actor=current, store_id=store.id)
     return {"tanggal": c.tanggal, "sistem": sist, "fisik": f,
-            "selisih": selisih, "ok": selisih == 0}
+            "selisih": selisih, "ok": selisih == 0, "baru": baru}
+
+
+# ================= TUTUP BUKU MINGGUAN =================
+@router.get("/weekly-close/preview")
+def weekly_close_preview(tanggal: Optional[str] = Query(None),
+                         store_id: Optional[int] = Query(None),
+                         db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Pratinjau tutup buku minggu Senin..Sabtu: jatah teknisi, kas saat ini,
+    dan sisa yang akan disetor ke owner. Tidak mengubah apa pun."""
+    store, _ = _ctx_read(db, current, store_id)
+    tgl = _parse_tgl(tanggal) if tanggal else datetime.date.today()
+    week_start, week_end = _week_bounds(tgl)
+    today = datetime.date.today()
+    rows = _weekly_tech_rows(db, store.id, week_start, week_end)
+    cash = _weekly_cash(db, store.id)
+    butuh = sum(max(0, int(r["sisa"] or 0)) for r in rows)
+    kas_utama = int(cash.get("kas_utama", 0))
+    kas_tersedia = sum(max(0, int(v or 0)) for v in cash.values())
+    kurang = max(0, butuh - max(0, kas_utama))
+    kurang_total = max(0, butuh - kas_tersedia)
+    wc = db.query(models.WeeklyClose).filter(
+        models.WeeklyClose.store_id == store.id,
+        models.WeeklyClose.week_start == week_start).first()
+    return {
+        "store_id": store.id, "tanggal": today,
+        "week_start": week_start, "week_end": week_end,
+        # Jendela setor kas: Jumat (persiapan) s/d Minggu (menyusul).
+        "aktif": -1 <= (today - week_end).days <= 1,
+        "boleh_proses": week_start <= today,
+        "teknisi": rows,
+        "total_netto": sum(r["netto"] for r in rows),
+        "total_tunggakan": sum(r["tunggakan"] for r in rows),
+        "total_sisa": butuh,
+        "sudah_dibayar": sum(r["sudah_dibayar"] for r in rows),
+        "butuh_gajian": butuh, "kas_utama": kas_utama,
+        "kas_tersedia": kas_tersedia,
+        "kurang_gajian": kurang, "kurang_total": kurang_total,
+        "cukup_gajian": kurang == 0,
+        "kas": cash, "kas_total": sum(cash.values()),
+        "sudah_ditutup": {
+            "id": wc.id, "tanggal": wc.week_end, "total_gajian": wc.total_gajian,
+            "total_prive": wc.total_prive, "saldo_akhir": wc.saldo_akhir,
+            "catatan": wc.catatan, "ditutup_oleh": wc.ditutup_oleh,
+            "created_at": wc.created_at,
+        } if wc else None,
+    }
+
+
+@router.post("/weekly-close")
+def weekly_close(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                 db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Tutup buku manual: bayar jatah teknisi minggu ini (yang belum dibayar) lalu
+    setor sisa kas ke owner (E2 Prive) agar Senin saldo kembali nol.
+
+    - Nominal SELALU dihitung server, bukan dari frontend.
+    - Gajian yang sudah dibayar tidak dobel; kalau masih kurang, baris payout
+      minggu itu ditambah (koreksi), bukan dibuat baris baru.
+    - Setor kas hanya untuk minggu aktif (Sabtu/Minggu) agar tidak menyapu kas
+      minggu berjalan saat menutup minggu lama.
+    """
+    store, _ = _ctx_write(db, current, store_id)
+    tgl = _parse_tgl(payload.get("tanggal")) if payload.get("tanggal") else datetime.date.today()
+    week_start, week_end = _week_bounds(tgl)
+    today = datetime.date.today()
+    if week_start > today:
+        raise HTTPException(status_code=400, detail="Minggu belum berjalan")
+    # Gajian boleh dibayar lebih awal (mis. Jumat), tetapi setor kas hanya
+    # dalam jendela Jumat..Minggu supaya kas minggu berjalan tidak tersapu.
+    aktif = -1 <= (today - week_end).days <= 1
+    bayar = bool(payload.get("bayar_gajian", True))
+    setor = bool(payload.get("setor_kas", True))
+    boleh_setor = setor and aktif
+    try:
+        keep = {m: max(0, int((payload.get("sisakan") or {}).get(m) or 0)) for m in MEDIA_UANG}
+    except Exception:
+        raise HTTPException(status_code=400, detail="sisakan harus angka per media")
+    catatan = (payload.get("catatan") or "").strip() or None
+    oleh = getattr(current, "username", None)
+
+    rows = _weekly_tech_rows(db, store.id, week_start, week_end)
+    # Jangan pernah membuat kas utama minus: gajian dibayar dari kas utama.
+    butuh = sum(max(0, int(t["sisa"] or 0)) for t in rows) if bayar else 0
+    kas_awal = _weekly_cash(db, store.id)
+    kas_utama = int(kas_awal.get("kas_utama", 0))
+    if bayar and butuh > max(0, kas_utama):
+        kurang = butuh - max(0, kas_utama)
+        fmt = lambda x: f"{int(x):,}".replace(",", ".")
+        raise HTTPException(
+            status_code=400,
+            detail=("Kas utama tidak cukup untuk membayar tunggakan teknisi. "
+                    f"Butuh Rp{fmt(butuh)}, tersedia Rp{fmt(max(0, kas_utama))}, "
+                    f"kurang Rp{fmt(kurang)}. Setor dana ke kas utama dulu, "
+                    "lalu ulangi tutup buku."))
+    total_gajian = 0
+    paid_detail = []
+    if bayar:
+        for t in rows:
+            sisa = int(t["sisa"] or 0)
+            if sisa <= 0:
+                continue
+            ex = db.query(models.LedgerEntry).filter(
+                models.LedgerEntry.store_id == store.id,
+                models.LedgerEntry.ref_type == "gajian",
+                models.LedgerEntry.ref_id == t["technician_id"],
+                models.LedgerEntry.keterangan.like(f"%{week_start.isoformat()}%")).all()
+            if ex:
+                row = ex[0]
+                row.nominal = int(row.nominal or 0) + sisa
+                row.dibuat_oleh = oleh
+                topup = True
+            else:
+                row = _ledger_add(db, store.id, today, "keluar", "C1",
+                                  f"Gajian {t['nama']} {week_start.isoformat()} (komisi+hadir)",
+                                  sisa, "kas_utama", ref_type="gajian",
+                                  ref_id=t["technician_id"], oleh=oleh,
+                                  masuk_laba=False, pengaruh_kas=True, skip_dup=True)
+                topup = False
+            total_gajian += sisa
+            paid_detail.append({"technician_id": t["technician_id"], "nama": t["nama"],
+                                "nominal": sisa, "topup": topup})
+    if total_gajian:
+        db.flush()
+
+    kas_sebelum = _weekly_cash(db, store.id)
+    total_prive = 0
+    sweep = {}
+    if boleh_setor:
+        for m in MEDIA_UANG:
+            sisa_setor = int(kas_sebelum.get(m, 0)) - int(keep.get(m, 0))
+            if sisa_setor <= 0:
+                continue
+            _ledger_add(db, store.id, today, "keluar", "E2",
+                        f"Tutup buku {week_start.isoformat()}: setor kas {m} ke owner",
+                        sisa_setor, m, oleh=oleh, masuk_laba=True, pengaruh_kas=True)
+            sweep[m] = sisa_setor
+            total_prive += sisa_setor
+        if total_prive:
+            db.flush()
+
+    saldo_akhir = _weekly_cash(db, store.id)
+    # Total minggu (termasuk pembayaran manual sebelum tutup buku), bukan cuma run ini.
+    week_paid = sum(int(p.nominal or 0) for p in db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.ref_type == "gajian",
+        models.LedgerEntry.keterangan.like(f"%{week_start.isoformat()}%")).all())
+    week_prive = sum(int(p.nominal or 0) for p in db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.kategori == "E2",
+        models.LedgerEntry.keterangan.like(f"Tutup buku {week_start.isoformat()}%")).all())
+    detail = {
+        "teknisi": rows, "kas_sebelum": kas_sebelum, "sisakan": keep,
+        "setor": sweep, "gajian": paid_detail,
+    }
+    wc = db.query(models.WeeklyClose).filter(
+        models.WeeklyClose.store_id == store.id,
+        models.WeeklyClose.week_start == week_start).first()
+    if not wc:
+        wc = models.WeeklyClose(store_id=store.id, week_start=week_start)
+        db.add(wc)
+    wc.week_end = week_end
+    wc.total_gajian = week_paid
+    wc.total_prive = week_prive
+    wc.saldo_akhir = sum(saldo_akhir.values())
+    wc.detail_json = json.dumps(detail, default=str)
+    wc.catatan = catatan
+    wc.ditutup_oleh = oleh
+    db.commit()
+    db.refresh(wc)
+    log_action(db, "finance.tutup_buku", target=week_start.isoformat(),
+               detail=f"gajian={total_gajian} prive={total_prive} saldo_akhir={wc.saldo_akhir} "
+                      f"aktif={aktif} setor={setor}",
+               actor=current, store_id=store.id)
+    return {
+        "ok": True, "week_start": week_start, "week_end": week_end,
+        "total_gajian": total_gajian, "total_prive": total_prive,
+        "total_gajian_minggu": week_paid, "total_prive_minggu": week_prive,
+        "gajian": paid_detail, "setor": sweep, "sisakan": keep,
+        "saldo_akhir": saldo_akhir, "saldo_total": wc.saldo_akhir,
+        "boleh_setor": boleh_setor,
+        "pesan": ("Saldo kas sudah disetor. Senin mulai dari nol."
+                  if boleh_setor and total_prive else
+                  ("Minggu lama: kas tidak disetor agar kas minggu berjalan tidak ikut tersapu."
+                   if setor and not aktif else "Tutup buku tersimpan.")),
+    }
+
+
+@router.get("/weekly-close/riwayat")
+def weekly_close_riwayat(limit: int = Query(12, ge=1, le=104),
+                         store_id: Optional[int] = Query(None),
+                         db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    rows = (db.query(models.WeeklyClose)
+              .filter(models.WeeklyClose.store_id == store.id)
+              .order_by(models.WeeklyClose.week_start.desc())
+              .limit(limit).all())
+    return {"items": [{
+        "id": w.id, "week_start": w.week_start, "week_end": w.week_end,
+        "total_gajian": w.total_gajian, "total_prive": w.total_prive,
+        "saldo_akhir": w.saldo_akhir, "catatan": w.catatan,
+        "ditutup_oleh": w.ditutup_oleh, "created_at": w.created_at,
+    } for w in rows]}
 
 
 def _wa_quote(t: str) -> str:
