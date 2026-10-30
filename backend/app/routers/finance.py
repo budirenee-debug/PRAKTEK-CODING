@@ -1295,7 +1295,7 @@ def create_ledger(payload: dict = Body(...), store_id: Optional[int] = Query(Non
                   db: Session = Depends(get_db), current=Depends(get_current_user)):
     """Catat manual ke buku besar: wajib jenis + kategori A-G + media G.
     Karyawan (kasir) boleh catat harian; transfer F1 bukan omzet; DP F3 bukan omzet penuh."""
-    store, _ = _ctx_write(db, current, store_id)
+    store, role = _ctx_write(db, current, store_id)
     jenis = (payload.get("jenis") or "").strip().lower()
     kategori = (payload.get("kategori") or "").strip().upper()
     try:
@@ -1305,6 +1305,21 @@ def create_ledger(payload: dict = Body(...), store_id: Optional[int] = Query(Non
     media = (payload.get("media") or "").strip().lower()
     mt = (payload.get("media_tujuan") or "").strip().lower() or None
     keterangan = (payload.get("keterangan") or "").strip() or None
+    # Transfer antar kas = kewenangan owner/admin (bukan kasir/teknisi).
+    if kategori == "F1" or jenis == "transfer":
+        if role not in ("superadmin", "owner", "admin"):
+            raise HTTPException(status_code=403,
+                                detail="Hanya owner/admin yang boleh transfer antar kas")
+        if media not in MEDIA_UANG or mt not in MEDIA_UANG:
+            raise HTTPException(status_code=400,
+                                detail="Transfer hanya antar media uang (bukan stok)")
+        saldo_asal = int(_sistem_media(db, store.id).get(media, 0) or 0)
+        if nominal > saldo_asal:
+            fmt = lambda x: f"{int(x):,}".replace(",", ".")
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Saldo {lm.MEDIA.get(media, media)} tidak cukup: "
+                        f"tersedia Rp{fmt(max(0, saldo_asal))}, diminta Rp{fmt(nominal)}"))
     subkategori = (payload.get("subkategori") or "").strip() or None
     masuk_laba = payload.get("masuk_laba", True)
     masuk_laba = False if masuk_laba is False or str(masuk_laba).lower() in ("0", "false", "no") else True

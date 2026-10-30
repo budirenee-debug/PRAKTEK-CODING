@@ -1373,6 +1373,11 @@ function applyRoleMenu(){
     const own = document.getElementById('menu-owner');
     if(own) own.style.display = canManage ? '' : 'none';
   }catch{}
+  // Transfer antar kas di Kas Toko: hanya owner/admin/superadmin
+  try{
+    const tf = document.getElementById('btnKasTransfer');
+    if(tf) tf.style.display = canManage ? '' : 'none';
+  }catch{}
 }
 async function loadData(silent){
   if(!USE_API){

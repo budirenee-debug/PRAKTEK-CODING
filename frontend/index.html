@@ -883,7 +883,7 @@
             </section>
             <!-- KAS TOKO: riwayat transaksi uang keseluruhan + sisa kas (sub-tab Saya = personal teknisi) -->
             <section class="view" id="view-kas-saya">
-                <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-dark small" data-kas="toko" style="background:#059669;border-color:#059669" onclick="kasInOpen()">+ Catat Masuk</button> <button class="btn btn-dark small" data-kas="toko" onclick="kasOutOpen()">+ Catat Keluar</button> <button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
+                <div class="card"><div class="card-head"><h3>🏪 Kas Toko</h3><span class="muted">Riwayat transaksi uang keseluruhan + sisa kas</span><span style="flex:1"></span><button class="btn btn-dark small" data-kas="toko" style="background:#059669;border-color:#059669" onclick="kasInOpen()">+ Catat Masuk</button> <button class="btn btn-dark small" data-kas="toko" onclick="kasOutOpen()">+ Catat Keluar</button> <button id="btnKasTransfer" class="btn btn-dark small" style="display:none;background:#7c3aed;border-color:#7c3aed" onclick="kasTransferOpen()">Transfer Antar Kas</button> <button class="btn btn-ghost small" onclick="renderKasToko(true)">↻ Refresh</button></div>
                 <div class="tabs" style="margin-bottom:10px">
                     <button class="tab active" data-kasview="arus" onclick="setKasView('arus')">🏪 Arus Toko</button>
                     <button class="tab" data-kasview="rincian" onclick="setKasView('rincian')">🧾 Rincian Keluar</button>
@@ -979,6 +979,24 @@
                             </div>
                             <div id="kasout-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
                             <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="kasOutClose()">← Batal</button><button type="submit" class="btn btn-dark">Simpan Pengeluaran</button></div>
+                        </form>
+                    </div>
+                </div>
+                <div class="modal" id="kasTransferModal">
+                    <div class="modal-box" style="max-width:480px">
+                        <button class="modal-close" onclick="kasTransferClose()">×</button>
+                        <h3 style="margin-bottom:4px">Transfer Antar Kas</h3>
+                        <p style="font-size:12px;color:#8a8f98;margin:0 0 12px">Pindahkan saldo antar media. Bukan omzet/biaya. Khusus owner/admin.</p>
+                        <form id="kasTransferForm" onsubmit="kasTransferSave(event)">
+                            <div class="form-grid">
+                                <div class="field"><label>Dari Media *</label><select id="kastf-dari" onchange="kasTransferPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="kas_utama">Kas Utama (laci)</option><option value="kas_kecil">Kas Kecil</option><option value="bank">Bank / Transfer</option><option value="qris">QRIS / E-Wallet</option></select></div>
+                                <div class="field"><label>Ke Media *</label><select id="kastf-ke" onchange="kasTransferPreview()" style="padding:11px 12px;border-radius:12px;border:1px solid #ececec"><option value="kas_utama">Kas Utama (laci)</option><option value="kas_kecil">Kas Kecil</option><option value="bank">Bank / Transfer</option><option value="qris">QRIS / E-Wallet</option></select></div>
+                                <div class="field"><label>Nominal (Rp) *</label><input id="kastf-nominal" type="number" min="1" required placeholder="500000" oninput="kasTransferPreview()"><span id="kastf-info" style="font-size:11px;color:#8a8f98">Rp 0</span></div>
+                                <div class="field"><label>Tanggal</label><input id="kastf-tanggal" type="date"></div>
+                                <div class="field" style="grid-column:1/-1"><label>Keterangan</label><input id="kastf-ket" placeholder="contoh: pindah QRIS ke laci untuk gajian"></div>
+                            </div>
+                            <div id="kastf-preview" style="font-size:12.5px;background:#f9fafb;border:1px dashed #d9d9de;border-radius:12px;padding:10px 12px;margin-top:10px;color:#4b5563"></div>
+                            <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="kasTransferClose()">← Batal</button><button type="submit" class="btn btn-dark" style="background:#7c3aed;border-color:#7c3aed">Simpan Transfer</button></div>
                         </form>
                     </div>
                 </div>
@@ -1418,8 +1436,8 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
-    <script src="assets/js/script.js?v=page27-imei1"></script>
-    <script src="assets/js/engine.js?v=eng22-tutupbuku"></script>
+    <script src="assets/js/script.js?v=page28-transferkas"></script>
+    <script src="assets/js/engine.js?v=eng23-transferkas"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>
 </html>

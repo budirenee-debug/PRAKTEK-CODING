@@ -189,6 +189,10 @@ async function kasKasDel(src, id){
   }catch(e){ try{ showToast('Gagal hapus: '+(e.message||e)); }catch(_){} }
 }
 async function renderKasToko(force){
+  try{
+    const tf = document.getElementById('btnKasTransfer');
+    if(tf) tf.style.display = _kasTfCan() ? '' : 'none';
+  }catch(e){}
   const tbody = document.getElementById('tbodyKasToko');
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   try{
@@ -451,6 +455,114 @@ async function kasInSave(e){
   }finally{
     window._kasInBusy = false;
     const _b2 = document.querySelector('#kasInForm button[type="submit"]');
+    if(_b2){ _b2.disabled = false; _b2.textContent = _txt; }
+  }
+}
+// ---------- Transfer antar kas (owner/admin saja) ----------
+const KAS_TF_MEDIA = {
+  kas_utama: 'Kas Utama (laci)', kas_kecil: 'Kas Kecil',
+  bank: 'Bank / Transfer', qris: 'QRIS / E-Wallet'
+};
+let _kasTfSaldo = null;
+function _kasTfCan(){
+  try{
+    if(window.BOSAuth && typeof window.BOSAuth.canManage === 'function') return !!window.BOSAuth.canManage();
+  }catch(e){}
+  const r = String(localStorage.getItem('role') || '').toLowerCase();
+  return ['superadmin','owner','admin'].includes(r);
+}
+function kasTransferOpen(){
+  if(!_kasTfCan()) return (window.showToast || alert)('Hanya owner/admin yang boleh transfer antar kas');
+  const m = document.getElementById('kasTransferModal');
+  if(!m) return;
+  const dari = document.getElementById('kastf-dari');
+  const ke = document.getElementById('kastf-ke');
+  if(dari) dari.value = 'bank';
+  if(ke) ke.value = 'kas_utama';
+  const t = document.getElementById('kastf-tanggal');
+  if(t && !t.value){
+    const d = new Date();
+    t.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  const n = document.getElementById('kastf-nominal');
+  if(n) n.value = '';
+  const ket = document.getElementById('kastf-ket');
+  if(ket) ket.value = '';
+  _kasTfSaldo = null;
+  kasTransferPreview();
+  m.classList.add('show');
+  setTimeout(()=>n?.focus(), 100);
+  apiFetch('/finance/ledger/ringkasan').then(r=>{
+    _kasTfSaldo = (r && r.per_media) || {};
+    kasTransferPreview();
+  }).catch(()=>{ _kasTfSaldo = {}; kasTransferPreview(); });
+}
+function kasTransferClose(){
+  try{ document.getElementById('kasTransferModal')?.classList.remove('show'); }catch(e){}
+}
+function kasTransferPreview(){
+  try{
+    const dari = document.getElementById('kastf-dari')?.value || 'bank';
+    const ke = document.getElementById('kastf-ke')?.value || 'kas_utama';
+    const n = parseInt(document.getElementById('kastf-nominal')?.value)||0;
+    const info = document.getElementById('kastf-info');
+    if(info) info.textContent = _rp(n);
+    const p = document.getElementById('kastf-preview');
+    if(!p) return;
+    const LBL = KAS_TF_MEDIA;
+    if(dari === ke){
+      p.innerHTML = '<span style="color:#dc2626">Media asal dan tujuan tidak boleh sama.</span>';
+      return;
+    }
+    if(n <= 0){
+      p.innerHTML = 'Isi nominal transfer dulu.';
+      return;
+    }
+    if(_kasTfSaldo === null){
+      p.innerHTML = `Akan memindahkan <strong>${_rp(n)}</strong> dari <strong>${LBL[dari]}</strong> ke <strong>${LBL[ke]}</strong>. Memuat saldo...`;
+      return;
+    }
+    const saldo = Number(_kasTfSaldo[dari])||0;
+    if(n > saldo){
+      p.innerHTML = `<span style="color:#dc2626">Saldo ${LBL[dari]} tidak cukup. Tersedia <strong>${_rp(saldo)}</strong>, diminta <strong>${_rp(n)}</strong>.</span>`;
+      return;
+    }
+    p.innerHTML = `Pindahkan <strong>${_rp(n)}</strong> dari <strong>${LBL[dari]}</strong> ke <strong>${LBL[ke]}</strong>. Saldo ${LBL[dari]} sekarang <strong>${_rp(saldo)}</strong> → sisa <strong>${_rp(saldo-n)}</strong>.`;
+  }catch(e){}
+}
+async function kasTransferSave(e){
+  if(e) e.preventDefault();
+  if(!_kasTfCan()) return (window.showToast || alert)('Hanya owner/admin yang boleh transfer antar kas');
+  if(window._kasTfBusy) return;
+  window._kasTfBusy = true;
+  const _btn = document.querySelector('#kasTransferForm button[type="submit"]');
+  const _txt = _btn ? _btn.textContent : '';
+  if(_btn){ _btn.disabled = true; _btn.textContent = 'Menyimpan...'; }
+  try{
+    const dari = document.getElementById('kastf-dari')?.value || '';
+    const ke = document.getElementById('kastf-ke')?.value || '';
+    const nominal = parseInt(document.getElementById('kastf-nominal')?.value)||0;
+    const tanggal = document.getElementById('kastf-tanggal')?.value || '';
+    const keterangan = document.getElementById('kastf-ket')?.value.trim() || '';
+    if(!dari || !ke) return (window.showToast || alert)('Media asal dan tujuan wajib dipilih');
+    if(dari === ke) return (window.showToast || alert)('Media asal dan tujuan tidak boleh sama');
+    if(nominal <= 0) return (window.showToast || alert)('Nominal harus > 0');
+    if(_kasTfSaldo && nominal > (Number(_kasTfSaldo[dari])||0))
+      return (window.showToast || alert)(`Saldo ${KAS_TF_MEDIA[dari]} tidak cukup`);
+    const body = {jenis:'transfer', kategori:'F1', nominal,
+      media:dari, media_tujuan:ke, masuk_laba:false, pengaruh_kas:true};
+    if(tanggal) body.tanggal = tanggal;
+    if(keterangan) body.keterangan = keterangan;
+    await apiFetch('/finance/ledger', {method:'POST', body: JSON.stringify(body)});
+    kasTransferClose();
+    (window.showToast || alert)(`Transfer ${_rp(nominal)} dari ${KAS_TF_MEDIA[dari]} ke ${KAS_TF_MEDIA[ke]} tersimpan`);
+    await renderKasToko(true);
+    try{ if(typeof kasTutupTokoLoad === 'function') kasTutupTokoLoad(); }catch(_){}
+  }catch(err){
+    (window.showToast || alert)('Gagal transfer: '+(err.message||err));
+  }finally{
+    window._kasTfBusy = false;
+    const _b2 = document.querySelector('#kasTransferForm button[type="submit"]');
     if(_b2){ _b2.disabled = false; _b2.textContent = _txt; }
   }
 }
