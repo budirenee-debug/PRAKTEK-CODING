@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=padat2">
+    <link rel="stylesheet" href="assets/css/style.css?v=padat4">
     <link rel="stylesheet" href="assets/css/ai-widget.css?v=multi1">
     <style>html.guard-lock body{visibility:hidden}</style>
     <script>
@@ -241,44 +241,50 @@
                     <button class="btn btn-dark small" style="white-space:nowrap" onclick="event.stopPropagation(); switchView('approval-akun')">Lihat →</button>
                 </div>
                 <div id="kasBarToko" class="approval-banner" style="display:none"></div>
-                <div class="stats">
-                    <div class="stat-card" onclick="statGoMasuk()" style="cursor:pointer" title="Lihat Semua Service →">
-                        <div class="stat-head"><span>Service Masuk</span><span class="stat-icon blue">＋</span></div>
-                        <h3 id="stat-masuk">12</h3>
-                        <p class="trend up">▲ +3 dari kemarin • klik →</p>
+                <div class="stats stats-5" id="statsPeriodeToko">
+                    <div class="stat-card stat-omset">
+                        <div class="stat-head"><span>OMSET HARI INI</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">💵</span></div>
+                        <h3 id="stat-omset-periode">Rp 0</h3>
+                        <p class="trend" id="stat-omset-periode-sub">Periode hari ini</p>
                     </div>
-                    <div class="stat-card" onclick="statGoProses()" style="cursor:pointer" title="Lihat Proses Service →">
-                        <div class="stat-head"><span>Dalam Proses</span><span class="stat-icon amber">◷</span></div>
-                        <h3 id="stat-proses">7</h3>
-                        <p class="trend">5 antri • 2 dikerjakan • klik →</p>
+                    <div class="stat-card stat-kotor">
+                        <div class="stat-head"><span>LABA KOTOR</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">📈</span></div>
+                        <h3 id="stat-laba-kotor">Rp 0</h3>
+                        <p class="trend">Omzet LUNAS − modal</p>
                     </div>
-                    <div class="stat-card" onclick="statGoSukses()" style="cursor:pointer" title="Lihat Service Sukses →">
-                        <div class="stat-head"><span>Service Sukses Hari Ini</span><span class="stat-icon green">✓</span></div>
-                        <h3 id="stat-selesai">5</h3>
-                        <p class="trend up">▲ Service sukses tepat waktu 92% • klik →</p>
+                    <div class="stat-card stat-beban">
+                        <div class="stat-head"><span>TOTAL BEBAN</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">🧾</span></div>
+                        <h3 id="stat-total-beban">Rp 0</h3>
+                        <p class="trend">Operasional + hadir</p>
                     </div>
-                    <div class="stat-card dark" onclick="statGoPendapatan()" style="cursor:pointer" title="Lihat Pendapatan Sukses →">
-                        <div class="stat-head"><span>Estimasi Pendapatan</span><span class="stat-icon dark-icon">₿</span></div>
-                        <h3 id="stat-estimasi">Rp 0</h3>
-                        <p id="stat-estimasi-sub">Pipeline aktif • belum termasuk sparepart • klik →</p>
+                    <div class="stat-card stat-bersih" id="statLabaBersihCard">
+                        <div class="stat-head"><span>LABA BERSIH</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">🏆</span></div>
+                        <h3 id="stat-laba-bersih">Rp 0</h3>
+                        <p class="trend">Kotor − total beban</p>
+                    </div>
+                    <div class="stat-card stat-target">
+                        <div class="stat-head"><span>🎯 TARGET 1 GAJI (CTS)</span><span class="target-fase" id="stat-target-fase">FASE 1/2</span></div>
+                        <h3 id="stat-target-gaji">Rp 0</h3>
+                        <div class="target-bar"><div id="stat-target-bar" style="width:0%"></div></div>
+                        <div class="target-meta"><span>Laba: <strong id="stat-target-laba">Rp 0</strong></span><span id="stat-target-kurang">Kurang Rp 0</span></div>
                     </div>
                 </div>
-                <!-- DEADLINE BANNER STATS -->
-                <div class="stats" style="margin-top:-6px">
-                    <div class="stat-card" style="border-left:4px solid #ef4444;cursor:pointer" onclick="statGoOverdue()" title="Lihat Overdue di Proses Service →">
-                        <div class="stat-head"><span>Overdue</span><span class="stat-icon" style="background:#fef2f2;color:#ef4444">⚠</span></div>
-                        <h3 id="stat-overdue" style="color:#ef4444">0</h3>
-                        <p class="trend" style="color:#ef4444">Lewat deadline • klik →</p>
+
+                <div class="stats">
+                    <div class="stat-card" style="border-left:4px solid #2563eb;background:#eff6ff;cursor:pointer" onclick="statGoMasuk()" title="Lihat semua service →">
+                        <div class="stat-head"><span>Service Masuk</span><span class="stat-icon" style="background:#dbeafe;color:#1d4ed8">📥</span></div>
+                        <h3 id="stat-service-masuk" style="color:#1d4ed8">0</h3>
+                        <p class="trend" style="color:#1e40af">Masuk hari ini • klik →</p>
                     </div>
-                    <div class="stat-card" style="border-left:4px solid #f59e0b;cursor:pointer" onclick="statGoToday()" title="Lihat Deadline Hari Ini →">
-                        <div class="stat-head"><span>Deadline Hari Ini</span><span class="stat-icon" style="background:#fffbeb;color:#f59e0b">⏰</span></div>
-                        <h3 id="stat-deadline-today">0</h3>
-                        <p class="trend">Jatuh tempo hari ini • klik →</p>
+                    <div class="stat-card" style="border-left:4px solid #059669;background:#ecfdf5;cursor:pointer" onclick="statGoSukses()" title="Lihat service sukses →">
+                        <div class="stat-head"><span>Service Sukses</span><span class="stat-icon" style="background:#d1fae5;color:#047857">✅</span></div>
+                        <h3 id="stat-service-sukses" style="color:#047857">0</h3>
+                        <p class="trend" style="color:#065f46">Sukses hari ini • klik →</p>
                     </div>
-                    <div class="stat-card" style="cursor:pointer" onclick="statGoHarian()" title="Lihat Harian 3h →">
-                        <div class="stat-head"><span>Harian (3 hari)</span><span class="stat-icon blue">3h</span></div>
-                        <h3 id="stat-harian">0</h3>
-                        <p class="trend">Deadline 3 hari • klik →</p>
+                    <div class="stat-card" style="border-left:4px solid #7c3aed;background:#f5f3ff;cursor:pointer" onclick="statGoProses()" title="Lihat Proses Service →">
+                        <div class="stat-head"><span>Proses Service</span><span class="stat-icon" style="background:#ede9fe;color:#6d28d9">🔧</span></div>
+                        <h3 id="stat-proses-service" style="color:#6d28d9">0</h3>
+                        <p class="trend" style="color:#5b21b6">Sedang diproses • klik →</p>
                     </div>
                     <div class="stat-card" style="border-left:4px solid #f59e0b;background:#fffbeb;cursor:pointer" onclick="statGoMenungguKonfirmasi()" title="Lihat Menunggu Konfirmasi →">
                         <div class="stat-head"><span>Menunggu Konfirmasi</span><span class="stat-icon" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">⋯</span></div>
@@ -1436,7 +1442,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
-    <script src="assets/js/script.js?v=page28-transferkas"></script>
+    <script src="assets/js/script.js?v=page30-servicecards"></script>
     <script src="assets/js/engine.js?v=eng23-transferkas"></script>
     <script src="assets/js/ai-widget.js?v=multi1"></script>
 </body>

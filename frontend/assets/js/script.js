@@ -2878,7 +2878,6 @@ function switchView(view, clearSearch){
 function statGoMasuk(){ switchView('semua-service'); const s=document.getElementById('filterStatusSemua'); if(s){ s.value=''; renderSemuaService(); } }
 function statGoProses(){ switchView('proses'); setDeadlineFilter('all'); statusFilter='all'; document.querySelectorAll('#view-proses .tab[data-filter]').forEach(b=>b.classList.toggle('active', b.dataset.filter==='all')); renderKanban(); }
 function statGoSukses(){ switchView('semua-service'); setTimeout(()=>{ const s=document.getElementById('filterStatusSemua'); if(s){ s.value='Service Sukses'; renderSemuaService(); }},80); }
-function statGoPendapatan(){ if(isTeknisiMode()){ switchView('kas-saya'); return; } switchView('transaksi-pendapatan'); }
 function statGoOverdue(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('overdue'),80); }
 function statGoToday(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('today'),80); }
 function statGoHarian(){ switchView('proses'); setTimeout(()=> setDeadlineFilter('harian'),80); }
@@ -2922,15 +2921,20 @@ function hl(text, kw){
 }
 
 function updateStats(){
-  document.getElementById('stat-masuk').textContent = data.length;
-  document.getElementById('stat-proses').textContent = data.filter(d=>['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart'].includes(d.status)).length;
-  // Label kartu = "Service Sukses Hari Ini" -> hitung yg date-nya hari ini saja,
-  // agar tidak kedip (sebelumnya all-time, lalu ditimpa API today).
-  try{
-    const _today = (typeof todayISO==='function') ? todayISO() : new Date().toISOString().slice(0,10);
-    document.getElementById('stat-selesai').textContent = data.filter(d=>['Selesai','Service Sukses'].includes(d.status) && String(d.date||'').slice(0,10)===_today).length;
-  }catch{ document.getElementById('stat-selesai').textContent = data.filter(d=>['Selesai','Service Sukses'].includes(d.status)).length; }
-  document.getElementById('queueCount').textContent = data.length+' antrian';
+  // Kartu service harian + proses aktif di dashboard toko.
+  const today = todayISO();
+  const tgl = v => String(v || '').slice(0, 10);
+  const masukHariIni = data.filter(d => tgl(d.date) === today).length;
+  const suksesHariIni = data.filter(d =>
+    ['Service Sukses', 'Sudah Diambil', 'Selesai'].includes(d.status) &&
+    tgl(d.diambil_at || d.updated_at || d.date) === today
+  ).length;
+  const prosesCount = data.filter(d => PROSES_STATUSES.includes(d.status)).length;
+  const elMasuk = document.getElementById('stat-service-masuk'); if(elMasuk) elMasuk.textContent = masukHariIni;
+  const elSukses = document.getElementById('stat-service-sukses'); if(elSukses) elSukses.textContent = suksesHariIni;
+  const elProses = document.getElementById('stat-proses-service'); if(elProses) elProses.textContent = prosesCount;
+  const queueCountEl = document.getElementById('queueCount');
+  if(queueCountEl) queueCountEl.textContent = data.length+' antrian';
   const badge = document.querySelector('.menu-item[data-view="semua-service"] .badge');
   if(badge) badge.textContent = data.length;
   // deadline counts: konjungsi SEMUA filter aktif (basis PROSES + tab status +
@@ -2942,9 +2946,6 @@ function updateStats(){
   const hCount = countProses('harian', statusFilter);
   const mCount = countProses('mingguan', statusFilter);
   const menungguKonfirmasiCount = data.filter(d=>d.status==='Menunggu Konfirmasi').length;
-  const elO = document.getElementById('stat-overdue'); if(elO) elO.textContent = overdueCount;
-  const elT = document.getElementById('stat-deadline-today'); if(elT) elT.textContent = todayDl;
-  const elH = document.getElementById('stat-harian'); if(elH) elH.textContent = hCount;
   const elM = document.getElementById('stat-menunggu-konfirmasi'); if(elM) elM.textContent = menungguKonfirmasiCount;
   const cO = document.getElementById('countOverdue'); if(cO) cO.textContent = overdueCount;
   const cT = document.getElementById('countToday'); if(cT) cT.textContent = todayDl;
@@ -2962,7 +2963,7 @@ function updateStats(){
   const elFailed = document.getElementById('failedCount'); if(elFailed) elFailed.textContent = failedCount + ' failed';
   const elGaransi = document.getElementById('garansiCount'); if(elGaransi) elGaransi.textContent = garansiCount + ' garansi';
   // sidebar badges seperti Semua Service (sinkron dashboard)
-  const bProses = document.getElementById('badge-proses'); if(bProses) bProses.textContent = data.filter(d=> PROSES_STATUSES.includes(d.status)).length;
+  const bProses = document.getElementById('badge-proses'); if(bProses) bProses.textContent = prosesCount;
   const bBisa = document.getElementById('badge-bisa-diambil'); if(bBisa) bBisa.textContent = bisaCount;
   const bSudah = document.getElementById('badge-sudah-diambil'); if(bSudah) bSudah.textContent = sudahCount;
   const bFailed = document.getElementById('badge-service-failed'); if(bFailed) bFailed.textContent = failedCount;
@@ -2972,30 +2973,87 @@ function updateStats(){
   // update Proses Service tab counts (Antri etc) agar sinkron
   document.querySelectorAll('#view-proses .tab[data-filter]').forEach(tab=>{
     const f=tab.dataset.filter;
-    const cnt = f==='all'? data.filter(d=> PROSES_STATUSES.includes(d.status)).length : data.filter(d=>d.status===f).length;
+    const cnt = f==='all'? prosesCount : data.filter(d=>d.status===f).length;
     const sp = tab.querySelector('span');
     if(sp) sp.textContent = cnt;
   });
-  // jika API online, fetch stats real
-  // PENTING: kartu Overdue/Deadline/Harian + tab Proses SENGAJA tidak ditimpa API.
-  // Alasan: angka kartu dihitung via countProses() = konjungsi SEMUA filter aktif
-  // (basis PROSES + tab status + search + teknisi), sehingga SELALU sama dengan isi
-  // kanban saat kartu diklik. /api/stats tidak kenal search/teknisi/tab + scope teknisi
-  // beda, jadi overwrite justru bikin "angka kartu beda dengan isi" (bug yg dilaporkan).
-  // Backend get_stats() sudah diperbaiki ke scope PROSES agar konsisten untuk konsumen API.
-  if(USE_API){
-    apiFetch('/stats').then(s=>{
-      document.getElementById('stat-masuk').textContent = s.total_masuk;
-      document.getElementById('stat-proses').textContent = s.dalam_proses;
-      document.getElementById('stat-selesai').textContent = s.selesai_hari_ini;
-      const el = document.querySelector('.stat-card.dark h3');
-      if(el) el.textContent = 'Rp ' + Number(s.estimasi_pendapatan).toLocaleString('id-ID');
-      // sinkron sidebar badge Dalam Proses dari API (total unfiltered — benar)
-      const bP2=document.getElementById('badge-proses'); if(bP2) bP2.textContent = s.dalam_proses;
-    }).catch(()=>{});
-  }
+  // Kartu ringkasan periode (omzet/laba/beban/target gaji) — ambil dari buku besar.
+  try{
+    if(document.getElementById('view-dashboard')?.classList.contains('active')) loadDashboardPeriode();
+  }catch{}
   // render hits setelah stats — data sudah tersedia
   renderHitsIndicators();
+}
+
+// ---------- Kartu ringkasan periode di dashboard toko ----------
+let _dashPeriodeLast = 0, _dashPeriodeBusy = false;
+function _dashRp(n){
+  const v = Number(n) || 0;
+  return (v < 0 ? '-Rp ' : 'Rp ') + Math.abs(v).toLocaleString('id-ID');
+}
+async function loadDashboardPeriode(force=false){
+  const wrap = document.getElementById('statsPeriodeToko');
+  try{
+    if(typeof isTeknisiMode === 'function' && isTeknisiMode()){
+      if(wrap) wrap.style.display = 'none';
+      return;
+    }
+    if(wrap) wrap.style.display = '';
+  }catch(e){}
+  if(_dashPeriodeBusy) return;
+  if(!force && (Date.now() - _dashPeriodeLast) < 5000) return;
+  _dashPeriodeBusy = true;
+  _dashPeriodeLast = Date.now();
+  const setTxt = (id, v)=>{ const el = document.getElementById(id); if(el) el.textContent = v; };
+  try{
+    const tgl = todayISO();
+    const q = encodeURIComponent;
+    const [hari, wk, ops, ledger] = await Promise.all([
+      apiFetch('/finance/ledger/periode?dari=' + q(tgl) + '&sampai=' + q(tgl)).catch(()=>null),
+      apiFetch('/finance/weekly-close/preview').catch(()=>null),
+      apiFetch('/ops/settings').catch(()=>null),
+      apiFetch('/finance/ledger?since=' + q(tgl) + '&sampai=' + q(tgl) + '&jenis=masuk&page=1&per_page=200').catch(()=>null),
+    ]);
+    if(!hari) return;
+    const L = hari.laba || {};
+    const omzet = Number(L.omzet) || 0;
+    const kotor = Number(L.kotor) || 0;
+    const beban = Number(L.operasional) || 0;
+    const bersih = Number(L.bersih) || 0;
+    setTxt('stat-omset-periode', _dashRp(omzet));
+    setTxt('stat-laba-kotor', _dashRp(kotor));
+    setTxt('stat-total-beban', _dashRp(beban));
+    setTxt('stat-laba-bersih', _dashRp(bersih));
+    const cardBersih = document.getElementById('statLabaBersihCard');
+    if(cardBersih) cardBersih.classList.toggle('positif', bersih >= 0);
+
+    let nBayar = 0;
+    try{
+      const rows = Array.isArray(ledger) ? ledger : ((ledger && ledger.items) || []);
+      nBayar = rows.filter(r => r && r.jenis === 'masuk'
+        && ['service', 'sale', 'sale_jasa'].includes(r.ref_type)).length;
+    }catch(e){}
+    const sub = document.getElementById('stat-omset-periode-sub');
+    if(sub) sub.textContent = (nBayar ? nBayar + ' pembayaran • ' : '') + 'Periode hari ini';
+
+    // Target 1 gaji: ambil kebutuhan gajian minggu ini (bila kosong, pakai gaji admin).
+    let target = Number(wk && wk.butuh_gajian) || 0;
+    if(!target) target = Number(ops && ops.gaji_nominal) || 0;
+    const pct = target > 0 ? Math.max(0, Math.min(100, Math.round(kotor * 100 / target))) : 0;
+    const kurang = Math.max(0, target - kotor);
+    setTxt('stat-target-gaji', _dashRp(target));
+    setTxt('stat-target-laba', _dashRp(kotor));
+    setTxt('stat-target-kurang', kurang > 0 ? 'Kurang ' + _dashRp(kurang) : 'Tercapai');
+    const bar = document.getElementById('stat-target-bar');
+    if(bar) bar.style.width = pct + '%';
+    const fase = document.getElementById('stat-target-fase');
+    if(fase) fase.textContent = 'FASE ' + (pct < 50 ? 1 : 2) + '/2';
+    if(wrap) wrap.title = target ? 'Target gaji minggu ini ' + _dashRp(target) : 'Target gaji belum diatur';
+  }catch(e){
+    // offline / tanpa akses: biarkan nilai terakhir
+  }finally{
+    _dashPeriodeBusy = false;
+  }
 }
 function getBrandFromDevice(device){
   if(!device) return 'Lainnya';
@@ -4194,14 +4252,6 @@ function resetAlatDummy(){
 }
 
 function renderDashboard(){
-  // Estimasi = nilai pipeline aktif (belum diambil/failed) — real, bukan angka contoh.
-  try{
-    const OPEN=['Antri','Menunggu Konfirmasi','Dikerjakan','Menunggu Sparepart','Bisa Diambil','Service Sukses','Selesai'];
-    const pipe=data.filter(d=>OPEN.includes(d.status));
-    const tot=pipe.reduce((s,d)=>s+(Number(d.biaya)||0),0);
-    const el=document.getElementById('stat-estimasi'); if(el) el.textContent=formatRupiah(tot);
-    const sub=document.getElementById('stat-estimasi-sub'); if(sub) sub.textContent=`${pipe.length} service aktif • belum termasuk sparepart • klik →`;
-  }catch(e){}
   const tbody=document.querySelector('#tableDashboard tbody');
   if(tbody){
     tbody.innerHTML = data.slice(0,4).map(d=>`
@@ -6513,6 +6563,6 @@ window.loadProfil=loadProfil; window.handleProfilUpdate=handleProfilUpdate; wind
 window.loadInventory=loadInventory; window.saveInventory=saveInventory; window.renderSparepart=renderSparepart; window.renderAsesoris=renderAsesoris; window.tambahAsesoris=tambahAsesoris; window.batalTambahSparepart=batalTambahSparepart; window.jualAsesoris=jualAsesoris; window.updateSparepartField=updateSparepartField; window.saveSparepartRow=saveSparepartRow; window.deleteSparepart=deleteSparepart; window.handleSparepartAdd=handleSparepartAdd; window.openSpEditModal=openSpEditModal; window.closeSpEditModal=closeSpEditModal; window.submitSpEdit=submitSpEdit; window.resetSparepartDummy=resetSparepartDummy; window.terimaBarangMasuk=terimaBarangMasuk; window.apiInventoryMasuk=apiInventoryMasuk; window.apiInventoryRiwayat=apiInventoryRiwayat;
 window.loadAlat=loadAlat; window.saveAlat=saveAlat; window.renderAlat=renderAlat; window.updateAlatField=updateAlatField; window.saveAlatRow=saveAlatRow; window.deleteAlat=deleteAlat; window.openAlatAddModal=openAlatAddModal; window.openAlatEditModal=openAlatEditModal; window.closeAlatModal=closeAlatModal; window.submitAlatEdit=submitAlatEdit; window.resetAlatDummy=resetAlatDummy; window.kondisiBadge=kondisiBadge;
 window.loadSparepartUsage=loadSparepartUsage; window.saveSparepartUsage=saveSparepartUsage; window.pakaiSparepart=pakaiSparepart; window.sparepartSelectOptions=sparepartSelectOptions; window.filterSparepartSelect=filterSparepartSelect; window.filterSparepartInput=filterSparepartInput; window.showSparepartDropdown=showSparepartDropdown; window.selectSparepart=selectSparepart; window.suggestSparepart=suggestSparepart; window.showStokSparepart=showStokSparepart; window.openSparepartLog=openSparepartLog; window.closeSpareDropdown=closeSpareDropdown; window.renderUsedSpareparts=renderUsedSpareparts; window.getUsedCount=getUsedCount; window.batalPakaiPart=batalPakaiPart; window.normalizeMerk=normalizeMerk; window.inferMerkFromNama=inferMerkFromNama; window.merkBadgeStyle=merkBadgeStyle;
-window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoPendapatan=statGoPendapatan; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan; window.statGoMenungguKonfirmasi=statGoMenungguKonfirmasi;
+window.statGoMasuk=statGoMasuk; window.statGoProses=statGoProses; window.statGoSukses=statGoSukses; window.statGoOverdue=statGoOverdue; window.statGoToday=statGoToday; window.statGoHarian=statGoHarian; window.statGoMingguan=statGoMingguan; window.statGoMenungguKonfirmasi=statGoMenungguKonfirmasi;
 window.formatRupiah=formatRupiah; window.formatAngka=formatAngka; window.parseRupiah=parseRupiah; window.attachRupiahLive=attachRupiahLive;
 window.loadTeamData=loadTeamData; window.createTeamInvite=createTeamInvite; window.copyTeamInviteCode=copyTeamInviteCode; window.copyTeamInviteLink=copyTeamInviteLink; window.copyText=copyText; window.revokeTeamInvite=revokeTeamInvite; window.changeMemberRole=changeMemberRole; window.toggleMemberActive=toggleMemberActive; window.removeMember=removeMember; window.switchActiveStore=switchActiveStore;
