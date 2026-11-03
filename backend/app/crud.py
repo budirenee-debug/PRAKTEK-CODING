@@ -454,7 +454,7 @@ def delete_service(db: Session, invoice: str, store_id=None, actor=None):
             print("ledger hapus-service part skip:", invoice, e)
     # 2. ledger omzet (service) + HPP komisi (service_komisi): exact-match invoice
     cands = db.query(models.LedgerEntry).filter(
-        models.LedgerEntry.ref_type.in_(["service", "service_komisi"]))
+        models.LedgerEntry.ref_type.in_(["service", "service_komisi", "servicepart_margin"]))
     if sid is not None:
         cands = cands.filter(models.LedgerEntry.store_id == sid)
     for le in cands.all():
@@ -463,7 +463,9 @@ def delete_service(db: Session, invoice: str, store_id=None, actor=None):
                       and ket.startswith(f"Service {invoice}:"))
         is_komisi = (le.ref_type == "service_komisi"
                      and ket.startswith("Komisi ") and f" {invoice} (" in ket)
-        if is_service or is_komisi:
+        is_part_margin = (le.ref_type == "servicepart_margin"
+                          and ket.startswith(f"Penyesuaian harga jual part {invoice}"))
+        if is_service or is_komisi or is_part_margin:
             db.delete(le)
             cleaned["ledger"] += 1
     # 3. riwayat komisi teknisi utk invoice ini (hutang teknisi tidak disentuh)

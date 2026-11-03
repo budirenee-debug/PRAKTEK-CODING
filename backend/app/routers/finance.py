@@ -397,6 +397,8 @@ def _agregat_ledger(rows):
                     g["hpp_komisi"] += n
                 elif ref == "servicepart":
                     g["hpp_part"] += n
+                elif ref == "servicepart_margin":
+                    g["hpp_part"] += n
                 elif ref in _REF_HPP_BARANG:
                     g["hpp_modal_barang"] += n
                 else:

@@ -45,6 +45,18 @@ def _svc_tanggal(svc):
         return datetime.date.today()
 
 
+def _post_penyesuaian_part(db: Session, svc, harga_part: int, actor=None):
+    """Tambah selisih harga jual part - modal agar laba kotor = biaya - harga jual part - komisi."""
+    margin = int(harga_part or 0) - part_modal_total(db, svc.invoice)
+    if margin <= 0:
+        return None
+    return _ledger_post_safe(db, svc.store_id, _svc_tanggal(svc), "keluar", "B1",
+                             f"Penyesuaian harga jual part {svc.invoice}",
+                             margin, _svc_media(svc), "servicepart_margin",
+                             svc.invoice, getattr(actor, "username", None),
+                             pengaruh_kas=False)
+
+
 def get_settings(db: Session, store_id: int) -> models.StoreSettings:
     s = db.query(models.StoreSettings).filter(models.StoreSettings.store_id == store_id).first()
     if not s:
@@ -274,6 +286,7 @@ def cairkan(db: Session, svc: models.Service, actor=None):
     row.jasa_bersih = jasa
     row.komisi_teknisi = komisi
     hpp_part = int(row.harga_part_up or 0)
+    _post_penyesuaian_part(db, svc, hpp_part, actor)
     tid = tech_id(db, svc.store_id, svc.teknisi)
     if not tid or komisi <= 0:
         # Sukses TANPA komisi: omzet jasa tetap terbentuk di buku besar.
