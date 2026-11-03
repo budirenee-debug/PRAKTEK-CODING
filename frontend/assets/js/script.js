@@ -1776,7 +1776,6 @@ function updateSidebarUser(){
   else {
     // sembunyikan semua notifikasi jika bukan superadmin
     const b = document.getElementById('badge-pending'); if(b){ b.style.display='none'; b.classList.remove('badge-pulse'); }
-    const bell = document.getElementById('notifBell'); if(bell) bell.classList.remove('has-notif');
     const banner = document.getElementById('approvalBanner'); if(banner) banner.style.display='none';
   }
 }
@@ -1900,18 +1899,16 @@ async function handleProfilUpdate(e){
 let lastPendingCount = -1;
 async function refreshPendingBadge(){
   const badge = document.getElementById('badge-pending');
-  const bell = document.getElementById('notifBell');
-  const bellCount = document.getElementById('notifCount');
   const banner = document.getElementById('approvalBanner');
   const bannerTitle = document.getElementById('bannerTitle');
   const bannerSub = document.getElementById('bannerSub');
   const role = localStorage.getItem('role');
   const token = localStorage.getItem('access_token');
 
-  // jika bukan superadmin atau belum login → sembunyikan
+  // jika bukan superadmin atau belum login → sembunyikan badge approval
+  // (bell tetap dipakai untuk notifikasi tugas toko — jangan dimatikan di sini)
   if(role !== 'superadmin' || !token){
     if(badge){ badge.style.display='none'; badge.classList.remove('badge-pulse'); }
-    if(bell) bell.classList.remove('has-notif');
     if(banner) banner.style.display='none';
     return;
   }
@@ -1933,12 +1930,7 @@ async function refreshPendingBadge(){
       else badge.classList.remove('badge-pulse');
       badge.style.background = n > 0 ? '#f59e0b' : '#2a2c2f';
     }
-    // topbar bell
-    if(bell){
-      if(n > 0) bell.classList.add('has-notif');
-      else bell.classList.remove('has-notif');
-    }
-    if(bellCount) bellCount.textContent = n;
+    // topbar bell diurus refreshNotifData() — approval masuk salah satu kartu notifikasi
 
     // dashboard banner
     if(banner){
@@ -1968,19 +1960,200 @@ async function refreshPendingBadge(){
     // tapi jika 401 (token expired) sembunyikan dan arahkan login
     if(String(e.message).includes('401') || String(e.message).includes('Token')){
       if(badge) badge.style.display='none';
-      if(bell) bell.classList.remove('has-notif');
     }
   }
 }
 
-function handleNotifClick(){
-  const role = localStorage.getItem('role');
-  if(role !== 'superadmin'){
-    showToast('⛔ Hanya superadmin yang bisa menyetujui akun');
+// ---------- Notifikasi & Tugas Toko (bell) ----------
+let _notifCards = [];
+let _notifPanelOpen = false;
+let _notifLastAt = 0;
+let _notifFetching = null;
+let _notifOutsideBound = false;
+
+function _notifTodayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function _notifAddDays(iso, days){
+  const p = String(iso||'').split('-');
+  const d = new Date(+p[0], (+p[1]||1)-1, +p[2]||1);
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function _notifRp(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); } }
+async function _notifGet(path){ try{ return await apiFetch(path); }catch(e){ return null; } }
+
+async function buildNotifCards(){
+  const cards = [];
+  const role = String(localStorage.getItem('role') || '').toLowerCase();
+  const today = _notifTodayISO();
+  const soon = _notifAddDays(today, 7);
+  const stale = _notifAddDays(today, -7);
+  const ymd = v => String(v || '').slice(0,10);
+
+  // akun menunggu persetujuan (superadmin)
+  if(role === 'superadmin'){
+    const pend = await _notifGet('/auth/pending');
+    if(Array.isArray(pend) && pend.length){
+      cards.push({tone:'indigo', icon:'🛡️', title:`${pend.length} Akun Menunggu Persetujuan`,
+        desc:'Admin/teknisi baru menunggu diizinkan superadmin.', label:'Setujui', view:'approval-akun'});
+    }
+  }
+
+  // service
+  const svc = await _notifGet('/services?limit=500');
+  const arr = Array.isArray(svc) ? svc : [];
+  const OPEN = ['Antri','Menunggu Konfirmasi','Menunggu Sparepart','Dikerjakan','Garansi'];
+  const isOpen = s => OPEN.includes(String(s.status || ''));
+  const siap = arr.filter(s => String(s.status||'') === 'Bisa Diambil');
+  const antri = arr.filter(s => ['Antri','Menunggu Konfirmasi','Menunggu Sparepart'].includes(String(s.status||'')));
+  const gagal = arr.filter(s => String(s.status||'') === 'Service Failed');
+  const garansi = arr.filter(s => {
+    const g = ymd(s.garansi_sampai);
+    return g && g >= today && g <= soon;
+  });
+  const mengendap = arr.filter(s => {
+    const d = ymd(s.date);
+    return isOpen(s) && d && d <= stale;
+  });
+
+  if(siap.length) cards.push({tone:'sky', icon:'📦', title:`${siap.length} Unit Siap Diambil`,
+    desc:'Unit selesai menunggu diambil pelanggan.', label:'Buka', view:'bisa-diambil'});
+  if(garansi.length) cards.push({tone:'amber', icon:'🛡️', title:`${garansi.length} Garansi Hampir Habis`,
+    desc:'Masa garansi berakhir ≤7 hari — follow-up via WA.', label:'Cek Garansi', view:'status-garansi'});
+  if(antri.length) cards.push({tone:'violet', icon:'🕒', title:`${antri.length} Antrian Belum Dikerjakan`,
+    desc:'Unit masuk belum diproses teknisi.', label:'Proses', view:'proses'});
+  if(mengendap.length) cards.push({tone:'rose', icon:'⏳', title:`${mengendap.length} Unit Mengendap >7 Hari`,
+    desc:'Unit belum selesai lebih dari sepekan.', label:'Cek', view:'proses'});
+  if(gagal.length) cards.push({tone:'rose', icon:'⚠️', title:`${gagal.length} Service Failed`,
+    desc:'Klaim/garansi gagal — perlu ditindaklanjuti.', label:'Lihat', view:'service-failed'});
+
+  // keuangan
+  const refunds = await _notifGet('/finance/refunds');
+  const refundProses = (Array.isArray(refunds) ? refunds : []).filter(r => String(r.status||'').toLowerCase() === 'proses');
+  if(refundProses.length){
+    const total = refundProses.reduce((a,r) => a + (Number(r.nominal)||0), 0);
+    cards.push({tone:'emerald', icon:'💸', title:`${refundProses.length} Refund Masih Proses`,
+      desc:`Total ${_notifRp(total)} belum tuntas.`, label:'Buka Kas', view:'kas-saya'});
+  }
+  const acc = await _notifGet('/finance/accidents');
+  const accOpen = (Array.isArray(acc) ? acc : []).filter(a => String(a.status||'').toLowerCase() !== 'selesai');
+  if(accOpen.length) cards.push({tone:'orange', icon:'🛠️', title:`${accOpen.length} Kecelakaan Kerja Belum Selesai`,
+    desc:'Beban teknisi/toko masih tercatat.', label:'Lihat', view:'kas-saya'});
+  const cc = await _notifGet('/finance/cash/close');
+  if(cc && !cc.tutup) cards.push({tone:'blue', icon:'🧾', title:'Kas Hari Ini Belum Ditutup',
+    desc:'Cocokkan kas fisik dan tutup buku harian.', label:'Tutup Kas', view:'kas-saya'});
+
+  // stok sparepart
+  const sp = await _notifGet('/inventory/spareparts');
+  const low = (Array.isArray(sp) ? sp : []).filter(x => Number(x.stok) <= 2);
+  if(low.length) cards.push({tone:'amber', icon:'📦', title:`${low.length} Part Perlu Restock`,
+    desc:'Stok menipis (≤2 unit). Segera pesan.', label:'Cek Sparepart', view:'inventory-sparepart'});
+
+  return cards;
+}
+
+function _notifTone(tone){
+  const map = {
+    amber:['#fffbeb','#d97706'], indigo:['#eef2ff','#4f46e5'], sky:['#eff6ff','#0284c7'],
+    violet:['#f5f3ff','#7c3aed'], rose:['#fef2f2','#dc2626'], emerald:['#ecfdf5','#059669'],
+    orange:['#fff7ed','#ea580c'], blue:['#eff6ff','#2563eb']
+  };
+  return map[tone] || map.amber;
+}
+
+function renderNotifBadge(){
+  const bell = document.getElementById('notifBell');
+  const count = document.getElementById('notifCount');
+  const n = _notifCards.length;
+  if(count) count.textContent = String(n);
+  if(bell){
+    if(n > 0) bell.classList.add('has-notif');
+    else bell.classList.remove('has-notif');
+  }
+}
+
+function renderNotifPanel(){
+  const list = document.getElementById('notifList');
+  const badge = document.getElementById('notifPerhatian');
+  if(badge) badge.textContent = `${_notifCards.length} Perhatian`;
+  if(!list) return;
+  if(!_notifCards.length){
+    list.innerHTML = '<div class="notif-empty">✅ Semua aman — tidak ada tugas mendesak.</div>';
     return;
   }
-  // jika ada pending, langsung ke approval, jika tidak tetap buka approval
-  switchView('approval-akun');
+  list.innerHTML = _notifCards.map(c => {
+    const t = _notifTone(c.tone);
+    return `<div class="notif-card" style="background:${t[0]};border-color:${t[1]}33">
+      <div class="notif-card-row">
+        <div class="notif-card-ico" style="background:${t[1]}1a;color:${t[1]}">${c.icon||'🔔'}</div>
+        <div class="notif-card-body"><strong>${escapeHtml(c.title)}</strong><p>${escapeHtml(c.desc)}</p></div>
+      </div>
+      <button class="notif-card-btn" onclick="notifGo('${c.view}')">${escapeHtml(c.label)} →</button>
+    </div>`;
+  }).join('');
+}
+
+async function refreshNotifData(force){
+  const now = Date.now();
+  if(!force && now - _notifLastAt < 30000) return;
+  if(_notifFetching) return _notifFetching;
+  _notifFetching = (async () => {
+    try{
+      const cards = await buildNotifCards();
+      _notifCards = Array.isArray(cards) ? cards : [];
+      _notifLastAt = Date.now();
+      renderNotifBadge();
+      if(_notifPanelOpen) renderNotifPanel();
+    }catch(e){
+      console.warn('notif gagal:', e && e.message);
+    }finally{
+      _notifFetching = null;
+    }
+  })();
+  return _notifFetching;
+}
+
+function _bindNotifOutside(){
+  if(_notifOutsideBound) return;
+  _notifOutsideBound = true;
+  document.addEventListener('click', function(e){
+    const w = document.getElementById('notifWrap');
+    if(w && !w.contains(e.target)) closeNotifPanel();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeNotifPanel();
+  });
+}
+
+function handleNotifClick(ev){
+  if(ev) ev.stopPropagation();
+  _bindNotifOutside();
+  const p = document.getElementById('notifPanel');
+  if(!p) return;
+  const willOpen = (p.style.display === 'none' || !p.style.display);
+  p.style.display = willOpen ? 'block' : 'none';
+  _notifPanelOpen = willOpen;
+  if(willOpen){
+    if(!_notifCards.length){
+      const list = document.getElementById('notifList');
+      if(list) list.innerHTML = '<div class="notif-loading">Memuat notifikasi...</div>';
+    }
+    renderNotifPanel();
+    refreshNotifData(true);
+  }
+}
+
+function closeNotifPanel(){
+  const p = document.getElementById('notifPanel');
+  if(p) p.style.display = 'none';
+  _notifPanelOpen = false;
+}
+
+function notifGo(view){
+  closeNotifPanel();
+  try{ switchView(view); }catch(e){}
 }
 
 // ---------- Superadmin Approval ----------
@@ -2732,6 +2905,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setInterval(refreshPendingBadge, 12000);
   // juga cek lagi setelah 1 detik (tunggu token settle)
   setTimeout(refreshPendingBadge, 1000);
+  // notifikasi tugas toko (keuangan/service/stok) — badge bell + panel
+  refreshNotifData(true);
+  setInterval(()=>{ if(!document.hidden) refreshNotifData(false); }, 60000);
 });
 
 async function checkHealth(){

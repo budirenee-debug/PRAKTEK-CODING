@@ -81,6 +81,29 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .notif .notif-count{position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:20px;display:none;place-items:center;border:2px solid #fff}
 .notif.has-notif .dot{display:block}
 .notif.has-notif .notif-count{display:grid}
+.notif-wrap{position:relative}
+.notif-ico{font-size:17px;line-height:1}
+.notif-panel{position:absolute;right:0;top:calc(100% + 10px);width:380px;max-width:calc(100vw - 28px);background:#fff;border:1px solid #e9e7f2;border-radius:16px;box-shadow:0 24px 60px rgba(30,27,75,.22);z-index:60;overflow:hidden;text-align:left;animation:slideDown .18s}
+.notif-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 10px}
+.notif-panel-head strong{font-size:14px}
+.notif-badge{background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.notif-brief{display:block;width:calc(100% - 24px);margin:0 12px 10px;padding:9px 12px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;text-align:center}
+.notif-brief:hover{background:#4338ca}
+.notif-list{max-height:min(62vh,420px);overflow:auto;padding:0 12px 4px;display:flex;flex-direction:column;gap:8px}
+.notif-card{border:1px solid #fde68a;border-radius:12px;padding:10px 12px}
+.notif-card-row{display:flex;gap:9px;align-items:flex-start}
+.notif-card-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.notif-card-body{flex:1;min-width:0}
+.notif-card-body strong{display:block;font-size:12.5px;line-height:1.35}
+.notif-card-body p{font-size:11.5px;color:#6b7280;margin-top:2px;line-height:1.35}
+.notif-card-btn{margin-top:8px;float:right;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer}
+.notif-card-btn:hover{background:#f9fafb}
+.notif-card::after{content:"";display:block;clear:both}
+.notif-empty,.notif-loading{padding:18px 8px;text-align:center;font-size:12px;color:#8a8f98}
+.notif-panel-foot{border-top:1px solid #f1f0f6;padding:9px}
+.notif-panel-foot button{width:100%;border:0;background:transparent;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer;padding:4px}
+.notif-panel-foot button:hover{color:#111827}
+@media(max-width:600px){.notif-panel{position:fixed;left:12px;right:12px;top:70px;width:auto;max-width:none}}
 @keyframes pulseBadge{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(245,158,11,.7)}70%{transform:scale(1.05);box-shadow:0 0 0 8px rgba(245,158,11,0)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}}
 .badge-pulse{animation:pulseBadge 1.6s infinite}
 .approval-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:14px;padding:14px 16px;margin-bottom:16px;animation:slideDown .25s}
