@@ -918,6 +918,82 @@ def delete_expense(exp_id: int, store_id: Optional[int] = Query(None),
     return {"ok": True, "id": exp_id}
 
 
+# ================= BEBAN TOKO HARIAN (setting: isi sekali, berlaku tiap hari) =================
+def _beban_out(s):
+    import json as _json
+    custom = []
+    try:
+        custom = _json.loads(s.custom or "[]")
+        if not isinstance(custom, list):
+            custom = []
+    except Exception:
+        custom = []
+    custom = [{"nama": str(c.get("nama") or "")[:60], "nominal": int(c.get("nominal") or 0)}
+              for c in custom if isinstance(c, dict) and str(c.get("nama") or "").strip()]
+    total = (int(s.sewa_harian or 0) + int(s.listrik_harian or 0) + int(s.wifi_harian or 0)
+             + int(s.gaji_harian or 0) + sum(c["nominal"] for c in custom))
+    return {"sewa_harian": int(s.sewa_harian or 0), "listrik_harian": int(s.listrik_harian or 0),
+            "wifi_harian": int(s.wifi_harian or 0), "gaji_harian": int(s.gaji_harian or 0),
+            "custom": custom, "total_hari": total,
+            "configured": total > 0, "updated_oleh": s.updated_oleh}
+
+
+@router.get("/beban-toko")
+def get_beban_toko(store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    store, _ = _ctx_read(db, current, store_id)
+    s = db.query(models.StoreBeban).filter(models.StoreBeban.store_id == store.id).first()
+    if not s:
+        return {"store_id": store.id, "sewa_harian": 0, "listrik_harian": 0, "wifi_harian": 0,
+                "gaji_harian": 0, "custom": [], "total_hari": 0, "configured": False, "updated_oleh": None}
+    return {"store_id": store.id, **_beban_out(s)}
+
+
+@router.put("/beban-toko")
+def put_beban_toko(payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Simpan beban toko harian (owner only). Full-replace: ganti = berlaku mulai hari ini."""
+    store, role = _ctx(db, current, store_id)
+    if role not in ["superadmin", "owner"]:
+        raise HTTPException(status_code=403, detail="Hanya owner yang boleh ubah beban toko")
+
+    def _int(v):
+        try:
+            return max(0, min(999_999_999, int(v)))
+        except (TypeError, ValueError):
+            return 0
+
+    custom = payload.get("custom") or []
+    if not isinstance(custom, list) or len(custom) > 20:
+        raise HTTPException(status_code=400, detail="custom maksimal 20 item")
+    clean = []
+    for c in custom:
+        if not isinstance(c, dict):
+            continue
+        nama = str(c.get("nama") or "").strip()[:60]
+        if not nama:
+            continue
+        clean.append({"nama": nama, "nominal": _int(c.get("nominal"))})
+    s = db.query(models.StoreBeban).filter(models.StoreBeban.store_id == store.id).first()
+    if not s:
+        s = models.StoreBeban(store_id=store.id)
+        db.add(s)
+    s.sewa_harian = _int(payload.get("sewa_harian"))
+    s.listrik_harian = _int(payload.get("listrik_harian"))
+    s.wifi_harian = _int(payload.get("wifi_harian"))
+    s.gaji_harian = _int(payload.get("gaji_harian"))
+    s.custom = json.dumps(clean)
+    s.updated_oleh = current.username
+    db.commit()
+    db.refresh(s)
+    out = _beban_out(s)
+    log_action(db, "beban_toko", target=f"store:{store.id}",
+               detail=f"total/hari={out['total_hari']} sewa={out['sewa_harian']} listrik={out['listrik_harian']} "
+                      f"wifi={out['wifi_harian']} gaji={out['gaji_harian']} custom={len(clean)}",
+               actor=current, store_id=store.id)
+    return {"store_id": store.id, **out}
+
+
 # ================= PEMASUKAN MANUAL (modal awal / tambahan modal / lain) =================
 KAT_INCOME = ["Modal Awal", "Tambahan Modal", "Pemasukan Lain"]
 

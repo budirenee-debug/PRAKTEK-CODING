@@ -554,6 +554,23 @@ class OpsSetting(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
+class StoreBeban(Base):
+    """Beban toko harian per toko (isi sekali, berlaku tiap hari sampai diganti/dihapus).
+    Dihitung di dashboard: TOTAL BEBAN += total/hari, Laba Bersih -= total/hari.
+    1 baris per toko. Edit owner only."""
+    __tablename__ = "store_bebans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, unique=True, index=True)
+    sewa_harian = Column(Integer, default=0)
+    listrik_harian = Column(Integer, default=0)
+    wifi_harian = Column(Integer, default=0)
+    gaji_harian = Column(Integer, default=0)
+    custom = Column(Text, default="[]")  # JSON: [{"nama": "...", "nominal": 0}]
+    updated_oleh = Column(String(80), nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
 class OpsEntry(Base):
     """Celengan operasional: sisih (memo tabungan, tanpa gerak kas) & bayar.
     Bayar selalu bertaut ke Expense (kas beneran keluar sekali, tercatat sekali)."""

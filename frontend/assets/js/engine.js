@@ -33,7 +33,9 @@ async function loadEngineSettings(){
     const myRole = document.getElementById('waMyRole')?.textContent.toLowerCase() || '';
     const isOwner = role==='superadmin' || role==='owner' || myRole.includes('owner') || myRole.includes('superadmin');
     if(card) card.style.display = isOwner ? '' : 'none';
-    if(!isOwner) return;
+    const tabKeu = document.getElementById('tabPengaturanKeuangan');
+    if(tabKeu) tabKeu.style.display = isOwner ? '' : 'none';
+    if(!isOwner){ if(tabKeu && tabKeu.classList.contains('active')){ try{ switchPengaturanTab('profil'); }catch(e){} } return; }
     const s = await apiFetch('/engine/settings');
     const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v??''; };
     set('eng-uang', s.uang_hadir); set('eng-jam', s.jam_masuk);
@@ -62,6 +64,74 @@ async function saveEngineSettings(){
     showToast('✅ Aturan engine disimpan');
     if(msg){ msg.style.display='block'; msg.style.color='#059669'; msg.textContent='✅ Tersimpan '+new Date().toLocaleTimeString('id-ID'); }
   }catch(e){ showToast('Gagal: '+e.message); }
+}
+
+// ---------- Beban Toko (per HARI): isi sekali, berlaku tiap hari ----------
+// Setting per toko (GET/PUT /finance/beban-toko). Dashboard: TOTAL BEBAN += total/hari,
+// Laba Bersih -= total/hari (Biaya - HPP jasa & sparepart - beban toko = Laba Bersih).
+let _bbtCustom = []; // [{nama, nominal}]
+function bbtNum(id){ return parseInt(String(document.getElementById(id)?.value||'').replace(/\D/g,''))||0; }
+function bbtRecalc(){
+  const t = bbtNum('bbt-sewa') + bbtNum('bbt-listrik') + bbtNum('bbt-wifi') + bbtNum('bbt-gaji')
+    + _bbtCustom.reduce((s,c)=> s + (parseInt(String(c.nominal||'').replace(/\D/g,''))||0), 0);
+  const el = document.getElementById('bbtTotalPrev'); if(el) el.textContent = _rp(t);
+  return t;
+}
+function renderBebanCustom(){
+  const w = document.getElementById('bbtCustom');
+  if(!w) return;
+  w.innerHTML = _bbtCustom.map((c,i)=>`
+    <div style="display:flex;gap:8px;align-items:center">
+      <input placeholder="Nama custom (mis. Parkir)" value="${_esc(c.nama||'')}" oninput="_bbtCustom[${i}].nama=this.value;bbtRecalc()" style="flex:2;padding:10px 12px;border:1px solid #ececec;border-radius:12px;font-size:13px">
+      <input type="text" inputmode="numeric" placeholder="Rp/hari" value="${_esc(c.nominal||'')}" oninput="_bbtCustom[${i}].nominal=this.value;bbtRecalc()" style="flex:1;padding:10px 12px;border:1px solid #ececec;border-radius:12px;font-size:13px;text-align:right">
+      <button class="btn btn-ghost small" style="color:#dc2626;border-color:#fecaca" onclick="bbtDelCustomRow(${i})" title="Hapus baris">✕</button>
+    </div>`).join('');
+}
+function bbtAddCustomRow(){ _bbtCustom.push({nama:'', nominal:''}); renderBebanCustom(); }
+function bbtDelCustomRow(i){ _bbtCustom.splice(i,1); renderBebanCustom(); bbtRecalc(); }
+async function loadBebanToko(){
+  const sum = document.getElementById('bbtSummary');
+  try{
+    const j = await apiFetch('/finance/beban-toko');
+    const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value = v ? String(v) : ''; };
+    set('bbt-sewa', j.sewa_harian); set('bbt-listrik', j.listrik_harian);
+    set('bbt-wifi', j.wifi_harian); set('bbt-gaji', j.gaji_harian);
+    _bbtCustom = (j.custom||[]).map(c=>({nama:c.nama||'', nominal:c.nominal||''}));
+    renderBebanCustom();
+    bbtRecalc();
+    if(sum) sum.innerHTML = j.configured
+      ? `Tersimpan: <strong>${_rp(j.total_hari)}</strong>/hari — masuk TOTAL BEBAN & dipotong dari Laba Bersih dashboard tiap hari.${j.updated_oleh?` Terakhir oleh ${ _esc(j.updated_oleh)}`:''}`
+      : 'Belum diatur — isi nominal di atas, berlaku tiap hari setelah disimpan.';
+    const msg = document.getElementById('bbtMsg'); if(msg) msg.style.display = 'none';
+  }catch(e){
+    if(sum) sum.innerHTML = `<span style="color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</span>`;
+  }
+}
+async function saveBebanToko(){
+  const msg = document.getElementById('bbtMsg');
+  const custom = _bbtCustom
+    .map(c=>({nama:String(c.nama||'').trim(), nominal:parseInt(String(c.nominal||'').replace(/\D/g,''))||0}))
+    .filter(c=>c.nama);
+  const body = {sewa_harian: bbtNum('bbt-sewa'), listrik_harian: bbtNum('bbt-listrik'),
+                wifi_harian: bbtNum('bbt-wifi'), gaji_harian: bbtNum('bbt-gaji'), custom};
+  try{
+    const j = await apiFetch('/finance/beban-toko', {method:'PUT', body: JSON.stringify(body)});
+    showToast(`✅ Beban toko ${_rp(j.total_hari)}/hari tersimpan — berlaku tiap hari`);
+    if(msg){ msg.style.display='block'; msg.style.color='#059669'; msg.textContent='✅ Tersimpan '+new Date().toLocaleTimeString('id-ID'); }
+    await loadBebanToko();
+    try{ if(typeof loadDashboardPeriode === 'function') loadDashboardPeriode(true); }catch(e){}
+  }catch(e){ showToast('Gagal simpan: ' + e.message); }
+}
+async function deleteBebanToko(){
+  if(!confirm('Hapus semua beban toko? (nominal jadi Rp 0/hari, tidak lagi dipotong dari Laba Bersih)')) return;
+  const msg = document.getElementById('bbtMsg');
+  try{
+    await apiFetch('/finance/beban-toko', {method:'PUT', body: JSON.stringify({sewa_harian:0, listrik_harian:0, wifi_harian:0, gaji_harian:0, custom:[]})});
+    showToast('🗑 Beban toko dihapus');
+    if(msg){ msg.style.display='block'; msg.style.color='#059669'; msg.textContent='🗑 Dihapus '+new Date().toLocaleTimeString('id-ID'); }
+    await loadBebanToko();
+    try{ if(typeof loadDashboardPeriode === 'function') loadDashboardPeriode(true); }catch(e){}
+  }catch(e){ showToast('Gagal hapus: ' + e.message); }
 }
 
 // ---------- Tabungan Operasional: memo Kas Toko + status Tutup Kas (tim baca) ----------
@@ -1105,7 +1175,7 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
     try{
       const titles = {'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],'gajian':['Gajian Sabtu','Slip mingguan Senin–Sabtu per teknisi']};
       if(titles[view]){ document.getElementById('page-title').textContent=titles[view][0]; document.getElementById('page-subtitle').textContent=titles[view][1]; }
-      if(view==='pengaturan'){ loadEngineSettings(); }
+      if(view==='pengaturan'){ loadEngineSettings(); loadBebanToko(); }
       if(view==='laporan-teknisi'){ /* tab kas butuh list */ }
       if(view==='kas-saya'){
         try{

@@ -254,17 +254,17 @@
                     <div class="stat-card stat-kotor">
                         <div class="stat-head"><span>LABA KOTOR</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">📈</span></div>
                         <h3 id="stat-laba-kotor">Rp 0</h3>
-                        <p class="trend">Omzet LUNAS − modal</p>
+                        <p class="trend">Biaya − HPP jasa &amp; sparepart</p>
                     </div>
                     <div class="stat-card stat-beban">
                         <div class="stat-head"><span>TOTAL BEBAN</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">🧾</span></div>
                         <h3 id="stat-total-beban">Rp 0</h3>
-                        <p class="trend">Operasional + hadir</p>
+                        <p class="trend">Beban toko + hadir</p>
                     </div>
                     <div class="stat-card stat-bersih" id="statLabaBersihCard">
                         <div class="stat-head"><span>LABA BERSIH</span><span class="stat-icon" style="background:rgba(255,255,255,.18);color:#fff">🏆</span></div>
                         <h3 id="stat-laba-bersih">Rp 0</h3>
-                        <p class="trend">Kotor − total beban</p>
+                        <p class="trend">Biaya − HPP jasa &amp; sparepart − beban toko</p>
                     </div>
                     <div class="stat-card stat-target">
                         <div class="stat-head"><span>🎯 TARGET 1 GAJI (CTS)</span><span class="target-fase" id="stat-target-fase">FASE 1/2</span></div>
@@ -311,18 +311,16 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-head"><h3>Performa Teknisi</h3><span class="muted">Hari ini</span></div>
-                        <div class="tech-list">
-                            <div class="tech">
-                                <img src="https://i.pravatar.cc/100?img=12"><div><strong>Andi</strong><span>4 device • 2 selesai</span></div><div class="progress"><div style="width:75%"></div></div><span>75%</span>
-                            </div>
-                            <div class="tech">
-                                <img src="https://i.pravatar.cc/100?img=15"><div><strong>Sinta</strong><span>3 device • 3 selesai</span></div><div class="progress"><div style="width:100%"></div></div><span>100%</span>
-                            </div>
-                            <div class="tech">
-                                <img src="https://i.pravatar.cc/100?img=8"><div><strong>Budi</strong><span>5 device • 1 selesai</span></div><div class="progress"><div style="width:45%"></div></div><span>45%</span>
+                        <div class="card-head">
+                            <h3>Performa Teknisi</h3>
+                            <div style="display:flex;align-items:center;gap:4px">
+                                <button class="btn btn-ghost small" style="padding:2px 7px;font-size:13px;line-height:1" onclick="dashWeekShift(-1)" title="Minggu sebelumnya">‹</button>
+                                <span class="muted" id="techWeekLabel" style="white-space:nowrap;font-weight:600;color:#374151">Minggu ini</span>
+                                <button class="btn btn-ghost small" id="techWeekNext" style="padding:2px 7px;font-size:13px;line-height:1" onclick="dashWeekShift(1)" title="Minggu berikutnya">›</button>
                             </div>
                         </div>
+                        <p class="muted" id="techWeekSub" style="font-size:11px;margin:-2px 0 10px">6 hari kerja (Sen–Sab)</p>
+                        <div class="tech-list"></div>
                     </div>
                 </div>
                 <!-- INDIKATOR HITS: MERK & KELUHAN -->
@@ -834,6 +832,7 @@
                     <div class="card-head"><h3>📈 Profit Nett (Otomatis)</h3><span class="count-pill" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0" id="profitTotal">Rp 0</span><span class="count-pill" id="profitCount">0 service</span></div>
                     <p style="font-size:11px;color:#8a8f98;margin-bottom:10px"><strong>Profit = Biaya − Sparepart</strong> otomatis per invoice. Jika tanpa sparepart, profit = biaya full.</p>
                     <div class="table-wrap"><table class="table compact" id="tableProfit"><thead><tr><th>Invoice</th><th>Device / Pelanggan</th><th style="text-align:right">Biaya</th><th style="text-align:right">Sparepart</th><th style="text-align:right">Profit</th><th>Teknisi</th></tr></thead><tbody id="tbodyProfit"><tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
+                    <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;font-size:12px" id="pgProfit"></div>
                     <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span id="profitSummary" style="color:#8a8f98">0 service • profit Rp 0</span><button class="btn btn-dark small" onclick="exportProfitCSV()">⬇ Export Profit CSV</button></div>
                 </div>
                 <div class="card" style="margin-top:12px">
@@ -1040,6 +1039,12 @@
 
             <!-- AKUN: PENGATURAN TOKO (template WA per status) -->
             <section class="view" id="view-pengaturan">
+                <div class="tabs" style="max-width:760px;margin:0 auto 14px">
+                    <button class="tab active" data-pengaturan-tab="profil" onclick="switchPengaturanTab('profil')">🏪 Profil Toko</button>
+                    <button class="tab" data-pengaturan-tab="template" onclick="switchPengaturanTab('template')">🧾 Template Nota &amp; WA</button>
+                    <button class="tab" data-pengaturan-tab="keuangan" id="tabPengaturanKeuangan" onclick="switchPengaturanTab('keuangan')">💰 Aturan Keuangan</button>
+                </div>
+                <div id="pengaturan-tab-profil">
                 <div class="card" style="max-width:760px;margin:0 auto 14px">
                     <div class="card-head toolbar">
                         <div class="toolbar-left">
@@ -1063,6 +1068,8 @@
                     </div>
                     <p id="storeProfileMsg" style="font-size:11px;color:#059669;margin-top:8px;display:none"></p>
                 </div>
+                </div>
+                <div id="pengaturan-tab-template" style="display:none">
                 <div class="card" style="max-width:760px;margin:0 auto">
                     <div class="card-head toolbar">
                         <div class="toolbar-left">
@@ -1075,6 +1082,8 @@
                     <p style="font-size:12px;color:#8a8f98;margin-bottom:14px">Template pesan WhatsApp <strong>per status</strong>, khusus owner/admin toko aktif. Variabel: <code>{nama}</code> <code>{device}</code> <code>{imei}</code> <code>{invoice}</code> <code>{tanggal}</code> <code>{keluhan}</code> <code>{keterangan}</code> <code>{kelengkapan}</code> <code>{toko}</code> <code>{alamat_toko}</code> <code>{wa_toko}</code> <code>{biaya}</code> <code>{estimasi}</code> <code>{teknisi}</code> <code>{penerima}</code> <code>{status}</code> <code>{garansi_dari}</code> <code>{garansi_sampai}</code> <code>{metode_bayar}</code> <code>{diambil_at}</code> <code>{diambil_oleh}</code> <code>{lacak}</code>. Kosongkan + Simpan = kembali ke default.</p>
                     <div id="waTplList" style="display:flex;flex-direction:column;gap:12px"><p style="font-size:12px;color:#8a8f98">Memuat...</p></div>
                 </div>
+                </div>
+                <div id="pengaturan-tab-keuangan" style="display:none">
                 <div class="card" id="engineSettingsCard" style="max-width:760px;margin:0 auto;display:none">
                     <div class="card-head toolbar">
                         <div class="toolbar-left"><h3>⚙️ Aturan Business Engine</h3><span class="muted">owner only</span></div>
@@ -1095,6 +1104,30 @@
                         <button class="btn btn-dark" style="flex:1" onclick="saveEngineSettings()">💾 Simpan Aturan Engine</button>
                     </div>
                     <p id="engineSettingsMsg" style="font-size:11px;color:#059669;margin-top:8px;display:none"></p>
+                </div>
+                <div class="card" id="bebanTokoCard" style="max-width:760px;margin:14px auto 0">
+                    <div class="card-head toolbar">
+                        <div class="toolbar-left"><h3>🧾 Beban Toko (per Hari)</h3><span class="muted">owner only</span></div>
+                        <div class="toolbar-right"><button class="btn btn-ghost small" onclick="loadBebanToko()">↻ Refresh</button></div>
+                    </div>
+                    <p style="font-size:12px;color:#8a8f98;margin-bottom:12px"><strong>Laba Bersih = Biaya − HPP jasa &amp; sparepart − Beban toko.</strong> Isi sekali — berlaku <strong>tiap hari</strong> sampai diganti/dihapus. Otomatis masuk kartu <strong>TOTAL BEBAN</strong> &amp; dipotong dari <strong>Laba Bersih</strong> di dashboard.</p>
+                    <div class="form-grid">
+                        <div class="field"><label>Sewa Tempat (Rp/hari)</label><input id="bbt-sewa" type="text" inputmode="numeric" placeholder="0" oninput="bbtRecalc()"></div>
+                        <div class="field"><label>Listrik (Rp/hari)</label><input id="bbt-listrik" type="text" inputmode="numeric" placeholder="0" oninput="bbtRecalc()"></div>
+                        <div class="field"><label>Wifi (Rp/hari)</label><input id="bbt-wifi" type="text" inputmode="numeric" placeholder="0" oninput="bbtRecalc()"></div>
+                        <div class="field"><label>Gaji Admin (Rp/hari)</label><input id="bbt-gaji" type="text" inputmode="numeric" placeholder="0" oninput="bbtRecalc()"></div>
+                    </div>
+                    <div id="bbtCustom" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
+                    <button class="btn btn-ghost small" style="margin-top:8px" onclick="bbtAddCustomRow()">+ Tambah Custom</button>
+                    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+                        <span style="font-size:13px;font-weight:700">Total: <span id="bbtTotalPrev" style="color:#dc2626">Rp 0</span>/hari</span>
+                        <span style="flex:1"></span>
+                        <button class="btn btn-ghost small" style="color:#dc2626;border-color:#fecaca" onclick="deleteBebanToko()">🗑 Hapus</button>
+                        <button class="btn btn-dark" style="flex:1;min-width:160px" onclick="saveBebanToko()">💾 Simpan Beban Toko</button>
+                    </div>
+                    <p id="bbtMsg" style="font-size:11px;color:#059669;margin-top:8px;display:none"></p>
+                    <div id="bbtSummary" style="font-size:12px;color:#6b7280;margin-top:8px">Memuat...</div>
+                </div>
                 </div>
             </section>
 
@@ -1446,7 +1479,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
-    <script src="assets/js/script.js?v=notif1"></script>
-    <script src="assets/js/engine.js?v=eng23-transferkas"></script>
+    <script src="assets/js/script.js?v=pengaturan3"></script>
+    <script src="assets/js/engine.js?v=eng27-bebantoko3"></script>
 </body>
 </html>

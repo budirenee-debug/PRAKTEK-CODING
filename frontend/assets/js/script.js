@@ -2998,7 +2998,7 @@ function switchView(view, clearSearch){
     'kas-saya':['Kas Toko','Riwayat transaksi uang keseluruhan + sisa kas'],
     'gajian':['Gajian Sabtu','Slip mingguan Senin–Sabtu per teknisi'],
     'profil':['Atur Profil','Kelola username & password akun Anda — avatar sinkron dengan sidebar'],
-    'pengaturan':['Pengaturan Toko','Template pesan WhatsApp per status — owner/admin only'],
+    'pengaturan':['Pengaturan Toko','Profil toko • Template nota/WA • Aturan keuangan — owner/admin only'],
     'kelola-tim':['Kelola Tim','Undang kasir/teknisi/admin via kode invite toko — owner/admin only'],
     'approval-akun':['Persetujuan Akun','Kelola persetujuan admin & teknisi — superadmin only']
   };
@@ -3184,18 +3184,21 @@ async function loadDashboardPeriode(force=false){
   try{
     const tgl = todayISO();
     const q = encodeURIComponent;
-    const [hari, wk, ops, ledger] = await Promise.all([
+    const [hari, wk, ops, ledger, bebanToko] = await Promise.all([
       apiFetch('/finance/ledger/periode?dari=' + q(tgl) + '&sampai=' + q(tgl)).catch(()=>null),
       apiFetch('/finance/weekly-close/preview').catch(()=>null),
       apiFetch('/ops/settings').catch(()=>null),
       apiFetch('/finance/ledger?since=' + q(tgl) + '&sampai=' + q(tgl) + '&jenis=masuk&page=1&per_page=200').catch(()=>null),
+      apiFetch('/finance/beban-toko').catch(()=>null),
     ]);
     if(!hari) return;
     const L = hari.laba || {};
     const omzet = Number(L.omzet) || 0;
     const kotor = Number(L.kotor) || 0;
-    const beban = Number(L.operasional) || 0;
-    const bersih = Number(L.bersih) || 0;
+    // Beban toko harian (setting: isi sekali, berlaku tiap hari) — masuk TOTAL BEBAN & potong Laba Bersih.
+    const bebanTokoHari = Number(bebanToko && bebanToko.total_hari) || 0;
+    const beban = (Number(L.operasional) || 0) + bebanTokoHari;
+    const bersih = (Number(L.bersih) || 0) - bebanTokoHari;
     setTxt('stat-omset-periode', _dashRp(omzet));
     setTxt('stat-laba-kotor', _dashRp(kotor));
     setTxt('stat-total-beban', _dashRp(beban));
@@ -4427,6 +4430,33 @@ function resetAlatDummy(){
   showToast('🔄 Alat direset ke dummy');
 }
 
+// ---- Performa teknisi per minggu (6 hari kerja Sen–Sab) ----
+let _dashWeekOffset = 0;
+function _dashISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _dashParseISO(iso){ const p=String(iso||'').split('-'); return new Date(+p[0],(+p[1]||1)-1,+p[2]||1); }
+function _dashWeekRange(offset){
+  // Senin–Sabtu. Hari Minggu dianggap bagian minggu yang berakhir kemarin (Sabtu).
+  const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dow=d.getDay(); const end=new Date(d);
+  if(dow===0) end.setDate(d.getDate()-1); else end.setDate(d.getDate()+(6-dow));
+  if(offset) end.setDate(end.getDate()+(offset*7));
+  const start=new Date(end); start.setDate(end.getDate()-5);
+  return {start:_dashISO(start), end:_dashISO(end)};
+}
+function _dashFmt(iso){
+  const N=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  const B=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const d=_dashParseISO(iso);
+  return N[d.getDay()]+' '+d.getDate()+' '+B[d.getMonth()];
+}
+function dashWeekShift(delta){
+  const next=_dashWeekOffset+delta;
+  if(next>0) return; // tidak boleh lihat minggu depan
+  _dashWeekOffset=next;
+  renderDashboard();
+}
+function dashWeekReset(){ _dashWeekOffset=0; renderDashboard(); }
+
 function renderDashboard(){
   const tbody=document.querySelector('#tableDashboard tbody');
   if(tbody){
@@ -4439,21 +4469,33 @@ function renderDashboard(){
       </tr>
     `).join('');
   }
-  // Performa Teknisi — hanya teknisi sungguhan dari backend (tanpa contoh).
+  // Performa Teknisi — per minggu 6 hari kerja (Sen–Sab), data nyata dari backend.
   const techWrap=document.querySelector('.tech-list');
   if(techWrap){
     const techs = availableTechs.filter(t=>t.role==='teknisi' && t.is_active!==false);
-    const list = techs;
-    techWrap.innerHTML = list.map(t=>{
+    const w = _dashWeekRange(_dashWeekOffset);
+    const lbl = document.getElementById('techWeekLabel');
+    const sub = document.getElementById('techWeekSub');
+    if(lbl) lbl.textContent = _dashWeekOffset===0 ? 'Minggu ini' : (_dashWeekOffset===-1 ? 'Minggu lalu' : '6 hari kerja');
+    if(sub) sub.textContent = `${_dashFmt(w.start)} – ${_dashFmt(w.end)} • 6 hari kerja (Sen–Sab)`;
+    const nextBtn = document.getElementById('techWeekNext');
+    if(nextBtn){
+      const atCurrent = _dashWeekOffset >= 0;
+      nextBtn.disabled = atCurrent;
+      nextBtn.style.opacity = atCurrent ? '.4' : '1';
+      nextBtn.style.cursor = atCurrent ? 'default' : 'pointer';
+    }
+    const inWeek = data.filter(d => d.date && d.date >= w.start && d.date <= w.end);
+    techWrap.innerHTML = techs.map(t=>{
       const name=t.username;
-      const handle=data.filter(d=>d.teknisi===name).length;
-      const selesai=data.filter(d=>d.teknisi===name && ['Service Sukses','Selesai','Bisa Diambil'].includes(d.status)).length;
-      const pct = handle ? Math.round((selesai/handle)*100) : 0;
+      const handled=inWeek.filter(d=>d.teknisi===name).length;
+      const selesai=inWeek.filter(d=>d.teknisi===name && ['Service Sukses','Selesai','Bisa Diambil','Sudah Diambil'].includes(d.status)).length;
+      const pct = handled ? Math.round((selesai/handled)*100) : 0;
       const avatar=avatarUrlFor(name, t.foto||null);
-      const sisa = handle - selesai;
+      const sisa = handled - selesai;
       return `<div class="tech">
         <img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" onerror="this.src='https://i.pravatar.cc/100?u=${encodeURIComponent(name)}'">
-        <div><strong>${escapeHtml(name)}</strong><span>${handle} device • ${selesai} selesai${sisa?` • ${sisa} proses`:''}</span></div>
+        <div><strong>${escapeHtml(name)}</strong><span>${handled} device • ${selesai} selesai${sisa?` • ${sisa} proses`:''}</span></div>
         <div class="progress"><div style="width:${pct}%"></div></div><span>${pct}%</span>
       </div>`;
     }).join('') || '<div style="text-align:center;padding:12px;color:#8a8f98;font-size:12px">Belum ada teknisi</div>';
@@ -5678,6 +5720,26 @@ function drawRekap(k){
     pg.innerHTML=`<button class="btn btn-ghost small" style="padding:4px 10px" ${page<=1?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="rekapGo('${k}',-1)">‹</button><span style="color:#6b7280">Hal ${page}/${max}</span><button class="btn btn-ghost small" style="padding:4px 10px" ${page>=max?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="rekapGo('${k}',1)">›</button>`;
   }
 }
+// pagination sub-tab Profit Nett (10 baris per halaman)
+const PROFIT_PER=10;
+let _profitRows=[], _profitPage=1;
+function profitGo(d){
+  const max=Math.max(1,Math.ceil(_profitRows.length/PROFIT_PER));
+  _profitPage=Math.min(max,Math.max(1,_profitPage+d));
+  drawProfit();
+}
+function drawProfit(){
+  const tb=document.getElementById('tbodyProfit');
+  const pg=document.getElementById('pgProfit');
+  const max=Math.max(1,Math.ceil(_profitRows.length/PROFIT_PER));
+  if(_profitPage>max) _profitPage=max;
+  const slice=_profitRows.slice((_profitPage-1)*PROFIT_PER,_profitPage*PROFIT_PER);
+  if(tb) tb.innerHTML=slice.join('')||`<tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Belum ada data</td></tr>`;
+  if(pg){
+    if(max<=1){ pg.innerHTML=`<span style="color:#8a8f98">${_profitRows.length} baris</span>`; return; }
+    pg.innerHTML=`<button class="btn btn-ghost small" style="padding:4px 10px" ${_profitPage<=1?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="profitGo(-1)">‹</button><span style="color:#6b7280">Hal ${_profitPage}/${max}</span><button class="btn btn-ghost small" style="padding:4px 10px" ${_profitPage>=max?'disabled style="opacity:.4;padding:4px 10px"':''} onclick="profitGo(1)">›</button>`;
+  }
+}
 // pagination tabel utama Pendapatan (10 baris terbaru per halaman)
 const PEND_PER=10;
 let _pendRows=[], _pendPage=1, _pendEmpty='';
@@ -5936,9 +5998,9 @@ function renderTransaksiPendapatan(){
     if(elProfitCount) elProfitCount.textContent = filtered.length + ' service';
     if(elProfitSummary) elProfitSummary.textContent = `${filtered.length} service • biaya ${formatRupiah(totalBiaya)} − sp ${formatRupiah(totalSp2)} = profit ${formatRupiah(totalProfit)}`;
     if(!rowsProfit.length){
-      tbodyProfit.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:12px;color:#8a8f98">Belum ada data</td></tr>`;
+      _profitRows=[]; drawProfit();
     } else {
-      tbodyProfit.innerHTML=rowsProfit.map(r=>`
+      _profitRows=rowsProfit.map(r=>`
         <tr>
           <td><strong style="font-size:11px">${escapeHtml(r.d.id)}</strong></td>
           <td><div style="display:flex;flex-direction:column"><strong style="font-size:12px">${escapeHtml(r.d.device)}</strong><span style="font-size:11px;color:#4b5563">${escapeHtml(r.d.nama)}</span></div></td>
@@ -5947,7 +6009,8 @@ function renderTransaksiPendapatan(){
           <td style="text-align:right;font-weight:700;color:${r.profit<0?'#dc2626':'#059669'}">${formatRupiah(r.profit)}</td>
           <td><span class="meta-pill">${escapeHtml(r.d.teknisi)}</span></td>
         </tr>
-      `).join('');
+      `);
+      drawProfit();
     }
     if(tbodyProfitTeknisi){
       const byTechP={};
@@ -5989,6 +6052,13 @@ function switchPendapatanTab(tab){
   document.getElementById('pendapatan-tab-sparepart').style.display = tab==='sparepart' ? 'block' : 'none';
   document.getElementById('pendapatan-tab-profit').style.display = tab==='profit' ? 'block' : 'none';
   if(tab!=='rekap') renderTransaksiPendapatan();
+}
+function switchPengaturanTab(tab){
+  document.querySelectorAll('[data-pengaturan-tab]').forEach(b=> b.classList.toggle('active', b.dataset.pengaturanTab===tab));
+  document.getElementById('pengaturan-tab-profil').style.display = tab==='profil' ? 'block' : 'none';
+  document.getElementById('pengaturan-tab-template').style.display = tab==='template' ? 'block' : 'none';
+  document.getElementById('pengaturan-tab-keuangan').style.display = tab==='keuangan' ? 'block' : 'none';
+  if(tab==='keuangan'){ try{ loadEngineSettings(); }catch(e){} try{ loadBebanToko(); }catch(e){} }
 }
 function exportProfitCSV(){
   const rows=data.filter(d=> ['Service Sukses'].includes(d.status));
