@@ -825,6 +825,7 @@ async function kasTutupTokoSave(){
     }catch(e){}
     await kasTutupTokoLoad();
     try{ kasBarToko(); }catch(e){}
+  try{ wcReminderCheck(); }catch(e){}
   }catch(e){ (window.showToast || alert)('Gagal simpan tutup kas: ' + (e.message || e)); }
 }
 // ---------- Filter Kas Toko: Harian / Mingguan (Senin-Sabtu) / Bulanan ----------
@@ -1038,8 +1039,8 @@ async function renderGajian(){
 const WC_MEDIA = [['kas_utama', 'Kas Utama (laci)'], ['kas_kecil', 'Kas Kecil'], ['bank', 'Bank'], ['qris', 'QRIS / E-Wallet']];
 let _wcData = null;
 function wcClose(){ const m = document.getElementById('wcModal'); if(m) m.classList.remove('show'); }
-async function wcOpen(){
-  const w = _gajiWeek();
+async function wcOpen(weekStart){
+  const w = weekStart ? {start: String(weekStart).slice(0,10)} : _gajiWeek();
   const box = document.getElementById('wcModal');
   if(box) box.classList.add('show');
   const body = document.getElementById('wcBody');
@@ -1067,6 +1068,8 @@ function wcCalc(){
     totalSetor += keluar;
     const el = document.getElementById('wcOut_' + m);
     if(el) el.textContent = _rp(keluar);
+    const sug = document.getElementById('wcSug_' + m);
+    if(sug) sug.textContent = _rp(saldoSetelah(m));
   });
   const akhir = WC_MEDIA.reduce((s, [m]) => s + (setor ? Math.min(saldoSetelah(m), wcKeepVal(m)) : saldoSetelah(m)), 0);
   const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
@@ -1099,12 +1102,13 @@ function wcRender(d){
     + '<td style="text-align:right;font-weight:800;color:' + (t.sisa ? '#b45309' : '#059669') + '">' + rp(t.sisa) + '</td>'
     + '</tr>').join('')
     : '<tr><td colspan="8" style="text-align:center;color:#8a8f98;padding:14px">Tidak ada jatah teknisi minggu ini</td></tr>';
+  const _wcSugVal = (m) => (Number((d.kas || {})[m]) || 0) - (m === 'kas_utama' && document.getElementById('wcBayar')?.checked ? (Array.isArray(d.teknisi)?d.teknisi:[]).reduce((s,t)=>s+(Number(t.sisa)||0),0) : 0);
   const mediaRows = WC_MEDIA.map(([m, label]) => {
     const saldo = Number((d.kas || {})[m]) || 0;
     return '<tr>'
       + '<td>' + label + '</td>'
-      + '<td style="text-align:right"><strong>' + rp(saldo) + '</strong></td>'
-      + '<td style="text-align:right"><input id="wcKeep_' + m + '" type="number" min="0" value="0" oninput="wcCalc()" style="width:120px;padding:6px 8px;border-radius:8px;border:1px solid #e5e7eb;text-align:right"></td>'
+      + '<td style="text-align:right"><strong>' + rp(saldo) + '</strong><br><span style="font-size:10px;color:#8a8f98">Saldo saat ini (saran stlh gaji): <strong id="wcSug_' + m + '">' + rp(saldo) + '</strong><br><a href="#" onclick="event.preventDefault();var bayar=!!document.getElementById(\'wcBayar\')?.checked;var tot=bayar?((_wcData&&_wcData.teknisi||[]).reduce((s,t)=>s+(Number(t.sisa)||0),0)):0;var v=(Number((_wcData&&_wcData.kas||{})[\'' + m + '\'])||0)-(\'' + m + '\'===\'kas_utama\'?tot:0);var e=document.getElementById(\'wcKeep_' + m + '\');if(e){e.value=String(Math.max(0,v));}wcCalc();">pakai saran</a></span></td>'
+      + '<td style="text-align:right"><input id="wcKeep_' + m + '" type="number" min="0" value="0" oninput="wcCalc()" style="width:120px;padding:6px 8px;border-radius:8px;border:1px solid #e5e7eb;text-align:right"><br><span style="font-size:10px;color:#8a8f98"><a href="#" onclick="event.preventDefault();var e=document.getElementById(\'wcKeep_' + m + '\');if(e) e.value=\'0\';wcCalc();">set 0</a> · bebas isi nominal disisakan</span></td>'
       + '<td style="text-align:right;color:#7c3aed;font-weight:700" id="wcOut_' + m + '">' + rp(0) + '</td>'
       + '</tr>';
   }).join('');
@@ -1113,8 +1117,11 @@ function wcRender(d){
     : '';
   const kurang = Number(d.kurang_gajian) || 0;
   const kurangTotal = Number(d.kurang_total) || 0;
+  const todayIso = (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')+'-'+String(new Date().getDate()).padStart(2,'0'));
+  const isPastWeek = !!(d.week_end && String(d.week_end).slice(0,10) < todayIso);
   const warn = (!bisa ? '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#b91c1c;margin-bottom:10px">Minggu ini belum selesai / belum berjalan. Tutup buku hanya bisa diproses mulai Sabtu.</div>' : '')
     + (!aktif ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#92400e;margin-bottom:10px">Minggu lama: setor kas otomatis dimatikan agar kas minggu berjalan tidak ikut tersapu.</div>' : '')
+    + (isPastWeek ? '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#1e40af;margin-bottom:10px"><strong>Menutup minggu terlewat (' + _esc(String(d.week_start||'').slice(0,10)) + ' s/d ' + _esc(String(d.week_end||'').slice(0,10)) + '):</strong> saldo yang ditampilkan <strong>terkini</strong> (bisa termasuk transaksi setelah Sabtu). Atur kolom <strong>Sisakan</strong> per media dengan benar (bisa klik "pakai saran" lalu sesuaikan) agar transaksi berjalan tidak ikut tersetor. Gajian/tunggakan tetap dihitung untuk minggu ini.</div>' : '')
     + (kurang ? '<div id="wcKurang" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#b91c1c;margin-bottom:10px">Kas utama kurang <strong>' + rp(kurang) + '</strong> untuk membayar semua tunggakan. Total semua media <strong>' + rp(d.kas_tersedia || 0) + '</strong>' + (kurangTotal ? ', masih kurang <strong>' + rp(kurangTotal) + '</strong> walau semua kas dipakai.' : ', cukup jika dipindah ke kas utama.') + ' Setor dana ke kas utama dulu, atau hilangkan centang bayar gajian. Sistem menolak tutup buku jika kas utama kurang.</div>' : '');
   body.innerHTML = note + warn
     + '<div class="table-wrap"><table class="table compact"><thead><tr><th>Teknisi</th><th style="text-align:right">Komisi</th><th style="text-align:right">Hadir</th><th style="text-align:right">Refund</th><th style="text-align:right">Bersih</th><th style="text-align:right">Dibayar</th><th style="text-align:right">Tunggakan</th><th style="text-align:right">Bayar Skrg</th></tr></thead><tbody>' + tr + '</tbody></table></div>'
@@ -1160,12 +1167,43 @@ async function wcRun(){
     try{ renderGajian(); }catch(e){}
     try{ if(typeof kasTutupTokoLoad === 'function') kasTutupTokoLoad(); }catch(e){}
     try{ if(typeof kasBarToko === 'function') kasBarToko(); }catch(e){}
+    try{ wcReminderCheck(); }catch(e){}
   }catch(e){
     if(btn){ btn.disabled = false; btn.textContent = 'Proses Tutup Buku'; }
     try{ (window.showToast || alert)('Gagal: ' + String((e && e.message) || e).replace(/^HTTP \d+:\s*/, '').slice(0, 180)); }catch(_){}
   }
 }
-if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcClose; window.wcRun = wcRun; window.wcCalc = wcCalc; }
+async function wcReminderCheck(){
+  try{
+    const el = document.getElementById('wcReminderBanner');
+    if(!el) return;
+    // hanya owner & admin (superadmin/owner/admin)
+    let role = '';
+    try{ role = (window.BOSAuth && window.BOSAuth.myActiveRole && window.BOSAuth.myActiveRole()) || String(localStorage.getItem('role')||'').toLowerCase(); }catch(e){}
+    if(!['superadmin','owner','admin'].includes(role)){ el.style.display='none'; window._wcReminderWeek=null; return; }
+    // mulai Senin: cek minggu Sabtu sebelumnya (minggu yang sudah lewat) belum ditutup
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dow = today.getDay(); // 0=Min,1=Sen
+    if(dow === 0){ el.style.display='none'; window._wcReminderWeek=null; return; } // Minggu: belum masuk periode reminder Senin
+    // prev week: week yang berakhir Sabtu kemarin relatif thd minggu berjalan
+    const cur = _gajiWeek(); // minggu berjalan (Mon-Sat)
+    const prevStart = _gajiAdd(cur.start, -7);
+    const prevEnd = _gajiAdd(prevStart, 5);
+    // hanya ingatkan mulai Senin setelah minggu tsb lewat (hari ini > prevEnd)
+    const todayIso = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    if(todayIso <= prevEnd){ el.style.display='none'; window._wcReminderWeek=null; return; }
+    const d = await apiFetch('/finance/weekly-close/preview?tanggal=' + encodeURIComponent(prevStart));
+    if(d && d.sudah_ditutup){ el.style.display='none'; window._wcReminderWeek=null; return; }
+    window._wcReminderWeek = prevStart;
+    const sub = document.getElementById('wcReminderSub');
+    const ttl = document.getElementById('wcReminderTitle');
+    if(ttl) ttl.textContent = 'Tutup buku minggu lalu belum dilakukan';
+    if(sub) sub.innerHTML = 'Minggu <strong>' + _esc(prevStart) + '</strong> s/d <strong>' + _esc(prevEnd) + '</strong> belum ditutup. Buka tutup buku, cek saldo terkini, atur <strong>Sisakan</strong> (bebas) lalu setor sisa kas agar saldo rapi. Gajian/tunggakan wajib cukup (kas utama) dulu.';
+    el.style.display = '';
+  }catch(e){ /* abaikan: reminder non-blocking */ }
+}
+if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcClose; window.wcRun = wcRun; window.wcCalc = wcCalc; window.wcReminderCheck = wcReminderCheck; }
 
 // hook ke switchView lama
 (function(){

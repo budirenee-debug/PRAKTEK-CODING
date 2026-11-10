@@ -153,6 +153,7 @@
     try {
       ['access_token', 'username', 'role', 'nama', 'foto', 'bos_stores', 'active_store_id', 'login_at']
         .forEach(function (k) { localStorage.removeItem(k); });
+      try { sessionStorage.removeItem('bg_screen_locked'); } catch (e) {}
     } catch (e) {}
     if (!silent) goLoginReplace();
   }

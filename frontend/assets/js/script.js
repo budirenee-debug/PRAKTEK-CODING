@@ -2576,12 +2576,15 @@ async function removeMember(membershipId, username){
 
 // ---------- Auto-lock: kunci layar setelah 10 menit tanpa aktivitas ----------
 const LOCK_AFTER_MS = 10*60*1000;
+const SCREEN_LOCK_KEY = 'bg_screen_locked';
 let _lastActivity = Date.now();
 let _screenLocked = false;
 function pokeActivity(){ _lastActivity = Date.now(); }
 ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(ev=>{
   window.addEventListener(ev, ()=>{ pokeActivity(); }, {passive:true});
 });
+function isScreenLockedPersisted(){ try{ return sessionStorage.getItem(SCREEN_LOCK_KEY) === '1'; }catch(e){ return false; } }
+function setScreenLockedPersisted(v){ try{ if(v) sessionStorage.setItem(SCREEN_LOCK_KEY,'1'); else sessionStorage.removeItem(SCREEN_LOCK_KEY); }catch(e){} }
 function startAutoLock(){
   pokeActivity();
   setInterval(()=>{
@@ -2593,20 +2596,22 @@ function startAutoLock(){
 function lockScreen(){
   if(_screenLocked) return;
   _screenLocked = true;
+  setScreenLockedPersisted(true);
   document.getElementById('lockUser').textContent = localStorage.getItem('username')||'-';
   const inp=document.getElementById('lockPass');
   if(inp) inp.value='';
   const al=document.getElementById('lockAlert');
   if(al) al.style.display='none';
-  document.getElementById('lockModal').classList.add('show');
-  setTimeout(()=>{ try{ inp.focus(); }catch{} },150);
+  const modal=document.getElementById('lockModal');
+  if(modal) modal.classList.add('show');
+  setTimeout(()=>{ try{ if(inp) inp.focus(); }catch{} },150);
 }
 async function unlockScreen(){
   const u=localStorage.getItem('username')||'';
   const p=document.getElementById('lockPass')?.value||'';
   const al=document.getElementById('lockAlert');
   const fail=(m)=>{ if(al){ al.className='alert err'; al.textContent=m; al.style.display='block'; } };
-  if(!u){ fail('Sesi tidak dikenal — silakan logout lalu login ulang'); return; }
+  if(!u){ fail('Sesi tidak dikenal - silakan logout lalu login ulang'); return; }
   if(!p){ fail('Isi password dulu bro'); return; }
   try{
     const res=await fetch(`${API_BASE}/auth/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
@@ -2618,19 +2623,22 @@ async function unlockScreen(){
     if(data.stores) localStorage.setItem('bos_stores', JSON.stringify(data.stores));
     if(data.primary_store_id) localStorage.setItem('active_store_id', String(data.primary_store_id));
     _screenLocked=false;
+    setScreenLockedPersisted(false);
     document.getElementById('lockModal').classList.remove('show');
     pokeActivity();
     try{ await loadData(); renderAll(); renderSemuaService(); }catch{}
-    showToast('🔓 Kunci dibuka — lanjut kerja');
+    showToast('Kunci dibuka - lanjut kerja');
   }catch(e){
-    fail(String((e && e.message)||'Gagal verifikasi — cek koneksi'));
+    fail(String((e && e.message)||'Gagal verifikasi - cek koneksi'));
   }
 }
 function lockLogout(){
-  // keluar dari layar kunci (tanpa confirm) — balik ke login
+  // keluar dari layar kunci (tanpa confirm) - balik ke login
+  setScreenLockedPersisted(false);
   ['access_token','username','role','nama','foto','bos_stores','active_store_id','login_at'].forEach(k=>{ try{ localStorage.removeItem(k); }catch{} });
   goLoginReplace();
 }
+
 
 // Init
 document.addEventListener('DOMContentLoaded', async ()=>{
@@ -2650,6 +2658,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
   // lolos guard → tampilkan body (buka kunci anti-flash)
   try{ document.documentElement.classList.remove('guard-lock'); }catch(e){}
+  if(isScreenLockedPersisted()){ lockScreen(); }
   setupNavigation();
   setupChips();
   setupFormDraftAutosave();
