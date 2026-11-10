@@ -897,6 +897,64 @@ def create_expense(payload: dict = Body(...), store_id: Optional[int] = Query(No
     return _expense_row(e)
 
 
+@router.put("/expenses/{exp_id}")
+def update_expense(exp_id: int, payload: dict = Body(...), store_id: Optional[int] = Query(None),
+                   db: Session = Depends(get_db), current=Depends(get_current_user)):
+    """Edit salah input pengeluaran. Tulis: owner/admin/superadmin saja.
+    Catatan: koreksi tidak mengubah efek 'tambah_stok' yang pernah tercatat saat input awal."""
+    store, _ = _ctx(db, current, store_id)
+    e = db.query(models.Expense).filter(models.Expense.id == exp_id,
+                                        models.Expense.store_id == store.id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Pengeluaran tidak ditemukan di toko ini")
+    keperluan = (payload.get("keperluan") or "").strip()
+    if not keperluan:
+        raise HTTPException(status_code=400, detail="keperluan wajib diisi")
+    nominal = int(payload.get("nominal") or 0)
+    if nominal <= 0:
+        raise HTTPException(status_code=400, detail="nominal harus > 0")
+    kat_in = (payload.get("kategori") or e.kategori or "C4").strip()
+    kat_legacy = {"Sewa": "C2", "Listrik": "C2", "Internet": "C3", "Gaji": "C1",
+                  "Belanja Part": "B1", "Operasional": "C4", "Lainnya": "C4"}
+    if kat_in in lm.KAT_EXPENSE_NEW:
+        kode = kat_in
+    elif kat_in in kat_legacy:
+        kode = kat_legacy[kat_in]
+    else:
+        raise HTTPException(status_code=400, detail="kategori harus kode mentor: " + "/".join(sorted(lm.KAT_EXPENSE_NEW.keys())))
+    metode = (payload.get("metode") or e.metode or "Tunai").strip()
+    if metode not in METODE:
+        raise HTTPException(status_code=400, detail="metode harus Tunai/Transfer/QRIS")
+    subkategori = (payload.get("subkategori") or "").strip() or None
+    if kode == "D" and (subkategori or "") not in lm.SUB_D:
+        raise HTTPException(status_code=400, detail="kategori D wajib subkategori: " + "/".join(lm.SUB_D))
+    sebelum = f"{e.kategori} {e.keperluan} nominal={e.nominal} metode={e.metode}"
+    e.tanggal = _parse_tgl(payload.get("tanggal")) if payload.get("tanggal") else e.tanggal
+    e.kategori = kode
+    e.keperluan = keperluan
+    e.nominal = nominal
+    e.metode = metode
+    e.keterangan = (payload.get("keterangan") or "").strip() or None
+    # sinkron buku besar: hapus baris lama expense ini lalu tulis ulang
+    db.query(models.LedgerEntry).filter(
+        models.LedgerEntry.store_id == store.id,
+        models.LedgerEntry.ref_type == "expense",
+        models.LedgerEntry.ref_id == exp_id).delete(synchronize_session=False)
+    label = lm.KAT_EXPENSE_NEW.get(kode, kode)
+    is_belanja = kode in ("B1", "B2")
+    _ledger_add(db, store.id, e.tanggal, "keluar", kode,
+                f"{label}: {keperluan}", nominal,
+                lm.METODE_KE_MEDIA.get(metode, "kas_utama"),
+                ref_type="expense", ref_id=exp_id, oleh=getattr(current, "username", None),
+                subkategori=subkategori, masuk_laba=not is_belanja, pengaruh_kas=True)
+    db.commit()
+    db.refresh(e)
+    log_action(db, "finance.expense_edit", target=f"EXP-{exp_id}",
+               detail=f"{sebelum} => {e.kategori} {e.keperluan} nominal={e.nominal} metode={e.metode}",
+               actor=current, store_id=store.id)
+    return _expense_row(e)
+
+
 @router.delete("/expenses/{exp_id}")
 def delete_expense(exp_id: int, store_id: Optional[int] = Query(None),
                    db: Session = Depends(get_db), current=Depends(get_current_user)):

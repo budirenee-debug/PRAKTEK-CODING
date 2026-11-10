@@ -248,16 +248,34 @@ function _kasCanHapus(){
   // Koreksi salah input kas: owner/admin/superadmin (backend juga menolak kasir/teknisi).
   try{ return ['owner','admin','superadmin'].includes(_kasMyRole()); }catch(e){ return false; }
 }
+let _kasOutEditId = null;
+let _kasOutRowsCache = null;
+async function kasKasEdit(id){
+  try{
+    // cari data dari cache rincian/kas toko atau fetch
+    let row = null;
+    try{ row = (Array.isArray(_rkRows)?_rkRows:[]).find(x=>String(x.id)===String(id)); }catch(e){}
+    if(!row){
+      const rows = await apiFetch('/finance/expenses');
+      row = (Array.isArray(rows)?rows:[]).find(x=>String(x.id)===String(id));
+    }
+    if(!row){ (window.showToast||alert)('Data pengeluaran tidak ditemukan'); return; }
+    _kasOutEditId = row.id;
+    kasOutOpen(row);
+  }catch(e){ (window.showToast||alert)('Gagal buka edit: '+(e.message||e)); }
+}
 async function kasKasDel(src, id){
   // Hapus catatan kas manual (pengeluaran/pemasukan salah input) + jejak bukunya.
   if(src !== 'expense' && src !== 'income') return;
-  if(!confirm('Hapus catatan kas ini? (salah input — jejak di buku besar ikut terhapus)')) return;
+  if(!confirm('Hapus catatan kas ini? (salah input - jejak di buku besar ikut terhapus)')) return;
   try{
     await apiFetch(src === 'expense' ? `/finance/expenses/${id}` : `/finance/incomes/${id}`, {method:'DELETE'});
-    try{ showToast('🗑 Catatan kas dihapus'); }catch(e){}
+    try{ showToast('Catatan kas dihapus'); }catch(e){}
     await renderKasToko(true);
+    try{ if(typeof renderRincianKeluar==='function') renderRincianKeluar(); }catch(_){}
   }catch(e){ try{ showToast('Gagal hapus: '+(e.message||e)); }catch(_){} }
 }
+
 async function renderKasToko(force){
   try{
     const tf = document.getElementById('btnKasTransfer');
@@ -385,8 +403,12 @@ function drawKasToko(){
   const canDel = _kasCanHapus();
   if(tbody){
     tbody.innerHTML = slice.map(r=>{
-      const aksi = (canDel && (r.src==='expense'||r.src==='income') && r.srcId)
-        ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi (salah input)" onclick="kasKasDel('${r.src}',${r.srcId})">🗑</button>` : '';
+      let aksi = '<span style="font-size:11px;color:#d1d5db">-</span>';
+      if(canDel && r.srcId){
+        if(r.src==='expense') aksi = `<div style="display:flex;gap:4px;justify-content:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px" title="Edit koreksi" onclick="kasKasEdit(${r.srcId})">Edit</button><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi" onclick="kasKasDel('expense',${r.srcId})">Hapus</button></div>`;
+        else if(r.src==='income') aksi = `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi" onclick="kasKasDel('income',${r.srcId})">Hapus</button>`;
+      }
+
       return _kasTokoRow(r.t, r.ref, r.tipe, r.masuk, r.keluar, r.ket, aksi);
     }).join('') || '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Belum ada transaksi</td></tr>';
     tbody.dataset.filled = '1';
@@ -637,23 +659,49 @@ async function kasTransferSave(e){
   }
 }
 // ---------- Catat pengeluaran langsung dari Kas Toko (kasir/owner/admin) ----------
-function kasOutOpen(){
+function kasOutOpen(row){
   try{
     const m = document.getElementById('kasOutModal');
     if(!m) return;
+    const isEdit = !!(row && row.id);
+    _kasOutEditId = isEdit ? row.id : null;
+    const ttl = m.querySelector('h3'); if(ttl) ttl.textContent = isEdit ? 'Edit Pengeluaran' : 'Catat Pengeluaran';
+    const sub = m.querySelector('p'); if(sub) sub.textContent = isEdit ? 'Koreksi salah input pengeluaran. Efek tambah-stok saat input awal (jika ada) tidak diubah otomatis.' : 'Listrik, wifi/internet, sewa, belanja part - otomatis masuk Total Keluar Kas Toko.';
+    const btn = document.querySelector('#kasOutForm button[type="submit"]'); if(btn) btn.textContent = isEdit ? 'Simpan Perubahan' : 'Simpan Pengeluaran';
+    try{ document.getElementById('kasOutForm')?.reset(); }catch(_){ }
     const t = document.getElementById('kasout-tanggal');
-    if(t && !t.value){
-      const d = new Date();
-      t.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(t){
+      if(isEdit && row.tanggal) t.value = String(row.tanggal).slice(0,10);
+      else if(!t.value){ const d=new Date(); t.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    }
+    if(isEdit){
+      const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value = (val==null?'':val); };
+      set('kasout-keperluan', row.keperluan||'');
+      set('kasout-nominal', Number(row.nominal)||0);
+      set('kasout-kategori', row.kategori||'C4');
+      set('kasout-metode', row.metode||'Tunai');
+      set('kasout-ket', row.keterangan||'');
+      try{ const sw=document.getElementById('kasout-stokWrap'); if(sw) sw.style.display='none'; }catch(_){}
+    } else {
+      // default hari ini kalau kosong
+      if(t && !t.value){ const d=new Date(); t.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     }
     kasOutPreview();
     m.classList.add('show');
     setTimeout(()=>document.getElementById('kasout-keperluan')?.focus(), 100);
   }catch(e){}
 }
+
 function kasOutClose(){
-  try{ document.getElementById('kasOutModal')?.classList.remove('show'); }catch(e){}
+  _kasOutEditId = null;
+  try{
+    const m = document.getElementById('kasOutModal');
+    if(m){ const ttl=m.querySelector('h3'); if(ttl) ttl.textContent='Catat Pengeluaran'; const sub=m.querySelector('p'); if(sub) sub.textContent='Listrik, wifi/internet, sewa, belanja part - otomatis masuk Total Keluar Kas Toko.'; }
+    const btn = document.querySelector('#kasOutForm button[type="submit"]'); if(btn) btn.textContent='Simpan Pengeluaran';
+    document.getElementById('kasOutModal')?.classList.remove('show');
+  }catch(e){}
 }
+
 function kasOutPreview(){
   try{
     const n = parseInt(document.getElementById('kasout-nominal')?.value)||0;
@@ -710,11 +758,22 @@ async function kasOutSave(e){
     }catch(e){}
     if(tanggal) body.tanggal = tanggal;
     if(keterangan) body.keterangan = keterangan;
-    await apiFetch('/finance/expenses', {method:'POST', body: JSON.stringify(body)});
-    kasOutClose();
-    try{ document.getElementById('kasOutForm')?.reset(); }catch(_){}
-    (window.showToast||alert)(`✅ Pengeluaran ${kategori} ${_rp(nominal)} tersimpan — masuk Kas Toko`);
+    if(_kasOutEditId){
+      delete body.tambah_stok;
+      await apiFetch('/finance/expenses/'+_kasOutEditId, {method:'PUT', body: JSON.stringify(body)});
+      const _eid=_kasOutEditId; _kasOutEditId = null;
+      kasOutClose();
+      try{ document.getElementById('kasOutForm')?.reset(); }catch(_){}
+      (window.showToast||alert)('Pengeluaran diperbarui - Kas Toko & buku besar ikut disinkronkan');
+    } else {
+      await apiFetch('/finance/expenses', {method:'POST', body: JSON.stringify(body)});
+      kasOutClose();
+      try{ document.getElementById('kasOutForm')?.reset(); }catch(_){}
+      (window.showToast||alert)(`Pengeluaran ${kategori} ${_rp(nominal)} tersimpan - masuk Kas Toko`);
+    }
     await renderKasToko(true);
+    try{ if(typeof renderRincianKeluar==='function') renderRincianKeluar(); }catch(_){}
+
   }catch(err){
     (window.showToast||alert)('Gagal simpan: '+(err.message||err));
   }finally{
@@ -1203,7 +1262,7 @@ async function wcReminderCheck(){
     el.style.display = '';
   }catch(e){ /* abaikan: reminder non-blocking */ }
 }
-if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcClose; window.wcRun = wcRun; window.wcCalc = wcCalc; window.wcReminderCheck = wcReminderCheck; }
+if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcClose; window.wcRun = wcRun; window.wcCalc = wcCalc; window.wcReminderCheck = wcReminderCheck; window.kasKasEdit = kasKasEdit; window.kasKasDel = kasKasDel; }
 
 // hook ke switchView lama
 (function(){
@@ -1288,8 +1347,12 @@ function drawRincianKeluar(){
     }
   }
   if(tb){
-    tb.innerHTML = slice.map(r=>`<tr><td style="white-space:nowrap">${_esc(String(r.tanggal||'').slice(0,10))}</td><td><strong>${_esc(r.keperluan||'-')}</strong>${r.keterangan?`<br><span style="font-size:11px;color:#8a8f98">${_esc(r.keterangan)}</span>`:''}</td><td style="font-size:11px">${_esc(RK_LBL[r.kategori]||r.kategori||'-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${_rp(r.nominal||0)}</td><td>${_esc(r.metode||'-')}</td><td style="font-size:11px">${_esc(r.dibuat_oleh||'-')}</td><td style="text-align:center">${(canDel&&r.id)?`<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus koreksi (salah input)" onclick="kasKasDel('expense',${r.id})">🗑</button>`:'<span style="font-size:11px;color:#d1d5db">-</span>'}</td></tr>`).join('')
-      || '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Belum ada pengeluaran</td></tr>';
+    tb.innerHTML = slice.map(r=>{
+      const aksi = (canDel&&r.id)
+        ? `<div style="display:flex;gap:4px;justify-content:center"><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px" title="Edit pengeluaran" onclick="kasKasEdit(${r.id})">Edit</button><button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" title="Hapus pengeluaran" onclick="kasKasDel('expense',${r.id})">Hapus</button></div>`
+        : '<span style="font-size:11px;color:#d1d5db">-</span>';
+      return `<tr><td style="white-space:nowrap">${_esc(String(r.tanggal||'').slice(0,10))}</td><td><strong>${_esc(r.keperluan||'-')}</strong>${r.keterangan?`<br><span style="font-size:11px;color:#8a8f98">${_esc(r.keterangan)}</span>`:''}</td><td style="font-size:11px">${_esc(RK_LBL[r.kategori]||r.kategori||'-')}</td><td style="text-align:right;font-weight:700;color:#dc2626">${_rp(r.nominal||0)}</td><td>${_esc(r.metode||'-')}</td><td style="font-size:11px">${_esc(r.dibuat_oleh||'-')}</td><td style="text-align:center">${aksi}</td></tr>`;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Belum ada pengeluaran</td></tr>';
   }
 }
 async function renderRincianKeluar(){
