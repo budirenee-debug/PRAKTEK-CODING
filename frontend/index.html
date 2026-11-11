@@ -918,6 +918,12 @@
                 <div class="pagination"><span id="kasTokoPaginationInfo"></span><div id="kasTokoPaginationBtns"></div></div>
                 </div>
                 <div id="kasPanel-rincian" style="display:none">
+                <div class="tabs" style="margin-bottom:10px">
+                    <button class="tab active" data-rkf="today" onclick="setRkFilter('today')">📅 Harian</button>
+                    <button class="tab" data-rkf="week" onclick="setRkFilter('week')">🗓️ Mingguan (Senin–Sabtu)</button>
+                    <button class="tab" data-rkf="month" onclick="setRkFilter('month')">📆 Bulanan</button>
+                    <span class="muted" id="rkFilterInfo" style="margin-left:auto;font-size:11px"></span>
+                </div>
                 <div class="stats" style="margin-bottom:10px">
                     <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Hari Ini</span></div><h3 id="rkHari" style="color:#dc2626">Rp 0</h3><p class="trend" id="rkHariSub">-</p></div>
                     <div class="stat-card"><div class="stat-head"><span>Bulan Ini</span></div><h3 id="rkBulan">Rp 0</h3><p class="trend" id="rkBulanSub">-</p></div>

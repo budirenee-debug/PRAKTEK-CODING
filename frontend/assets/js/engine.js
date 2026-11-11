@@ -1300,9 +1300,30 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} });
 else { try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} }
 // ---------- Rincian Keluar: tab khusus pengeluaran di Kas Toko (satu pintu operasional) ----------
-let _kasSub = 'arus', _rkRows = [], _rkPage = 1;
+let _kasSub = 'arus', _rkRows = [], _rkRowsAll = [], _rkPage = 1, _rkFilter = 'today';
 const RK_PER = 10;
 const RK_LBL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
+function setRkFilter(f){
+  _rkFilter = f;
+  try{ document.querySelectorAll('[data-rkf]').forEach(b=>b.classList.toggle('active', b.dataset.rkf===f)); }catch(e){}
+  applyRkFilter();
+}
+function _rkInRange(t){
+  t = String(t||'').slice(0,10); if(!t) return false;
+  if(_rkFilter === 'today') return t === _kasTodayStr();
+  if(_rkFilter === 'week'){ const w = _kasWeekRange(); return t >= w.start && t <= w.end; }
+  if(_rkFilter === 'month') return t.slice(0,7) === _kasTodayStr().slice(0,7);
+  return true;
+}
+function applyRkFilter(){
+  let rows = [..._rkRowsAll], info = '';
+  if(_rkFilter === 'today'){ const t = _kasTodayStr(); rows = rows.filter(r=>String(r.tanggal||'').slice(0,10)===t); info = '📅 '+t; }
+  else if(_rkFilter === 'week'){ const w = _kasWeekRange(); rows = rows.filter(r=>{ const t = String(r.tanggal||'').slice(0,10); return t>=w.start&&t<=w.end; }); info = '🗓️ '+w.start+' s/d '+w.end; }
+  else if(_rkFilter === 'month'){ const ym = _kasTodayStr().slice(0,7); rows = rows.filter(r=>String(r.tanggal||'').slice(0,7)===ym); info = '📆 '+ym; }
+  const infoEl = document.getElementById('rkFilterInfo'); if(infoEl) infoEl.textContent = info;
+  _rkRows = rows; _rkPage = 1;
+  drawRincianKeluar();
+}
 function setKasSub(t){
   _kasSub = (t === 'rincian') ? 'rincian' : 'arus';
   try{ document.querySelectorAll('[data-kassub]').forEach(b=>b.classList.toggle('active', b.dataset.kassub===_kasSub)); }catch(e){}
@@ -1372,9 +1393,11 @@ async function renderRincianKeluar(){
     set('rkBulanSub', (ring.bulan_ini || 0) + ' catatan bulan ini');
     set('rkTotal', _rp(ring.total_nominal || 0));
     set('rkTotalSub', (ring.total || 0) + ' catatan semua');
-    _rkRows = arr; _rkPage = 1;
-    drawRincianKeluar();
+    _rkRowsAll = arr;
+    applyRkFilter();
   }catch(e){
+    _rkRowsAll = []; _rkRows = [];
+    const infoEl = document.getElementById('rkFilterInfo'); if(infoEl) infoEl.textContent = '';
     if(tb) tb.innerHTML = `<tr><td colspan="7" style="color:#dc2626;text-align:center">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
 }
