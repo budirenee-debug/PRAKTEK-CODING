@@ -123,17 +123,11 @@ h1,h2{font-family:'Plus Jakarta Sans',sans-serif}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
 .stat-card.dark{background:var(--brand);color:#fff;border-color:var(--brand)}
 /* Kartu ringkasan periode (dashboard toko) */
-.stat-card.stat-omset{background:#065f46;border-color:#065f46;color:#fff}
-.stat-card.stat-kotor{background:#2563eb;border-color:#2563eb;color:#fff}
-.stat-card.stat-beban{background:#dc2626;border-color:#dc2626;color:#fff}
-.stat-card.stat-bersih{background:#22c55e;border-color:#22c55e;color:#052e16}
-.stat-card.stat-bersih.positif{background:#22c55e;border-color:#22c55e}
-.stat-card.stat-omset .stat-head,.stat-card.stat-kotor .stat-head,
-.stat-card.stat-beban .stat-head{color:rgba(255,255,255,.88)}
-.stat-card.stat-bersih .stat-head{color:#064e3b}
-.stat-card.stat-omset .trend,.stat-card.stat-kotor .trend,
-.stat-card.stat-beban .trend{color:rgba(255,255,255,.88)}
-.stat-card.stat-bersih .trend{color:#065f46}
+.stat-card.stat-omset{border-left:4px solid #059669}
+.stat-card.stat-kotor{border-left:4px solid #2563eb}
+.stat-card.stat-beban{border-left:4px solid #dc2626}
+.stat-card.stat-bersih{border-left:4px solid #16a34a}
+.stat-card.stat-bersih.positif{border-left-color:#16a34a}
 .stat-card.stat-target{border-left:4px solid #f59e0b}
 .stat-card.stat-target .stat-head{font-size:10px}
 .target-fase{font-size:9px;font-weight:800;background:#fff7ed;color:#b45309;border:1px solid #fed7aa;border-radius:6px;padding:2px 5px;white-space:nowrap}

@@ -1757,6 +1757,8 @@ function updateSidebarUser(){
     else if(r) elR.textContent = r;
     else elR.textContent = 'Belum login';
   }
+  const dashActive = document.getElementById('view-dashboard')?.classList.contains('active');
+  if(dashActive){ const pt=document.getElementById('page-title'); if(pt) pt.textContent='Selamat datang ' + u; }
   if(elA){
     // prioritas: foto upload sendiri > foto teknisi > pravatar
     const myFoto = localStorage.getItem('foto');
@@ -3012,8 +3014,13 @@ function switchView(view, clearSearch){
     'approval-akun':['Persetujuan Akun','Kelola persetujuan admin & teknisi — superadmin only']
   };
   if(titles[view]){
-    document.getElementById('page-title').textContent=titles[view][0];
-    document.getElementById('page-subtitle').textContent=titles[view][1];
+    let t0 = titles[view][0];
+    if(view === 'dashboard'){
+      const uname = (localStorage.getItem('username') || document.getElementById('sidebar-username')?.textContent || 'Admin').trim();
+      t0 = 'Selamat datang ' + uname;
+    }
+    document.getElementById('page-title').textContent = t0;
+    document.getElementById('page-subtitle').textContent = titles[view][1];
   }
   if(window.innerWidth<=860) closeSidebar();
   else document.getElementById('sidebar').classList.remove('open');
@@ -3815,19 +3822,33 @@ async function submitSpEdit(e){
   if(!nama) return showToast('Nama wajib');
   // cek duplikat kecuali diri sendiri
   if(inventory.some(x=>x.id!==id && x.nama.toLowerCase()===nama.toLowerCase())) return showToast('Nama sudah dipakai item lain');
+  const _spCanCorrect = (()=>{ try{ const r=(window.BOSAuth&&BOSAuth.myActiveRole?BOSAuth.myActiveRole():String(localStorage.getItem('role')||'')).toLowerCase(); return ['superadmin','owner','admin'].includes(r); }catch(e){ return false; } })();
+  const payloadSp = {nama, merk, kategori, harga, harga_beli};
+  if(_spCanCorrect){
+    const masukV = parseInt(document.getElementById('spEditMasuk')?.value);
+    const keluarV = parseInt(document.getElementById('spEditKeluar')?.value);
+    const stokV = parseInt(document.getElementById('spEditStok')?.value);
+    if(Number.isFinite(masukV) && masukV>=0) payloadSp.masuk = masukV;
+    if(Number.isFinite(keluarV) && keluarV>=0) payloadSp.keluar = keluarV;
+    if(Number.isFinite(stokV) && stokV>=0) payloadSp.stok = stokV;
+  }
   if(USE_API){
     try{
-      // Hanya nama/merk/kategori/harga/harga_beli yang boleh diedit — masuk/keluar/stok dikunci (auto DB)
-      await apiInventoryUpdate(id, {nama, merk, kategori, harga, harga_beli});
+      await apiInventoryUpdate(id, payloadSp);
       await loadInventory();
       closeSpEditModal();
       renderSparepart();
       try{ renderAsesoris(); }catch(e){}
-      showToast(`✎ ${nama} diperbarui (sync)`);
+      showToast(`Item ${nama} diperbarui${_spCanCorrect?' (koreksi tersimpan)':''}`);
       return;
     }catch(err){ showToast('Gagal API: '+err.message); return; }
   }
   it.nama=nama; it.merk=merk; it.kategori=kategori; it.harga=harga; it.harga_beli=harga_beli; it.tgl=todayISO();
+  if(_spCanCorrect){
+    if(payloadSp.masuk!=null) it.masuk=payloadSp.masuk;
+    if(payloadSp.keluar!=null) it.keluar=payloadSp.keluar;
+    if(payloadSp.stok!=null) it.stok=payloadSp.stok; else if(payloadSp.masuk!=null || payloadSp.keluar!=null) it.stok=Math.max(0,(it.masuk||0)-(it.keluar||0));
+  }
   saveInventory();
   closeSpEditModal();
   renderSparepart();
