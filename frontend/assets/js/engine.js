@@ -949,6 +949,7 @@ function applyKasTokoFilter(){
 // Sumber: /engine/kas/teknisi/{id} (riwayat ledger), difilter tanggal minggu.
 // Tanda lunas disimpan di HP ini (localStorage) per teknisi per minggu.
 let _gajiWeekStart=null; // ISO Senin; null = minggu berjalan
+let _gajiSlipData={}; // cache slip per teknisi (untuk tanda terima/cetak)
 function _gajiISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _gajiParse(s){ const p=String(s||'').split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
 function _gajiAdd(iso, days){ const d=_gajiParse(iso); d.setDate(d.getDate()+days); return _gajiISO(d); }
@@ -1069,22 +1070,41 @@ async function renderGajian(){
       const loc=_gajiPaidGet(t.id, w.start);
       const pd=srv||loc; if(pd) paid++;
       const paidNote=srv
-        ? ('Dibayar '+_esc(String(srv.tanggal||'').slice(0,10))+' oleh '+_esc(srv.oleh||'-')+' • '+_rp(srv.nominal)+' via '+_esc(srv.media||'kas_utama')+' (kas kepotong)')
+        ? ('Dibayar '+_esc(String(srv.tanggal||'').slice(0,10))+' oleh '+_esc(srv.oleh||'-')+' - '+_rp(srv.nominal)+' via '+_esc(srv.media||'kas_utama')+' (kas kepotong)')
         : (loc ? ('Dibayar '+_esc(loc.at||'')+' oleh '+_esc(loc.by||'')) : '');
-      const nama=_esc(j.nama||t.nama||('Teknisi '+t.id));
+      const namaRaw=j.nama||t.nama||('Teknisi '+t.id);
+      const nama=_esc(namaRaw);
+      // rincian harian Senin-Sabtu
+      const days=[];
+      for(let i=0;i<6;i++){
+        const ds=_gajiAdd(w.start,i);
+        const dr=rows.filter(r=>String(r.tanggal||'').slice(0,10)===ds);
+        let dKom=0,dHdr=0,dRfb=0,dCic=0,dSvc=0,dH=0; const items=[];
+        dr.forEach(r=>{ const mi=Number(r.masuk)||0, ko=Number(r.keluar)||0;
+          if(r.tipe==='komisi_cair'){ dKom+=mi; dSvc++; items.push({label:'Komisi '+(r.invoice||''), nominal:mi, ket:r.ket||r.invoice||''}); }
+          else if(r.tipe==='allowance'){ dHdr+=mi; dH++; items.push({label:'Uang hadir', nominal:mi, ket:r.ket||''}); }
+          else if(r.tipe==='potongan_cicilan'){ dCic+=ko; items.push({label:'Potong cicilan', nominal:-ko, ket:r.ket||''}); }
+          else if(r.tipe==='refund_balik'){ dRfb+=ko; items.push({label:'Potong refund', nominal:-ko, ket:r.ket||r.invoice||''}); }
+        });
+        days.push({tanggal:ds, komisi:dKom, hadir:dHdr, potCicilan:dCic, potRefund:dRfb, svc:dSvc, hdr:dH, items, bersih:dKom+dHdr-dRfb});
+      }
+      _gajiSlipData[t.id]={ id:t.id, nama:namaRaw, level:j.level||t.level||'junior', weekStart:w.start, weekEnd:w.end, days,
+        kom,hdr,cic,rfb,hpp,nSvc,nHdr,bersih,totalRow:kom+hdr, sisaHutang:j.sisa_hutang||0, pendingCount:j.pending_count||0,
+        paid:!!pd, paidNote, paidAt:(srv&&srv.tanggal)|| (loc&&loc.at)||'', paidBy:(srv&&srv.oleh)||(loc&&loc.by)||'' };
       cards.push(
         '<div class="card" style="border-left:4px solid '+(pd?'#059669':'#f59e0b')+'">'
         +'<div class="card-head"><h3>'+nama+'</h3>'+(_isTekGaji?'':'<span class="muted">'+_esc(j.level||t.level||'junior')+'</span>')+'<span style="flex:1"></span>'
-        +(pd?'<span class="badge-status Selesai">✅ Lunas</span>':'<span class="badge-status Menunggu Sparepart">⏳ Belum</span>')
+        +(pd?'<span class="badge-status Selesai">Lunas</span>':'<span class="badge-status Menunggu Sparepart">Belum</span>')
         +'</div>'
         +'<div class="stats" style="margin-bottom:10px">'
         +'<div class="stat-card"><div class="stat-head"><span>Komisi ('+nSvc+' svc)</span></div><h3 style="color:#059669">'+_rp(kom)+'</h3></div>'
         +'<div class="stat-card"><div class="stat-head"><span>Hadir ('+nHdr+' hari)</span></div><h3>'+_rp(hdr)+'</h3></div>'
         +'<div class="stat-card"><div class="stat-head"><span>Bersih</span></div><h3 style="color:#2563eb">'+_rp(bersih)+'</h3></div>'
         +'</div>'
-        +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' • Potong refund '+_rp(rfb)+' • Potong HPP (harga part) '+_rp(hpp)+' • Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' • '+j.pending_count+' komisi pending'):'')+'</p>'
+        +'<p style="font-size:11px;color:#8a8f98;margin-bottom:10px">Potong cicilan '+_rp(cic)+' - Potong refund '+_rp(rfb)+' - Potong HPP (harga part) '+_rp(hpp)+' - Sisa hutang saat ini '+_rp(j.sisa_hutang||0)+(j.pending_count?(' - '+j.pending_count+' komisi pending'):'')+'</p>'
         +(pd?'<p style="font-size:11px;color:#059669;margin-bottom:10px">'+paidNote+'</p>':'')
-        +'<div style="display:flex;gap:8px"><button class="btn '+(pd?'btn-ghost':'btn-dark')+' small" style="flex:1" onclick="gajiTogglePaid('+t.id+')">'+(pd?'↩️ Batalkan tanda':'✅ Tandai Sudah Dibayar')+'</button></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn '+(pd?'btn-ghost':'btn-dark')+' small" style="flex:1" onclick="gajiTogglePaid('+t.id+')">'+(pd?'Batalkan tanda':'Tandai Sudah Dibayar')+'</button>'
+        +'<button class="btn btn-ghost small" style="flex:1" onclick="printSlipGaji('+t.id+')">🧾 Tanda Terima / Cetak &amp; PDF</button></div>'
         +'</div>'
       );
     }
@@ -1414,3 +1434,73 @@ function kasHashRoute(){
   }catch(e){}
 }
 if(typeof window !== 'undefined'){ try{ window.addEventListener('hashchange', ()=>{ try{ kasHashRoute(); }catch(e){} }); }catch(e){} }
+
+function buildSlipGajiHTML(s){
+  const toko = (typeof storeDisplayName==='function') ? storeDisplayName() : 'Toko';
+  const today = new Date().toLocaleDateString('id-ID');
+  const rp = n => (typeof _rp==='function'?_rp(n):('Rp '+Number(n||0).toLocaleString('id-ID')));
+  const esc = t => (typeof _esc==='function'?_esc(t):String(t==null?'':t));
+  const fmt = iso => (typeof _gajiFmt==='function'?_gajiFmt(iso):iso);
+  const rows = (s.days||[]).map(d=>{
+    const det = (d.items&&d.items.length)
+      ? d.items.map(it=>'<div style="display:flex;justify-content:space-between;font-size:11px;color:#374151"><span>'+esc(it.label)+(it.ket&&it.ket!==it.label?' <span style="color:#9ca3af">('+esc(it.ket)+')</span>':'')+'</span><span style="white-space:nowrap">'+(it.nominal<0?'- ':'')+rp(Math.abs(it.nominal))+'</span></div>').join('')
+      : '<div style="font-size:11px;color:#9ca3af">Tidak ada transaksi</div>';
+    return '<tr>'
+      +'<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top;white-space:nowrap"><strong>'+esc(fmt(d.tanggal))+'</strong><br><span style="font-size:10px;color:#6b7280">'+esc(d.tanggal)+'</span></td>'
+      +'<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top">'+det+'</td>'
+      +'<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top;text-align:right;white-space:nowrap">'
+        +'<div style="font-size:11px;color:#059669">Komisi '+rp(d.komisi)+'</div>'
+        +'<div style="font-size:11px;color:#374151">Hadir '+rp(d.hadir)+'</div>'
+        +(d.potRefund?'<div style="font-size:11px;color:#dc2626">Pot. refund -'+rp(d.potRefund)+'</div>':'')
+        +(d.potCicilan?'<div style="font-size:11px;color:#dc2626">Pot. cicilan -'+rp(d.potCicilan)+'</div>':'')
+        +'<div style="font-weight:700;margin-top:4px">'+rp(d.bersih)+'</div>'
+      +'</td></tr>';
+  }).join('');
+  const status = s.paid ? '<span style="color:#059669;font-weight:700">LUNAS</span>' : '<span style="color:#d97706;font-weight:700">BELUM DIBAYAR</span>';
+  const paidInfo = s.paidNote ? '<div style="font-size:11px;color:#059669;margin-top:4px">'+esc(s.paidNote)+'</div>' : '';
+  return '<div style="font-family:Inter,Arial,sans-serif;color:#111827;max-width:760px;margin:0 auto">'
+    +'<div style="text-align:center;margin-bottom:12px"><div style="font-size:20px;font-weight:800">'+esc(toko)+'</div>'
+    +'<div style="font-size:14px;font-weight:700;margin-top:2px">TANDA TERIMA / RINCIAN PENDAPATAN TEKNISI</div>'
+    +'<div style="font-size:12px;color:#4b5563">Periode: '+esc(fmt(s.weekStart))+' - '+esc(fmt(s.weekEnd))+' (Senin-Sabtu)</div></div>'
+    +'<hr style="border:0;border-top:1px dashed #9ca3af;margin:10px 0">'
+    +'<table style="width:100%;font-size:12px;margin-bottom:10px"><tr>'
+      +'<td style="padding:2px 0"><strong>Nama</strong></td><td>: '+esc(s.nama)+'</td>'
+      +'<td style="padding:2px 0"><strong>Level</strong></td><td>: '+esc(s.level||'-')+'</td></tr>'
+    +'<tr><td style="padding:2px 0"><strong>Status</strong></td><td>: '+status+'</td>'
+      +'<td style="padding:2px 0"><strong>Dicetak</strong></td><td>: '+esc(today)+'</td></tr></table>'
+    +paidInfo
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:10px">'
+      +'<thead><tr style="background:#f3f4f6"><th style="text-align:left;padding:8px 6px;border-bottom:2px solid #e5e7eb;width:140px">Hari / Tanggal</th>'
+      +'<th style="text-align:left;padding:8px 6px;border-bottom:2px solid #e5e7eb">Rincian Pendapatan</th>'
+      +'<th style="text-align:right;padding:8px 6px;border-bottom:2px solid #e5e7eb;width:170px">Subtotal</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table>'
+    +'<div style="margin-top:12px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#f9fafb">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>Total Komisi ('+Number(s.nSvc||0)+' service)</span><strong>'+rp(s.kom)+'</strong></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>Total Uang Hadir ('+Number(s.nHdr||0)+' hari)</span><strong>'+rp(s.hdr)+'</strong></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>Potongan Cicilan</span><strong>- '+rp(s.cic)+'</strong></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>Potongan Refund</span><strong>- '+rp(s.rfb)+'</strong></div>'
+      +'<hr style="border:0;border-top:1px solid #d1d5db;margin:8px 0">'
+      +'<div style="display:flex;justify-content:space-between;font-size:15px"><span><strong>PENDAPATAN BERSIH (1 MINGGU)</strong></span><strong style="color:#2563eb">'+rp(s.bersih)+'</strong></div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#6b7280;margin-top:8px">Potong HPP (harga part): '+rp(s.hpp)+' · Sisa hutang saat ini: '+rp(s.sisaHutang)+(s.pendingCount?(' · Komisi pending: '+s.pendingCount):'')+'</div>'
+    +'<div style="display:flex;justify-content:space-between;gap:20px;margin-top:36px;font-size:12px">'
+      +'<div style="text-align:center;flex:1"><div>Penerima,</div><div style="height:56px"></div><div style="border-top:1px solid #111827;padding-top:4px;font-weight:600">'+esc(s.nama)+'</div></div>'
+      +'<div style="text-align:center;flex:1"><div>Yang Menyerahkan,</div><div style="height:56px"></div><div style="border-top:1px solid #111827;padding-top:4px;font-weight:600">Admin / Kasir</div></div>'
+    +'</div>'
+    +'<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:18px">Dokumen ini merupakan bukti rincian pendapatan teknisi periode '+esc(s.weekStart)+' s/d '+esc(s.weekEnd)+'.</div>'
+    +'</div>';
+}
+
+function printSlipGaji(id){
+  const s = (_gajiSlipData && (_gajiSlipData[id] || _gajiSlipData[String(id)]));
+  if(!s){ if(typeof showToast==='function') showToast('Data slip belum siap, buka ulang Gajian Sabtu'); else alert('Data slip belum siap'); return; }
+  const area=document.getElementById('printArea');
+  if(!area){ alert('Area cetak tidak tersedia'); return; }
+  area.innerHTML='<div class="nota-paper a4" style="padding:8px 4px">'+buildSlipGajiHTML(s)+'</div>';
+  const oldTitle=document.title;
+  try{ document.title='Slip Gaji '+(s.nama||'Teknisi')+' '+s.weekStart+'-'+s.weekEnd; }catch(e){}
+  const restore=()=>{ try{ document.title=oldTitle; }catch(e){} window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+  setTimeout(restore, 1500);
+}
