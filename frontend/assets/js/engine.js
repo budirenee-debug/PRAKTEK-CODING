@@ -134,22 +134,6 @@ async function deleteBebanToko(){
   }catch(e){ showToast('Gagal hapus: ' + e.message); }
 }
 
-// ---------- Tabungan Operasional: status Tutup Kas (tim baca) ----------
-// (Setting nominal pindah ke Owner Space → Aturan Engine.)
-function _opsRp(v){ const n=parseInt(String(v??'').replace(/\D/g,'')); return isNaN(n)?0:n; }
-function _opsFmt(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
-async function tksOpsLoad(){
-  const el = document.getElementById('tksOps');
-  if(!el) return;
-  try{
-    const j = await apiFetch('/ops/status');
-    const sw = j.sewa||{}, bl = j.bulanan||{};
-    const kumpul = (bl.sisih||0)+(bl.ngendap||0);
-    const pct = bl.need ? Math.min(100, Math.round(kumpul/bl.need*100)) : 0;
-    el.innerHTML = `Sewa hari ini ......... ${sw.ok?'✅':'⏳'} <strong>${_opsFmt(sw.terbayar||0)}</strong> / target ${_opsFmt(sw.target_harian||0)}`
-      + `<br>Celengan bulanan ...... <strong>${_opsFmt(kumpul)}</strong> / ${_opsFmt(bl.need||0)} (${pct}%)`;
-  }catch(e){ el.textContent = '🏠 Operasional: belum diatur'; }
-}
 async function buildKasMemoCards(){
   const cards=[];
   const role=String(localStorage.getItem('role')||'').toLowerCase();
@@ -163,7 +147,7 @@ async function buildKasMemoCards(){
         const techs=await apiFetch('/technicians');
         for(const t of (Array.isArray(techs)?techs:[])){
           try{
-            const j=await apiFetch(`/engine/kas/teknisi/${t.id}`);
+            const j=await apiFetch(`/engine/kas/teknisi/${t.id}?limit=5000`);
             tj.push({nama:j.nama||t.nama||('Teknisi '+t.id), riwayat:j.riwayat||[]});
           }catch(e){}
         }
@@ -184,17 +168,6 @@ async function buildKasMemoCards(){
       desc:(jt>0 ? _rp(jt)+' — '+per.join(' • ')+' • dibayar Sabtu malam, belum keluar kas' : 'Belum ada jatah komisi/hadir minggu ini (Senin–Sabtu).'),
       label:'Buka Gajian', view:'gajian', info:true});
   }
-  try{
-    const j=await apiFetch('/ops/status');
-    const sw=j.sewa||{}, bl=j.bulanan||{};
-    const kumpul=(bl.sisih||0)+(bl.ngendap||0);
-    const pct=bl.need?Math.min(100,Math.round(kumpul/bl.need*100)):0;
-    const t=bl.terdekat;
-    cards.push({tone:'emerald', icon:'🏠', title:'Tabungan Operasional',
-      desc:`Sewa hari ini ${sw.ok?'✅':'⏳'} ${_opsFmt(sw.terbayar||0)}/${_opsFmt(sw.target_harian||0)} • Celengan bulan ini ${_opsFmt(kumpul)}/${_opsFmt(bl.need||0)} (${pct}%)`
-        +(t?` • terdekat ${t.label} tgl ${String(t.jatuh_tempo||'').slice(8,10)}`:''),
-      label:'Buka Kas', view:'kas-saya', info:true});
-  }catch(e){}
   return cards;
 }
 
@@ -356,7 +329,7 @@ async function renderKasToko(force){
       const list = Array.isArray(techs)?techs:[];
       for(const t of list){
         try{
-          const j = await apiFetch(`/engine/kas/teknisi/${t.id}`);
+          const j = await apiFetch(`/engine/kas/teknisi/${t.id}?limit=5000`);
           const nama = j.nama || t.nama || ('Teknisi '+t.id);
           _tj.push({nama, riwayat: j.riwayat||[]});
         }catch(e){}
@@ -898,7 +871,7 @@ async function kasTutupTokoLoad(){
   }catch(e){
     tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0, 120)}</td></tr>`;
   }
-  try{ tksOpsLoad(); }catch(e){}
+
 }
 async function kasTutupTokoSave(){
   if(_tksIsTek()){ (window.showToast || alert)('⛔ Hanya kasir/admin/owner yang boleh tutup kas'); return; }
@@ -924,7 +897,9 @@ async function kasTutupTokoSave(){
 // ---------- Filter Kas Toko: Harian / Mingguan (Senin-Sabtu) / Bulanan / Periode Pilihan ----------
 // Toko sengaja TIDAK ada all-time: modal awal yg nongol terus bikin bingung.
 // Modal awal/tambahan juga dikecualikan (domain Owner Space).
-let _kasTokoFilter='today', _kasTokoRowsAll=[], _rkRowsAll=[], _kasTokoTechJatah=[], _rkFilter='today';
+let _kasTokoFilter='today', _kasTokoRowsAll=[], _rkRowsAll=[], _kasTokoTechJatah=[], _rkFilter='today', _kasSub='arus';
+let _ktRowsAll=[], _ktRows=[], _ktTechs=[], _ktData={}, _ktSelected='', _ktLoaded=false, _ktLoading=false, _ktPage=1;
+const KT_SKIP_NAMA=['opi','superadmin'];
 let _kasCustomMode='day', _kasCustomValue='';
 function _kasTodayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _kasIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -972,14 +947,14 @@ function _kasInRange(t, f){
 function _kasFillCustomYears(){
   const sel=document.getElementById('kasCustomYear'); if(!sel) return;
   const years=new Set([+_kasTodayStr().slice(0,4), +_kasCustomGet().slice(0,4)]);
-  [..._kasTokoRowsAll,..._rkRowsAll].forEach(r=>{ const y=String(r.t||r.tanggal||'').slice(0,4); if(/^\d{4}$/.test(y)) years.add(+y); });
+  [..._kasTokoRowsAll,..._rkRowsAll,..._ktRowsAll].forEach(r=>{ const y=String(r.t||r.tanggal||'').slice(0,4); if(/^\d{4}$/.test(y)) years.add(+y); });
   const list=[...years].sort((a,b)=>a-b), sig=list.join(',');
   if(sel.dataset.years!==sig){ sel.dataset.years=sig; sel.innerHTML=list.map(y=>`<option value="${y}">${y}</option>`).join(''); }
   sel.value=_kasCustomGet().slice(0,4);
 }
 function kasCustomSyncUI(){
   const bar=document.getElementById('kasCustomBar'); if(!bar) return;
-  bar.style.display=(_kasTokoFilter==='custom'||_rkFilter==='custom')?'':'none';
+  bar.style.display=((_kasSub==='arus'&&_kasTokoFilter==='custom')||(_kasSub==='rincian'&&_rkFilter==='custom')||_kasSub==='komisi')?'':'none';
   try{ document.querySelectorAll('[data-kascu]').forEach(b=>b.classList.toggle('active', b.dataset.kascu===_kasCustomMode)); }catch(e){}
   const v=_kasCustomGet();
   const d=document.getElementById('kasCustomDate'), mo=document.getElementById('kasCustomMonth'), y=document.getElementById('kasCustomYear');
@@ -988,8 +963,9 @@ function kasCustomSyncUI(){
   if(y){ y.style.display=_kasCustomMode==='year'?'':'none'; _kasFillCustomYears(); }
 }
 function kasCustomApply(){
-  if(_kasTokoFilter==='custom') applyKasTokoFilter();
-  if(_rkFilter==='custom') applyRkFilter();
+  if(_kasSub==='arus'&&_kasTokoFilter==='custom') applyKasTokoFilter();
+  if(_kasSub==='rincian'&&_rkFilter==='custom') applyRkFilter();
+  if(_kasSub==='komisi') applyKomisiFilter();
 }
 function setKasCustomMode(m){
   _kasCustomMode=(m==='month'||m==='year')?m:'day';
@@ -1392,6 +1368,9 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
             || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
           document.querySelectorAll('[data-kas="toko"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
           document.querySelectorAll('[data-kasview="arus"],[data-kasview="rincian"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+          const bolehKomisi = _ktBoleh();
+          document.querySelectorAll('[data-kasview="komisi"]').forEach(b=>{ b.style.display = bolehKomisi ? '' : 'none'; });
+          if(!bolehKomisi && _kasSub==='komisi') setKasSub('arus');
           setKasTab(isTek ? 'saya' : (_kasTab || 'toko'));
           if(!isTek){ try{ kasTutupTokoLoad(); }catch(e){} }
         }catch(e){ renderKasSaya(); }
@@ -1412,7 +1391,7 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} });
 else { try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} }
 // ---------- Rincian Keluar: tab khusus pengeluaran di Kas Toko (satu pintu operasional) ----------
-let _kasSub = 'arus', _rkRows = [], _rkPage = 1;
+let _rkRows = [], _rkPage = 1;
 const RK_PER = 10;
 const RK_LBL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
 function setRkFilter(f){
@@ -1430,14 +1409,19 @@ function applyRkFilter(){
   drawRincianKeluar();
 }
 function setKasSub(t){
-  _kasSub = (t === 'rincian') ? 'rincian' : 'arus';
+  if(t === 'komisi' && !_ktBoleh()) t = 'arus';
+  _kasSub = (t === 'rincian' || t === 'komisi') ? t : 'arus';
   try{ document.querySelectorAll('[data-kassub]').forEach(b=>b.classList.toggle('active', b.dataset.kassub===_kasSub)); }catch(e){}
   try{ document.getElementById('kasPanel-arus').style.display = _kasSub==='arus'?'':'none'; }catch(e){}
   try{ document.getElementById('kasPanel-rincian').style.display = _kasSub==='rincian'?'':'none'; }catch(e){}
+  try{ document.getElementById('kasPanel-komisi').style.display = _kasSub==='komisi'?'':'none'; }catch(e){}
+  try{ document.getElementById('tksCard').style.display = _kasSub==='komisi'?'none':''; }catch(e){}
   if(_kasSub === 'rincian') renderRincianKeluar();
+  if(_kasSub === 'komisi') renderKomisiTeknisi();
+  kasCustomSyncUI();
   _kasViewSync();
 }
-// Sub-tab kas satu baris: Arus Toko | Rincian Keluar | Kas Saya (ganti 2 baris tab ganda).
+// Sub-tab kas satu baris: Arus Toko | Rincian Keluar | Komisi Teknisi | Kas Saya.
 function _kasViewSync(){
   try{
     const v = (_kasTab === 'saya') ? 'saya' : _kasSub;
@@ -1445,8 +1429,12 @@ function _kasViewSync(){
   }catch(e){}
 }
 function setKasView(v){
+  if(v === 'komisi' && !_ktBoleh()){
+    try{ showToast('Komisi teknisi khusus owner/admin'); }catch(e){}
+    v = 'arus';
+  }
   if(v === 'saya') setKasTab('saya');
-  else { setKasTab('toko'); setKasSub(v === 'rincian' ? 'rincian' : 'arus'); }
+  else { setKasTab('toko'); setKasSub(v === 'rincian' || v === 'komisi' ? v : 'arus'); }
   _kasViewSync();
 }
 function rkGo(p){
@@ -1589,4 +1577,102 @@ function printSlipGaji(id){
   window.addEventListener('afterprint', restore);
   window.print();
   setTimeout(restore, 1500);
+}
+function _ktBoleh(){
+  const role=String(localStorage.getItem('role')||'').toLowerCase();
+  return role==='owner'||role==='admin'||role==='superadmin';
+}
+function _ktSetTechUI(){
+  const tabs=document.getElementById('ktTechTabs');
+  if(tabs){
+    tabs.innerHTML='<button class="tab" data-kttech="" onclick="setKtTeknisi(\'\')">Semua</button>'
+      +_ktTechs.map(t=>`<button class="tab" data-kttech="${t.id}" onclick="setKtTeknisi('${t.id}')">${_esc(t.nama)}</button>`).join('')
+      +'<button class="btn btn-ghost small" style="margin-left:auto" onclick="loadKomisiTeknisi(true)">Refresh</button>';
+    tabs.querySelectorAll('[data-kttech]').forEach(b=>b.classList.toggle('active', String(b.dataset.kttech)===_ktSelected));
+  }
+}
+function setKtTeknisi(id){
+  _ktSelected=String(id||'');
+  _ktSetTechUI();
+  applyKomisiFilter();
+}
+function applyKomisiFilter(){
+  const p=_kasPeriodRows(_ktRowsAll,'custom','tanggal');
+  _ktRows=p.rows; _ktPage=1;
+  const info=document.getElementById('ktPeriodeInfo');
+  if(info) info.textContent=p.info;
+  drawKomisiTeknisi();
+}
+function renderKomisiTeknisi(){
+  if(!_ktBoleh()) return;
+  if(!_ktLoaded){
+    drawKomisiTeknisi();
+    if(!_ktLoading) loadKomisiTeknisi();
+    return;
+  }
+  applyKomisiFilter();
+}
+async function loadKomisiTeknisi(force){
+  if(!_ktBoleh() || _ktLoading) return;
+  if(_ktLoaded && !force){ applyKomisiFilter(); return; }
+  _ktLoading=true;
+  drawKomisiTeknisi();
+  try{
+    const techs=await apiFetch('/technicians');
+    const list=(Array.isArray(techs)?techs:[]).filter(t=>KT_SKIP_NAMA.indexOf(String(t.nama||'').trim().toLowerCase())<0);
+    const data={};
+    for(const t of list){
+      try{ data[t.id]=await apiFetch(`/engine/kas/teknisi/${t.id}?limit=5000`); }
+      catch(e){ data[t.id]={nama:t.nama, riwayat:[]}; }
+    }
+    _ktTechs=list.map(t=>({id:t.id, nama:(data[t.id]&&data[t.id].nama)||t.nama||('Teknisi '+t.id)}));
+    _ktData=data;
+    const all=[];
+    _ktTechs.forEach(t=>{
+      const riwayat=(data[t.id]&&data[t.id].riwayat)||[];
+      riwayat.forEach(l=>all.push(Object.assign({}, l, {teknisi_id:t.id, nama:t.nama})));
+    });
+    all.sort((a,b)=>String(b.tanggal||'').localeCompare(String(a.tanggal||''))||(Number(b.id)||0)-(Number(a.id)||0));
+    _ktRowsAll=all;
+    if(_ktSelected && !_ktTechs.some(t=>String(t.id)===_ktSelected)) _ktSelected='';
+    _ktLoaded=true;
+  }catch(e){
+    try{ showToast('Gagal memuat komisi teknisi: '+(e.message||e)); }catch(err){}
+  }finally{
+    _ktLoading=false;
+  }
+  _ktSetTechUI();
+  applyKomisiFilter();
+}
+function ktGo(p){ _ktPage=p; drawKomisiTeknisi(); }
+function drawKomisiTeknisi(){
+  const tb=document.getElementById('tbodyKomisiTeknisi'); if(!tb) return;
+  const head=document.getElementById('ktHead'), span=_ktSelected?4:5;
+  if(head) head.innerHTML='<tr><th>Tanggal</th>'+(_ktSelected?'':'<th>Teknisi</th>')+'<th>Keterangan</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th></tr>';
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const empty=(msg)=>{ tb.innerHTML='<tr><td colspan="'+span+'" style="text-align:center;padding:16px;color:#8a8f98">'+msg+'</td></tr>'; set('ktRingkasan',''); _kasPagerDraw('ktPaginationInfo','ktPaginationBtns',0,1,'ktGo'); };
+  if(!_ktBoleh()){ empty('Data komisi khusus owner/admin'); return; }
+  if(_ktLoading){ empty('Memuat data teknisi...'); return; }
+  if(!_ktLoaded || !_ktTechs.length){ empty('Belum ada teknisi'); return; }
+  let rows=_ktRows.slice();
+  if(_ktSelected) rows=rows.filter(r=>String(r.teknisi_id)===_ktSelected);
+  if(!rows.length){ empty('Belum ada komisi pada periode ini'); return; }
+  const sum=(tipe,field)=>rows.filter(r=>r.tipe===tipe).reduce((s,r)=>s+(Number(r[field])||0),0);
+  const komisi=sum('komisi_cair','masuk'), hadir=sum('allowance','masuk');
+  const refund=sum('refund_balik','keluar'), potong=sum('potongan_cicilan','keluar')+refund;
+  set('ktRingkasan','Komisi '+_rp(komisi)+' • Hadir '+_rp(hadir)+' • Potong '+_rp(potong)+' • Terima '+_rp(komisi+hadir-refund));
+  _ktPage=_kasPagerDraw('ktPaginationInfo','ktPaginationBtns',rows.length,_ktPage,'ktGo');
+  const slice=rows.slice((_ktPage-1)*KAS_PER,_ktPage*KAS_PER);
+  const label={komisi_cair:'Komisi Cair',allowance:'Uang Hadir',potongan_cicilan:'Cicilan',refund_balik:'Refund Balik'};
+  tb.innerHTML=slice.map(r=>{
+    const masuk=Number(r.masuk)||0, keluar=Number(r.keluar)||0, tipe=String(r.tipe||'-');
+    const ket=[label[tipe],r.invoice,r.ket].filter(Boolean).map(v=>String(v)).join(' • ');
+    return '<tr>'
+      +'<td>'+_esc(String(r.tanggal||'').slice(0,10))+'</td>'
+      +(_ktSelected?'':'<td>'+_esc(r.nama||'')+'</td>')
+      +'<td style="font-size:11px">'+_esc(ket)+'</td>'
+      +'<td style="text-align:right;color:#059669">'+(masuk?_rp(masuk):'-')+'</td>'
+      +'<td style="text-align:right;color:#dc2626">'+(keluar?_rp(keluar):'-')+'</td>'
+    +'</tr>';
+  }).join('');
 }

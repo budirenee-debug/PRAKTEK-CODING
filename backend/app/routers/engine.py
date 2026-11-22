@@ -210,7 +210,7 @@ def my_quota(store_id: Optional[int] = Query(None),
             "rasio": f"{rasio}:1", "reset": "00:00"}
 
 
-def _kas_summary(db: Session, store_id: int, technician_id: int):
+def _kas_summary(db: Session, store_id: int, technician_id: int, limit: int = 100):
     leds = db.query(models.CommissionLedger).filter(
         models.CommissionLedger.store_id == store_id,
         models.CommissionLedger.technician_id == technician_id).all()
@@ -254,7 +254,7 @@ def _kas_summary(db: Session, store_id: int, technician_id: int):
             "riwayat": [{"id": l.id, "tanggal": l.tanggal, "invoice": l.invoice, "tipe": l.tipe,
                          "masuk": l.masuk_rp, "keluar": l.keluar_rp, "hpp": l.hpp_rp or 0,
                          "sisa_hutang": l.sisa_hutang_saat_itu, "ket": l.keterangan}
-                        for l in sorted(leds, key=lambda x: x.id or 0, reverse=True)[:100]]}
+                         for l in sorted(leds, key=lambda x: x.id or 0, reverse=True)[:limit]]}
 
 
 @router.get("/kas/saya")
@@ -274,6 +274,7 @@ def kas_saya(store_id: Optional[int] = Query(None),
 
 @router.get("/kas/teknisi/{technician_id}")
 def kas_teknisi(technician_id: int, store_id: Optional[int] = Query(None),
+                limit: int = Query(100, ge=1, le=5000),
                 db: Session = Depends(get_db), current=Depends(get_current_user)):
     """Buku kas per teknisi (owner/admin only)."""
     store = resolve_store(db, current, store_id)
@@ -283,9 +284,9 @@ def kas_teknisi(technician_id: int, store_id: Optional[int] = Query(None),
     if role not in ["superadmin", "owner", "admin"]:
         raise HTTPException(status_code=403, detail="Hanya owner/admin yang boleh lihat kas teknisi")
     tech = db.query(models.Technician).filter(models.Technician.id == technician_id).first()
-    if not tech:
+    if not tech or (tech.store_id is not None and tech.store_id != store.id):
         raise HTTPException(status_code=404, detail="Teknisi tidak ditemukan")
-    out = _kas_summary(db, store.id, tech.id)
+    out = _kas_summary(db, store.id, tech.id, limit=limit)
     out.update({"nama": tech.nama, "level": tech.level or "junior"})
     return out
 
