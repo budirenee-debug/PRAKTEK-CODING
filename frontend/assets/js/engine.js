@@ -134,24 +134,10 @@ async function deleteBebanToko(){
   }catch(e){ showToast('Gagal hapus: ' + e.message); }
 }
 
-// ---------- Tabungan Operasional: memo Kas Toko + status Tutup Kas (tim baca) ----------
+// ---------- Tabungan Operasional: status Tutup Kas (tim baca) ----------
 // (Setting nominal pindah ke Owner Space → Aturan Engine.)
 function _opsRp(v){ const n=parseInt(String(v??'').replace(/\D/g,'')); return isNaN(n)?0:n; }
 function _opsFmt(n){ try{ return formatRupiah(Number(n)||0); }catch(e){ return 'Rp '+Number(n||0).toLocaleString('id-ID'); } }
-async function opsMemoLoad(){
-  const el = document.getElementById('opsMemo');
-  if(!el) return;
-  try{
-    const j = await apiFetch('/ops/status');
-    const sw = j.sewa||{}, bl = j.bulanan||{};
-    const kumpul = (bl.sisih||0)+(bl.ngendap||0);
-    const pct = bl.need ? Math.min(100, Math.round(kumpul/bl.need*100)) : 0;
-    const t = bl.terdekat;
-    el.innerHTML = `🏠 Operasional • Sewa hari ini ${sw.ok?'✅':'⏳'} <strong>${_opsFmt(sw.terbayar||0)}/${_opsFmt(sw.target_harian||0)}</strong>`
-      + ` • Celengan bln ini <strong>${_opsFmt(kumpul)}/${_opsFmt(bl.need||0)}</strong> (${pct}%)`
-      + (t ? ` • terdekat: ${_esc(t.label)} tgl ${String(t.jatuh_tempo||'').slice(8,10)}` : '');
-  }catch(e){ el.textContent = '🏠 Operasional: belum diatur (owner atur di Pengaturan)'; }
-}
 async function tksOpsLoad(){
   const el = document.getElementById('tksOps');
   if(!el) return;
@@ -163,6 +149,53 @@ async function tksOpsLoad(){
     el.innerHTML = `Sewa hari ini ......... ${sw.ok?'✅':'⏳'} <strong>${_opsFmt(sw.terbayar||0)}</strong> / target ${_opsFmt(sw.target_harian||0)}`
       + `<br>Celengan bulanan ...... <strong>${_opsFmt(kumpul)}</strong> / ${_opsFmt(bl.need||0)} (${pct}%)`;
   }catch(e){ el.textContent = '🏠 Operasional: belum diatur'; }
+}
+async function buildKasMemoCards(){
+  const cards=[];
+  const role=String(localStorage.getItem('role')||'').toLowerCase();
+  if(role==='teknisi') return cards;
+  if(['owner','admin','superadmin'].includes(role)){
+    const w=_kasWeekRange();
+    let tj=Array.isArray(_kasTokoTechJatah)?_kasTokoTechJatah:[];
+    if(!tj.length){
+      tj=[];
+      try{
+        const techs=await apiFetch('/technicians');
+        for(const t of (Array.isArray(techs)?techs:[])){
+          try{
+            const j=await apiFetch(`/engine/kas/teknisi/${t.id}`);
+            tj.push({nama:j.nama||t.nama||('Teknisi '+t.id), riwayat:j.riwayat||[]});
+          }catch(e){}
+        }
+      }catch(e){}
+      _kasTokoTechJatah=tj;
+    }
+    let jt=0; const per=[];
+    tj.forEach(o=>{
+      let s=0;
+      (o.riwayat||[]).forEach(l=>{
+        const d=String(l.tanggal||'').slice(0,10);
+        if(d<w.start||d>w.end) return;
+        if(l.tipe==='komisi_cair'||l.tipe==='allowance') s+=Number(l.masuk)||0;
+      });
+      if(s>0){ jt+=s; per.push(String(o.nama||'')+' '+_rp(s)); }
+    });
+    cards.push({tone:'amber', icon:'💰', title:'Jatah Teknisi Minggu Ini',
+      desc:(jt>0 ? _rp(jt)+' — '+per.join(' • ')+' • dibayar Sabtu malam, belum keluar kas' : 'Belum ada jatah komisi/hadir minggu ini (Senin–Sabtu).'),
+      label:'Buka Gajian', view:'gajian', info:true});
+  }
+  try{
+    const j=await apiFetch('/ops/status');
+    const sw=j.sewa||{}, bl=j.bulanan||{};
+    const kumpul=(bl.sisih||0)+(bl.ngendap||0);
+    const pct=bl.need?Math.min(100,Math.round(kumpul/bl.need*100)):0;
+    const t=bl.terdekat;
+    cards.push({tone:'emerald', icon:'🏠', title:'Tabungan Operasional',
+      desc:`Sewa hari ini ${sw.ok?'✅':'⏳'} ${_opsFmt(sw.terbayar||0)}/${_opsFmt(sw.target_harian||0)} • Celengan bulan ini ${_opsFmt(kumpul)}/${_opsFmt(bl.need||0)} (${pct}%)`
+        +(t?` • terdekat ${t.label} tgl ${String(t.jatuh_tempo||'').slice(8,10)}`:''),
+      label:'Buka Kas', view:'kas-saya', info:true});
+  }catch(e){}
+  return cards;
 }
 
 function setLapTekTab(t){
@@ -292,7 +325,7 @@ async function renderKasToko(force){
     const SUKSES = ['Service Sukses','Sudah Diambil','Selesai'];
     const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0,10);
     let services = [];
-    try{ services = await apiFetch('/services?limit=200'); }catch(e){ services = []; }
+    try{ services = await apiFetch('/services?limit=5000'); }catch(e){ services = []; }
     const cair = (Array.isArray(services)?services:[]).filter(d=>SUKSES.includes(d.status));
     let masukTotal = cair.reduce((s,d)=>s+(Number(d.biaya)||0),0);
     const rows = cair.map(d=>({t: actDate(d), ref: d.invoice||'-', tipe: '💰 Pendapatan cair', masuk: Number(d.biaya)||0, keluar: 0, ket: `${d.device||''} • ${d.teknisi||''} • ${d.metode_bayar||'Belum bayar'}`}));
@@ -385,6 +418,7 @@ async function renderKasToko(force){
     // simpan semua baris all-time, tampilkan sesuai filter tanggal (Hari/Minggu/Semua)
     _kasTokoRowsAll=rows;
     applyKasTokoFilter();
+    kasCustomSyncUI();
   }catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#dc2626">Gagal: ${_esc(e.message).slice(0,150)}</td></tr>`;
   }
@@ -887,38 +921,107 @@ async function kasTutupTokoSave(){
   try{ wcReminderCheck(); }catch(e){}
   }catch(e){ (window.showToast || alert)('Gagal simpan tutup kas: ' + (e.message || e)); }
 }
-// ---------- Filter Kas Toko: Harian / Mingguan (Senin-Sabtu) / Bulanan ----------
+// ---------- Filter Kas Toko: Harian / Mingguan (Senin-Sabtu) / Bulanan / Periode Pilihan ----------
 // Toko sengaja TIDAK ada all-time: modal awal yg nongol terus bikin bingung.
 // Modal awal/tambahan juga dikecualikan (domain Owner Space).
-let _kasTokoFilter='today', _kasTokoRowsAll=[], _kasTokoTechJatah=[];
+let _kasTokoFilter='today', _kasTokoRowsAll=[], _rkRowsAll=[], _kasTokoTechJatah=[], _rkFilter='today';
+let _kasCustomMode='day', _kasCustomValue='';
 function _kasTodayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _kasIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _kasWeekRange(){
   const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const dow=d.getDay(); const end=new Date(d);
   if(dow===0) end.setDate(d.getDate()-1); else end.setDate(d.getDate()+(6-dow));
   const start=new Date(end); start.setDate(end.getDate()-5);
-  const iso=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
-  return {start:iso(start), end:iso(end)};
+  return {start:_kasIso(start), end:_kasIso(end)};
 }
+function _kasCustomGet(){ return /^\d{4}-\d{2}-\d{2}$/.test(_kasCustomValue) ? _kasCustomValue : _kasTodayStr(); }
+function _kasCustomRange(){
+  const v=_kasCustomGet();
+  if(_kasCustomMode==='month'){
+    const ym=v.slice(0,7), y=+ym.slice(0,4), m=+ym.slice(5,7);
+    const last=new Date(y,m,0).getDate();
+    const label=new Date(y,m-1,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    return {start:ym+'-01', end:ym+'-'+String(last).padStart(2,'0'), info:'📆 '+label};
+  }
+  if(_kasCustomMode==='year'){
+    const y=v.slice(0,4);
+    return {start:y+'-01-01', end:y+'-12-31', info:'🗓️ Tahun '+y};
+  }
+  const label=new Date(+v.slice(0,4),+v.slice(5,7)-1,+v.slice(8,10)).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  return {start:v, end:v, info:'🎯 '+label};
+}
+function _kasPeriodRows(rows, f, key){
+  f=f||'today'; key=key||'t';
+  const dateOf=r=>String(r[key]||'').slice(0,10);
+  if(f==='today'){ const t=_kasTodayStr(); return {rows:rows.filter(r=>dateOf(r)===t), info:'📅 '+t}; }
+  if(f==='week'){ const w=_kasWeekRange(); return {rows:rows.filter(r=>{ const t=dateOf(r); return t>=w.start&&t<=w.end; }), info:'🗓️ '+w.start+' s/d '+w.end}; }
+  if(f==='month'){ const ym=_kasTodayStr().slice(0,7); return {rows:rows.filter(r=>dateOf(r).slice(0,7)===ym), info:'📆 '+ym}; }
+  if(f==='custom'){ const p=_kasCustomRange(); return {rows:rows.filter(r=>{ const t=dateOf(r); return t>=p.start&&t<=p.end; }), info:p.info}; }
+  return {rows:[], info:''};
+}
+function _kasInRange(t, f){
+  f=f||_kasTokoFilter;
+  t=String(t||'').slice(0,10); if(!t) return false;
+  if(f==='today') return t===_kasTodayStr();
+  if(f==='week'){ const w=_kasWeekRange(); return t>=w.start&&t<=w.end; }
+  if(f==='month') return t.slice(0,7)===_kasTodayStr().slice(0,7);
+  if(f==='custom'){ const p=_kasCustomRange(); return t>=p.start&&t<=p.end; }
+  return true;
+}
+function _kasFillCustomYears(){
+  const sel=document.getElementById('kasCustomYear'); if(!sel) return;
+  const years=new Set([+_kasTodayStr().slice(0,4), +_kasCustomGet().slice(0,4)]);
+  [..._kasTokoRowsAll,..._rkRowsAll].forEach(r=>{ const y=String(r.t||r.tanggal||'').slice(0,4); if(/^\d{4}$/.test(y)) years.add(+y); });
+  const list=[...years].sort((a,b)=>a-b), sig=list.join(',');
+  if(sel.dataset.years!==sig){ sel.dataset.years=sig; sel.innerHTML=list.map(y=>`<option value="${y}">${y}</option>`).join(''); }
+  sel.value=_kasCustomGet().slice(0,4);
+}
+function kasCustomSyncUI(){
+  const bar=document.getElementById('kasCustomBar'); if(!bar) return;
+  bar.style.display=(_kasTokoFilter==='custom'||_rkFilter==='custom')?'':'none';
+  try{ document.querySelectorAll('[data-kascu]').forEach(b=>b.classList.toggle('active', b.dataset.kascu===_kasCustomMode)); }catch(e){}
+  const v=_kasCustomGet();
+  const d=document.getElementById('kasCustomDate'), mo=document.getElementById('kasCustomMonth'), y=document.getElementById('kasCustomYear');
+  if(d){ d.style.display=_kasCustomMode==='day'?'':'none'; d.value=v; }
+  if(mo){ mo.style.display=_kasCustomMode==='month'?'':'none'; mo.value=v.slice(0,7); }
+  if(y){ y.style.display=_kasCustomMode==='year'?'':'none'; _kasFillCustomYears(); }
+}
+function kasCustomApply(){
+  if(_kasTokoFilter==='custom') applyKasTokoFilter();
+  if(_rkFilter==='custom') applyRkFilter();
+}
+function setKasCustomMode(m){
+  _kasCustomMode=(m==='month'||m==='year')?m:'day';
+  kasCustomSyncUI(); kasCustomApply();
+}
+function setKasCustomValue(v){
+  v=String(v||'');
+  if(_kasCustomMode==='month' && /^\d{4}-\d{2}$/.test(v)) v+='-01';
+  if(_kasCustomMode==='year' && /^\d{4}$/.test(v)) v+='-01-01';
+  _kasCustomValue=/^\d{4}-\d{2}-\d{2}$/.test(v)?v:_kasTodayStr();
+  kasCustomSyncUI(); kasCustomApply();
+}
+function kasCustomShift(delta){
+  const v=_kasCustomGet();
+  let next=v;
+  if(_kasCustomMode==='day'){ const d=new Date(+v.slice(0,4),+v.slice(5,7)-1,+v.slice(8,10)); d.setDate(d.getDate()+delta); next=_kasIso(d); }
+  else if(_kasCustomMode==='month'){ const d=new Date(+v.slice(0,4),+v.slice(5,7)-1+delta,1); next=_kasIso(d).slice(0,7)+'-01'; }
+  else { next=String(+v.slice(0,4)+delta)+'-01-01'; }
+  _kasCustomValue=next;
+  kasCustomSyncUI(); kasCustomApply();
+}
+function kasCustomReset(){ _kasCustomValue=_kasTodayStr(); kasCustomSyncUI(); kasCustomApply(); }
 function setKasTokoFilter(f){
   _kasTokoFilter=f;
   try{ document.querySelectorAll('[data-kasf]').forEach(b=>b.classList.toggle('active', b.dataset.kasf===f)); }catch(e){}
+  kasCustomSyncUI();
   applyKasTokoFilter();
-}
-function _kasInRange(t){
-  t=String(t||'').slice(0,10); if(!t) return false;
-  if(_kasTokoFilter==='today') return t===_kasTodayStr();
-  if(_kasTokoFilter==='week'){ const w=_kasWeekRange(); return t>=w.start&&t<=w.end; }
-  if(_kasTokoFilter==='month') return t.slice(0,7)===_kasTodayStr().slice(0,7);
-  return true;
 }
 function applyKasTokoFilter(){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  let rows=[..._kasTokoRowsAll], info='';
-  if(_kasTokoFilter==='today'){ const t=_kasTodayStr(); rows=rows.filter(r=>String(r.t||'').slice(0,10)===t); info='📅 '+t; }
-  else if(_kasTokoFilter==='week'){ const w=_kasWeekRange(); rows=rows.filter(r=>{ const t=String(r.t||'').slice(0,10); return t>=w.start&&t<=w.end; }); info='🗓️ '+w.start+' s/d '+w.end; }
-  else if(_kasTokoFilter==='month'){ const ym=_kasTodayStr().slice(0,7); rows=rows.filter(r=>String(r.t||'').slice(0,7)===ym); info='📆 '+ym; }
-  else { rows=[]; }
+  const p=_kasPeriodRows([..._kasTokoRowsAll], _kasTokoFilter, 't');
+  let rows=p.rows, info=p.info;
   let m=0,k=0,rf=0,bt=0,op=0,st=0,nm=0;
   rows.forEach(r=>{ const mi=Number(r.masuk)||0, ko=Number(r.keluar)||0; m+=mi; k+=ko; if(mi>0) nm++;
     const tp=String(r.tipe||'');
@@ -930,20 +1033,9 @@ function applyKasTokoFilter(){
   set('kasTokoKeluar', _rp(k)); set('kasTokoKeluarSub', 'operasional '+_rp(op)+' • belanja stok '+_rp(st)+' • refund '+_rp(rf)+' • beban toko '+_rp(bt));
   set('kasTokoSisa', _rp(m-k));
   set('kasTokoFilterInfo', info);
-  // Memo jatah teknisi periode ini (komisi+hadir) — belum keluar kas, dibayar Sabtu. Bukan pengurang sisa.
-  let jt=0; const per=[];
-  (_kasTokoTechJatah||[]).forEach(o=>{
-    let s=0; (o.riwayat||[]).forEach(l=>{ if(!_kasInRange(l.tanggal)) return; if(l.tipe==='komisi_cair'||l.tipe==='allowance') s+=Number(l.masuk)||0; });
-    if(s>0){ jt+=s; per.push(_esc(o.nama)+' '+_rp(s)); }
-  });
-  const jm=document.getElementById('kasTokoJatah');
-  if(jm) jm.innerHTML='💰 Jatah teknisi periode ini <strong>'+_rp(jt)+'</strong> — dibayar Sabtu malam, <strong>belum keluar kas</strong>'
-    +(per.length?'<br><span style="font-size:11px">'+per.join(' • ')+'</span>':'<br><span style="font-size:11px">belum ada jatah periode ini</span>')
-    +' <button class="btn btn-dark small" style="margin-left:8px;white-space:nowrap" onclick="switchView(\'gajian\')">Buka Gajian →</button>';
   rows.sort((a,b)=>String(b.t||'').localeCompare(String(a.t||'')));
   _kasTokoRows=rows; _kasTokoPage=1;
   drawKasToko();
-  try{ opsMemoLoad(); }catch(e){}
 }
 // ---------- Gajian Sabtu: slip mingguan Senin-Sabtu per teknisi ----------
 // Sumber: /engine/kas/teknisi/{id} (riwayat ledger), difilter tanggal minggu.
@@ -1320,26 +1412,19 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>{ try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} });
 else { try{ kasBarToko(); }catch(e){} try{ kasHashRoute(); }catch(e){} }
 // ---------- Rincian Keluar: tab khusus pengeluaran di Kas Toko (satu pintu operasional) ----------
-let _kasSub = 'arus', _rkRows = [], _rkRowsAll = [], _rkPage = 1, _rkFilter = 'today';
+let _kasSub = 'arus', _rkRows = [], _rkPage = 1;
 const RK_PER = 10;
 const RK_LBL = {B1:'Sparepart',B2:'Accessories',C1:'Gaji',C2:'Tempat',C3:'Internet',C4:'Harian',C5:'Marketing',C6:'Maintenance',D:'Aset'};
 function setRkFilter(f){
   _rkFilter = f;
   try{ document.querySelectorAll('[data-rkf]').forEach(b=>b.classList.toggle('active', b.dataset.rkf===f)); }catch(e){}
+  kasCustomSyncUI();
   applyRkFilter();
 }
-function _rkInRange(t){
-  t = String(t||'').slice(0,10); if(!t) return false;
-  if(_rkFilter === 'today') return t === _kasTodayStr();
-  if(_rkFilter === 'week'){ const w = _kasWeekRange(); return t >= w.start && t <= w.end; }
-  if(_rkFilter === 'month') return t.slice(0,7) === _kasTodayStr().slice(0,7);
-  return true;
-}
+function _rkInRange(t){ return _kasInRange(t, _rkFilter); }
 function applyRkFilter(){
-  let rows = [..._rkRowsAll], info = '';
-  if(_rkFilter === 'today'){ const t = _kasTodayStr(); rows = rows.filter(r=>String(r.tanggal||'').slice(0,10)===t); info = '📅 '+t; }
-  else if(_rkFilter === 'week'){ const w = _kasWeekRange(); rows = rows.filter(r=>{ const t = String(r.tanggal||'').slice(0,10); return t>=w.start&&t<=w.end; }); info = '🗓️ '+w.start+' s/d '+w.end; }
-  else if(_rkFilter === 'month'){ const ym = _kasTodayStr().slice(0,7); rows = rows.filter(r=>String(r.tanggal||'').slice(0,7)===ym); info = '📆 '+ym; }
+  const p=_kasPeriodRows([..._rkRowsAll], _rkFilter, 'tanggal');
+  let rows=p.rows, info=p.info;
   const infoEl = document.getElementById('rkFilterInfo'); if(infoEl) infoEl.textContent = info;
   _rkRows = rows; _rkPage = 1;
   drawRincianKeluar();
@@ -1415,6 +1500,7 @@ async function renderRincianKeluar(){
     set('rkTotalSub', (ring.total || 0) + ' catatan semua');
     _rkRowsAll = arr;
     applyRkFilter();
+    kasCustomSyncUI();
   }catch(e){
     _rkRowsAll = []; _rkRows = [];
     const infoEl = document.getElementById('rkFilterInfo'); if(infoEl) infoEl.textContent = '';

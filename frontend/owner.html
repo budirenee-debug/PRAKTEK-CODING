@@ -129,6 +129,17 @@
     .bos-kv{display:flex;justify-content:space-between;gap:6px;padding:3px 0;border-bottom:1px solid #f3f4f6;font-size:11px;white-space:nowrap;overflow:hidden}
     .bos-kv:last-child{border-bottom:0}
     .bos-kv strong{overflow:hidden;text-overflow:ellipsis}
+    /* strip LABA: 1 baris, rumus mentor terbaca kiri-ke-kanan */
+    .bos-laba{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;overflow-x:auto;
+      background:#fff;border:1px solid #ececec;border-left:4px solid #7c3aed;border-radius:10px;
+      padding:6px 10px;margin-bottom:6px;white-space:nowrap}
+    .bos-laba-t{font-size:9.5px;font-weight:800;color:#7c3aed;letter-spacing:.4px;flex-shrink:0}
+    .bos-laba-i{display:flex;flex-direction:column;line-height:1.15;flex-shrink:0}
+    .bos-laba-i em{font-style:normal;font-size:9.5px;color:#8a8f98}
+    .bos-laba-i b{font-size:12.5px}
+    .bos-laba-i.tot{background:#f5f3ff;border-radius:6px;padding:1px 7px}
+    .bos-laba-i.tot b{color:#7c3aed}
+    .bos-laba-op{color:#c9ced6;font-size:12px;font-weight:700;flex-shrink:0}
     /* sembunyikan tabel + kartu lama biar 1 layar muat; buka via Detail */
     #view-own-ringkas.bos-simple .bos-table,#view-own-ringkas.bos-simple .bos-legend{display:none}
     #view-own-ringkas.bos-simple > .stats,#view-own-ringkas.bos-simple > .card,
@@ -299,15 +310,29 @@
           <!-- BOS v2 SIMPLE: 1 baris status + 4 angka + 3 kolom, fit tanpa scroll -->
           <div id="bosBanner" class="bos-banner warn" style="display:none"><span class="dot"></span><div style="flex:1;min-width:0"><h3 id="bosBannerTitle">Memuat...</h3><p id="bosBannerSub"></p><p id="bosBannerWatch"></p></div><button class="btn btn-ghost small" onclick="document.getElementById('view-own-ringkas').classList.toggle('show-watch');document.getElementById('bosBanner').classList.toggle('show-watch')" title="Lihat Perlu dijaga">👀</button><button class="btn btn-ghost small" onclick="bosReload()" title="Hitung ulang">↻</button><button class="btn btn-ghost small" onclick="document.getElementById('view-own-ringkas').classList.toggle('show-old')" title="Detail lama">Detail</button></div>
           <div class="bos-4">
-            <div class="bos-num" style="border-left:4px solid #059669"><div class="lbl">Arus Kas • bln ini</div><h3 id="bosArus">-</h3><div class="sub" id="bosArusSub">-</div></div>
-            <div class="bos-num" style="border-left:4px solid #04074a"><div class="lbl">Saldo • runway</div><h3 id="bosSaldo">-</h3><div class="sub" id="bosSaldoSub">-</div></div>
-            <div class="bos-num" style="border-left:4px solid #2563eb"><div class="lbl">BEP • tercapai</div><h3 id="bosBep">-</h3><div class="sub" id="bosBepSub">-</div></div>
-            <div class="bos-num" style="border-left:4px solid #7c3aed"><div class="lbl">Margin kotor</div><h3 id="bosMargin">-</h3><div class="sub" id="bosMarginSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #059669"><div class="lbl">💵 Kas Masuk • bln ini</div><h3 id="bosMasuk" style="color:#059669">-</h3><div class="sub" id="bosMasukSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #dc2626"><div class="lbl">💸 Kas Keluar • bln ini</div><h3 id="bosKeluarKas" style="color:#dc2626">-</h3><div class="sub" id="bosKeluarKasSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #04074a"><div class="lbl">🏦 Saldo Kas • nyata</div><h3 id="bosSaldo">-</h3><div class="sub" id="bosSaldoSub">-</div></div>
+            <div class="bos-num" style="border-left:4px solid #7c3aed"><div class="lbl">📈 Arus Kas • bln ini</div><h3 id="bosArus">-</h3><div class="sub" id="bosArusSub">masuk − keluar</div></div>
+          </div>
+          <div class="bos-laba">
+            <span class="bos-laba-t">LABAUSAHA • bln ini</span>
+            <span class="bos-laba-i"><em>Omzet</em><b id="bosLomzet">-</b></span>
+            <span class="bos-laba-op">−</span>
+            <span class="bos-laba-i"><em>HPP</em><b id="bosLhpp">-</b></span>
+            <span class="bos-laba-op">=</span>
+            <span class="bos-laba-i"><em>Laba Kotor</em><b id="bosLkotor">-</b></span>
+            <span class="bos-laba-op">−</span>
+            <span class="bos-laba-i"><em>Operasional</em><b id="bosLops">-</b></span>
+            <span class="bos-laba-op">=</span>
+            <span class="bos-laba-i tot"><em>Laba Bersih</em><b id="bosLlaba">-</b></span>
+            <span class="bos-laba-op">|</span>
+            <span class="bos-laba-i"><em>Margin</em><b id="bosMargin">-</b></span>
           </div>
           <div class="bos-2">
-            <div class="bos-card"><h4>💧 Kas 6 bln <span class="muted" id="bosKasRange">masuk vs keluar</span></h4><div id="bosKasChart" class="bos-bars"><span style="font-size:11px;color:#8a8f98">Memuat...</span></div><div class="bos-table table-wrap" style="margin-top:4px"><table class="table compact"><tbody id="tbodyBosKas"></tbody></table></div></div>
-            <div class="bos-card"><h4>🧾 Keluar bln ini <span class="muted" id="bosKeluarTot">-</span></h4><div id="bosKeluarList"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div><div style="margin-top:4px;padding-top:4px;border-top:1px dashed #ececec" id="bosGrowth"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
-            <div class="bos-card"><h4>❤️ Sehat? <span class="muted">piutang • garansi • modal</span></h4><div id="bosCust"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div><div style="margin-top:4px;padding-top:4px;border-top:1px dashed #ececec" id="bosHealth"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
+            <div class="bos-card"><h4>💧 Kas 6 bln <span class="muted" id="bosKasRange">masuk vs keluar</span></h4><div id="bosKasChart" class="bos-bars"><span style="font-size:11px;color:#8a8f98">Memuat...</span></div></div>
+            <div class="bos-card"><h4>🧾 Keluar bln ini <span class="muted" id="bosKeluarTot">-</span></h4><div id="bosKeluarList"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
+            <div class="bos-card"><h4>❤️ Sehat? <span class="muted">piutang • stok • modal</span></h4><div id="bosCust"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div><div id="bosHealth" style="margin-top:4px;padding-top:4px;border-top:1px dashed #ececec"><p style="font-size:11px;color:#8a8f98">Memuat...</p></div></div>
           </div>
           <div class="stats">
             <div class="stat-card" onclick="ownShow('penjualan')" style="cursor:pointer;border-left:4px solid #059669">
@@ -810,10 +835,12 @@
             <div class="stat-card" style="border-left:4px solid #059669;background:#f0fdf4;margin-bottom:10px;cursor:pointer" onclick="ownShowKeu('hpp')" title="Lihat rincian di tab HPP"><div class="stat-head"><span>💰 Modal nempel di barang (Persediaan)</span></div><h3 id="bbPersediaan" style="color:#047857">-</h3><p class="trend" id="bbPersediaanSub">uang yang sudah jadi barang • klik → rincian HPP</p></div>
             <p style="font-size:11px;color:#8a8f98;margin:0 0 10px" id="bbNote">Memuat...</p>
             <div class="toolbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-              <select id="bbJenis" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Jenis</option><option value="masuk">Masuk</option><option value="keluar">Keluar</option><option value="transfer">Transfer</option></select>
-              <select id="bbKat" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option></select>
-              <select id="bbMedia" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Media</option></select>
-              <input id="bbSince" type="date" onchange="ownBuku()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+              <select id="bbJenis" onchange="bbResetPage()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Jenis</option><option value="masuk">Masuk</option><option value="keluar">Keluar</option><option value="transfer">Transfer</option></select>
+              <select id="bbKat" onchange="bbResetPage()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Kategori</option></select>
+              <select id="bbMedia" onchange="bbResetPage()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"><option value="">Semua Media</option></select>
+              <input id="bbSince" type="date" title="Dari tanggal" onchange="bbResetPage()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+              <input id="bbSampai" type="date" title="Sampai tanggal" onchange="bbResetPage()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+              <input id="bbCari" type="search" placeholder="Cari keterangan…" oninput="bbCariDebounce()" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff;min-width:150px">
             </div>
             <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Nominal</th><th>Media</th><th>Sumber</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyLedger"><tr><td colspan="8" style="text-align:center">Memuat...</td></tr></tbody></table></div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;font-size:12px;color:#8a8f98"><span id="bbPageInfo"></span><div id="bbPageBtns" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div></div>
@@ -862,6 +889,20 @@
             </div>
             <div class="form-actions" style="margin-top:10px"><button class="btn btn-dark" onclick="ownCloseSave()">🌙 Simpan Tutup Kas</button></div>
             <p style="font-size:11px;color:#8a8f98;margin-top:8px" id="clsInfo">Hitung uang fisik + cek mutasi bank/QRIS, isi kolom fisik, simpan malam ini juga.</p>
+          </div>
+          <div class="card">
+            <div class="card-head toolbar">
+              <div class="toolbar-left"><h3>📅 Riwayat &amp; Disiplin</h3><span class="muted">30 hari terakhir</span></div>
+              <div class="toolbar-right"><button class="btn btn-ghost small" onclick="ownCloseRiwayat()">↻</button></div>
+            </div>
+            <div class="stats" style="margin-bottom:10px">
+              <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Selesai Rp0</span></div><h3 id="risBersih">-</h3><p class="trend" id="risBersihSub">dari N hari ditutup</p></div>
+              <div class="stat-card" style="border-left:4px solid #f59e0b"><div class="stat-head"><span>Rata-rata selisih</span></div><h3 id="risRata">-</h3><p class="trend">per tutup kas</p></div>
+              <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Hari telat</span></div><h3 id="risTelat" style="color:#dc2626">-</h3><p class="trend">30 hari terakhir</p></div>
+              <div class="stat-card" style="border-left:4px solid #04074a"><div class="stat-head"><span>Hari ini</span></div><h3 id="risHariIni">-</h3><p class="trend" id="risHariIniSub">sudah tutup?</p></div>
+            </div>
+            <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th style="text-align:right">Sistem</th><th style="text-align:right">Fisik</th><th style="text-align:right">Selisih</th><th>Oleh</th><th>Catatan</th></tr></thead><tbody id="tbodyRiwayat"><tr><td colspan="6" style="text-align:center">Memuat...</td></tr></tbody></table></div>
+            <p style="font-size:11px;color:#8a8f98;margin-top:8px">Angka <strong>Sistem</strong> di bawah dihitung <em>s/d tanggal itu</em>, bukan s/d hari ini — jadi buka tanggal lama angkanya tetap benar. Selisih target <strong>Rp0</strong>.</p>
           </div>
         </section>
 
@@ -1382,7 +1423,7 @@
           bayar: () => ownBayar(),
           keluar: () => ownKeluar(),
           bukubesar: () => ownBuku(),
-          tutupkas: () => ownClose(),
+          tutupkas: () => Promise.allSettled([ownClose(), ownCloseRiwayat()]),
           penjualan: () => ownPenjualan(),
           laporan: () => ownLaporan(),
           inventori: () => { ownInvResetFilters(); return ownInvLoad(); },
@@ -1772,6 +1813,10 @@
     // Operasional = pengeluaran + uang hadir. Pemasukan lain/modal = arus kas, BUKAN omzet.
     let _arusPromise = null, _arusAt = 0;
     async function ownArus(){
+      // SATU sumber angka: /finance/ledger/periode (backend _agregat_ledger).
+      // Dulu fungsi ini hitung sendiri dari tabel Service/Sale/Refund/Expense dan
+      // melenceng 3 hal: (1) belanja stok dihitung operasional, (2) HPP part terpakai
+      // hilang, (3) komisi yang belum digaji dipotong dari arus kas.
       const now = Date.now();
       if(_arusPromise && (now - _arusAt) < 90000) return _arusPromise;
       _arusAt = now;
@@ -1780,90 +1825,88 @@
         const today = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
         const ym = today.slice(0, 7);
         const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
-        const actDate = d => String(d.diambil_at || d.updated_at || d.date || '').slice(0, 10);
-        const arr = await ownServices();
-        const ok = arr.filter(d => SUKSES.includes(d.status));
-        const sum = l => l.reduce((s, d) => s + (Number(d.biaya) || 0), 0);
-        const omSvcH = sum(ok.filter(d => actDate(d) === today));
-        const omSvcB = sum(ok.filter(d => actDate(d).slice(0, 7) === ym));
-        const omSvcT = sum(ok);
-        const mediaSvcH = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
-        ok.filter(d => actDate(d) === today).forEach(d => {
-          const m = d.metode_bayar || '';
-          const k = mediaSvcH[m] !== undefined ? m : 'Lain';
-          mediaSvcH[k] += Number(d.biaya) || 0;
-        });
-        const mediaSvcT = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
-        ok.forEach(d => {
-          const m = d.metode_bayar || '';
-          const k = mediaSvcT[m] !== undefined ? m : 'Lain';
-          mediaSvcT[k] += Number(d.biaya) || 0;
-        });
-        let komH = 0, komB = 0, komT = 0, hadH = 0, hadB = 0, hadT = 0;
-        try{
-          const techs = await ownFetch('/technicians');
-          const list = Array.isArray(techs) ? techs : [];
-          await Promise.all(list.map(async t => {
-            try{
-              const j = await ownFetch(`/engine/kas/teknisi/${t.id}`);
-              (j.riwayat || []).forEach(l => {
-                const m = Number(l.masuk) || 0; if(!m) return;
-                const tt = String(l.tanggal || '').slice(0, 10);
-                if(l.tipe === 'allowance'){ hadT += m; if(tt === today) hadH += m; if(tt.slice(0, 7) === ym) hadB += m; }
-                else if(l.tipe !== 'hutang_baru'){ komT += m; if(tt === today) komH += m; if(tt.slice(0, 7) === ym) komB += m; }
-              });
-            }catch(e){}
-          }));
-        }catch(e){}
-        const sumByDay = (rows, key) => {
-          let h = 0, b = 0, t = 0;
-          (Array.isArray(rows) ? rows : []).forEach(r => {
-            const n = Number(r[key]) || 0; if(!n) return;
-            const tt = String(r.tanggal || '').slice(0, 10);
-            t += n; if(tt === today) h += n; if(tt.slice(0, 7) === ym) b += n;
-          });
-          return {h, b, t};
+
+        const qs = '?dari=' + today + '&sampai=' + today;
+        const qb = '?bulan=' + ym;
+        const [pH, pB, pA] = await Promise.all([
+          ownFetch('/finance/ledger/periode' + qs).catch(() => null),
+          ownFetch('/finance/ledger/periode' + qb).catch(() => null),
+          ownFetch('/finance/ledger/periode').catch(() => null),
+        ]);
+
+        // map 1 periode -> field yang dipakai seluruh owner.html
+        const map = p => {
+          const L = (p && p.laba) || {}, K = (p && p.kas) || {}, N = (p && p.nempel) || {};
+          return {
+            omSvc: L.omzet_service || 0, jual: L.omzet_penjualan || 0, omLain: L.omzet_lain || 0,
+            ref: L.refund || 0, om: L.omzet || 0,
+            kom: L.hpp_komisi || 0, hppJual: L.hpp_modal_barang || 0, hppPart: L.hpp_part || 0,
+            cel: L.hpp_beban || 0, hpp: L.hpp || 0,
+            opsBiaya: L.ops_biaya || 0, had: L.ops_hadir || 0, ops: L.operasional || 0,
+            kotor: L.kotor || 0, laba: L.bersih || 0,
+            kasMasuk: K.masuk || 0, kasKeluar: K.keluar || 0, kas: K.bersih || 0,
+            kasGajian: K.keluar_gajian || 0, kasBelanja: K.keluar_belanja || 0,
+            kasRefund: K.keluar_refund || 0, kasOps: K.keluar_operasional || 0,
+            kasModal: K.masuk_modal || 0, kasLainMasuk: K.masuk_lain || 0, kasLainKeluar: K.keluar_lain || 0,
+            nempelHpp: N.hpp || 0, nempelOps: N.operasional || 0,
+            persediaan: (p && p.persediaan) || 0,
+            saldo: Object.values((p && p.saldo_akhir) || {}).reduce((a, b) => a + (Number(b) || 0), 0),
+            perMedia: (p && p.saldo_akhir) || {},
+          };
         };
-        let ref = {h: 0, b: 0, t: 0}, cel = {h: 0, b: 0, t: 0}, out = {h: 0, b: 0, t: 0}, inc = {h: 0, b: 0, t: 0};
-        try{ ref = sumByDay(await ownFetch('/finance/refunds'), 'nominal'); }catch(e){}
-        try{
-          let ac = [];
-          try{ ac = await ownFetch('/finance/accidents'); }catch(e){}
-          ac = Array.isArray(ac) ? ac : [];
-          let h = 0, b = 0, t = 0;
-          ac.forEach(a => {
-            const n = Number(a.beban_toko) || 0; if(!n) return;
-            const tt = String(a.tanggal || '').slice(0, 10);
-            t += n; if(tt === today) h += n; if(tt.slice(0, 7) === ym) b += n;
-          });
-          cel = {h, b, t};
-        }catch(e){}
-        try{ out = sumByDay(await ownFetch('/finance/expenses'), 'nominal'); }catch(e){}
-        try{ inc = sumByDay(await ownFetch('/finance/incomes'), 'nominal'); }catch(e){}
-        let jualH = 0, jualB = 0, jualT = 0, hppJualH = 0, hppJualB = 0, hppJualT = 0;
+        const H = map(pH), B = map(pB), A = map(pA);
+
+        // 'inc' dulu = pemasukan lain/modal (masuk kas, bukan omzet)
+        const incH = H.kasModal + H.kasLainMasuk, incB = B.kasModal + B.kasLainMasuk;
+
+        // split per metode bayar HARI INI (display saja, bukan angka keuangan)
+        const mediaSvcH = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
+        const mediaSvcT = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
         const mediaJualH = {Tunai: 0, Transfer: 0, QRIS: 0, Lain: 0};
         try{
-          const sl = await ownFetch('/sales?limit=300');
+          const arr = await ownServices();
+          const actDate = x => String(x.diambil_at || x.updated_at || x.date || '').slice(0, 10);
+          const ok = (Array.isArray(arr) ? arr : []).filter(d => SUKSES.includes(d.status));
+          ok.forEach(d => {
+            const m = d.metode_bayar || '';
+            const k = mediaSvcH[m] !== undefined ? m : 'Lain';
+            mediaSvcT[k] += Number(d.biaya) || 0;
+            if(actDate(d) === today) mediaSvcH[k] += Number(d.biaya) || 0;
+          });
+          const sl = await ownFetch('/sales?limit=300').catch(() => []);
           (Array.isArray(sl) ? sl : []).forEach(s => {
-            const total = Number(s.total) || 0, profit = Number(s.profit) || 0;
-            const hpp = Math.max(0, total - profit);
-            const tt = String(s.tanggal || '').slice(0, 10);
-            jualT += total; hppJualT += hpp;
-            if(tt === today){ jualH += total; hppJualH += hpp; const k = mediaJualH[s.metode] !== undefined ? s.metode : 'Lain'; mediaJualH[k] += total; }
-            if(tt.slice(0, 7) === ym){ jualB += total; hppJualB += hpp; }
+            if(String(s.tanggal || '').slice(0, 10) !== today) return;
+            const m = s.metode || '';
+            const k = mediaJualH[m] !== undefined ? m : 'Lain';
+            mediaJualH[k] += Number(s.total) || 0;
           });
         }catch(e){}
-        const omH = omSvcH + jualH - ref.h, omB = omSvcB + jualB - ref.b, omT = omSvcT + jualT - ref.t;
-        const hppH = komH + hppJualH + cel.h, hppB = komB + hppJualB + cel.b, hppT = komT + hppJualT + cel.t;
-        const opsH = out.h + hadH, opsB = out.b + hadB, opsT = out.t + hadT;
+
+        // bentuk lama (dipakai ownAnalytics + ownLaba): H=hari ini, B=bulan ini, T=semua
         return {
-          today, ym, omSvcH, omSvcB, omSvcT, jualH, jualB, jualT, hppJualH, hppJualB, hppJualT,
-          ref, cel, out, inc, komH, komB, komT, hadH, hadB, hadT, mediaSvcH, mediaSvcT, mediaJualH,
-          omH, omB, omT, hppH, hppB, hppT, opsH, opsB, opsT,
-          kotorH: omH - hppH, kotorB: omB - hppB,
-          labaH: omH - hppH - opsH, labaB: omB - hppB - opsB,
-          arusH: omH + inc.h - hppH - opsH, arusB: omB + inc.b - hppB - opsB,
-          saldoT: omT + inc.t - hppT - opsT,
+          today, ym,
+          omSvcH: H.omSvc, omSvcB: B.omSvc, omSvcT: A.omSvc,
+          jualH: H.jual, jualB: B.jual, jualT: A.jual,
+          ref: {h: H.ref, b: B.ref, t: A.ref},
+          cel: {h: H.cel, b: B.cel, t: A.cel},
+          out: {h: H.opsBiaya, b: B.opsBiaya, t: A.opsBiaya},
+          inc: {h: incH, b: incB, t: A.kasModal + A.kasLainMasuk},
+          komH: H.kom, komB: B.kom, komT: A.kom,
+          hadH: H.had, hadB: B.had, hadT: A.had,
+          hppJualH: H.hppJual, hppJualB: B.hppJual, hppJualT: A.hppJual,
+          mediaSvcH, mediaSvcT, mediaJualH,
+          omH: H.om, omB: B.om, omT: A.om,
+          hppH: H.hpp, hppB: B.hpp, hppT: A.hpp,
+          opsH: H.ops, opsB: B.ops, opsT: A.ops,
+          kotorH: H.kotor, kotorB: B.kotor,
+          labaH: H.laba, labaB: B.laba,
+          arusH: H.kas, arusB: B.kas, saldoT: A.saldo,
+          // baru: rincian untuk UI
+          detail: {
+            H, B, A,
+            saldoMedia: A.perMedia,
+            belumBayar: A.nempelHpp + A.nempelOps,
+          },
         };
       })();
       return _arusPromise;
@@ -1944,25 +1987,41 @@
             set('mOmzet', rp(A.omH)); set('mOmzetSub', `service ${rp(A.omSvcH)} + jual ${rp(A.jualH)} − refund ${rp(A.ref.h)}`);
             set('mKotor', rp(A.kotorH)); set('mKotorSub', `omzet ${rp(A.omH)} − HPP ${rp(A.hppH)}`);
             try{ document.getElementById('mKotor').style.color = col(A.kotorH); }catch(e){}
-            set('mOps', rp(A.opsH)); set('mOpsSub', `keluar ${rp(A.out.h)} + hadir ${rp(A.hadH)}`);
+            set('mOps', rp(A.opsH)); set('mOpsSub', `operasional ${rp(A.out.h)} + uang hadir ${rp(A.hadH)}`);
             set('mLaba', rp(A.labaH)); set('mLabaSub', `kotor ${rp(A.kotorH)} − operasional ${rp(A.opsH)}`);
             try{ document.getElementById('mLaba').style.color = col(A.labaH); }catch(e){}
-            set('mSaldo', rp(A.saldoT)); set('mSaldoSub', 'tanpa saldo awal • wajib Tutup Kas');
+            set('mSaldo', rp(A.saldoT)); set('mSaldoSub', 'saldo kas s/d hari ini • sama dgn Tutup Kas');
             const neg = v => v ? `<span style="color:#dc2626">−${rp(v)}</span>` : rp(0);
             const r2 = (label, val, bold) => `<tr${bold ? ' style="background:#f9fafb;font-weight:800"' : ''}><td>${label}</td><td style="text-align:right">${val}</td></tr>`;
+            const D = (A.detail && A.detail.H) || {};
+            const dbelum = (A.detail && A.detail.belumBayar) || 0;
             try{
               document.getElementById('tbodyLapHarian').innerHTML =
+                '<tr><td colspan="2" style="background:#f0fdf4;font-weight:800;color:#065f46;padding-top:8px">💵 KAS — uang yang benar-benar bergerak</td></tr>' +
+                r2('🛠 Service cair', rp(D.masuk_service || 0)) +
+                r2('🛒 Penjualan kasir', rp(D.masuk_penjualan || 0)) +
+                r2('💰 Modal owner / pemasukan lain', rp((D.kasModal || 0) + (D.kasLainMasuk || 0))) +
+                r2('💸 Belanja stok', neg(D.kasBelanja || 0)) +
+                r2('👷 Gajian teknisi', neg(D.kasGajian || 0)) +
+                r2('🏠 Operasional', neg(D.kasOps || 0)) +
+                r2('↩️ Refund', neg(D.kasRefund || 0)) +
+                r2('🧾 Lainnya', neg(D.kasLainKeluar || 0)) +
+                `<tr style="background:#f0fdf4;font-weight:800"><td>＝ Arus kas hari ini</td><td style="text-align:right;color:${col(A.arusH)}">${rp(A.arusH)}</td></tr>` +
+                '<tr><td colspan="2" style="background:#faf5ff;font-weight:800;color:#6b21a8;padding-top:8px">📈 LABA — hasil usaha (bukan cek buku kas)</td></tr>' +
                 r2('🛠 Service cair', rp(A.omSvcH)) +
                 r2('🛒 Penjualan kasir', rp(A.jualH)) +
                 r2('💸 Refund (diambil dari omzet)', neg(A.ref.h)) +
-                r2('＝ Total omzet', rp(A.omH), true) +
+                r2('＝ Omzet', rp(A.omH), true) +
                 r2('💰 Komisi teknisi (HPP)', neg(A.komH)) +
                 r2('📦 Modal barang terjual (HPP)', neg(A.hppJualH)) +
+                r2('🔩 Part terpakai (HPP)', neg((D.hppPart || 0))) +
                 r2('🛠 Beban toko kecelakaan (HPP)', neg(A.cel.h)) +
-                r2('🧾 Pengeluaran operasional', neg(A.out.h)) +
+                r2('＝ HPP', neg(A.hppH), true) +
+                r2('＝ Laba kotor', rp(A.kotorH), true) +
+                r2('🏠 Operasional', neg(A.out.h)) +
                 r2('🕘 Uang hadir', neg(A.hadH)) +
-                r2('📥 Pemasukan lain/modal (masuk kas, bukan omzet)', rp(A.inc.h)) +
-                `<tr style="background:#ecfdf5;font-weight:800"><td>＝ Arus kas bersih hari ini</td><td style="text-align:right;color:${col(A.arusH)}">${rp(A.arusH)}</td></tr>`;
+                `<tr style="background:#ecfdf5;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${col(A.labaH)}">${rp(A.labaH)}</td></tr>` +
+                (dbelum ? `<tr><td colspan="2" style="color:#b45309;font-size:11px;padding-top:6px">⏳ Sudah jadi beban tapi uangnya belum keluar: <strong>${rp(dbelum)}</strong> (dibayar saat gajian)</td></tr>` : '');
             }catch(e){}
             try{
               const p = A.today.split('-');
@@ -2120,41 +2179,37 @@
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - offset);
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     }
-    async function bosDashboard(){
+async function bosDashboard(){
       if(_bosBusy) return; _bosBusy = true;
       try{
-        const [tren, ring] = await Promise.all([
+        const curYm = _bosMonth(0), prevYm = _bosMonth(1);
+        // SATU sumber angka untuk blok KAS + LABA bulan ini (backend _agregat_ledger).
+        const [per, tren] = await Promise.all([
+          ownFetch('/finance/ledger/periode?bulan=' + curYm).catch(() => null),
           ownFetch('/finance/tren-bulanan?bulan=6').catch(() => null),
-          ownFetch('/finance/ledger/ringkasan').catch(() => null),
         ]);
+        const K = (per && per.kas) || {}, L = (per && per.laba) || {}, N = (per && per.nempel) || {};
+        const kasMasuk = K.masuk || 0, kasKeluar = K.keluar || 0, arusBln = K.bersih || 0;
+        const saldoMedia = (per && per.saldo_akhir) || {};
+        const saldo = Object.values(saldoMedia).reduce((a, b) => a + (Number(b) || 0), 0);
+
         const rows = (tren && tren.bulan) || [];
         const byYm = {}; rows.forEach(r => byYm[r.ym] = r);
-        const curYm = _bosMonth(0), prevYm = _bosMonth(1);
-        const cur = byYm[curYm] || {omzet:0,hpp:0,operasional:0,masuk:0,sukses:0,kotor:0,bersih:0};
-        const prev = byYm[prevYm] || {omzet:0,hpp:0,operasional:0,masuk:0,sukses:0};
-        // Arus kas bersih versi UI: omzet - hpp - operasional (belum termasuk modal/prive, biar nyambung kartu lama)
-        const arusCur = (cur.omzet||0) - (cur.hpp||0) - (cur.operasional||0);
-        const arusPrev = (prev.omzet||0) - (prev.hpp||0) - (prev.operasional||0);
-        const dArus = arusCur - arusPrev;
-        // Saldo + runway: saldo estimasi dari ringkasan arus_bersih, burn = rata keluar 3 bln / 30
-        let saldo = 0, totMasuk = 0, totKeluar = 0, perMedia = null;
-        try{ saldo = Number(ring.arus_bersih || 0); totMasuk = Number(ring.total_masuk||0); totKeluar = Number(ring.total_keluar||0); perMedia = ring.per_media || null; }catch(e){}
+        const cur = byYm[curYm] || {};
+        const prev = byYm[prevYm] || {};
+        const arusPrev = prev.kas_bersih || 0;
+        const dArus = arusBln - arusPrev;
+
+        // burn harian = rata-rata kas keluar 3 bulan (bukan hpp+ops — itu bukan uang)
         const last3 = rows.slice(-3);
-        const avgKeluar = last3.length ? last3.reduce((s,r)=>s+((r.hpp||0)+(r.operasional||0)),0)/last3.length : 0;
-        const burnHarian = avgKeluar ? avgKeluar/30 : 0;
-        const runway = burnHarian > 0 && saldo > 0 ? Math.floor(saldo/burnHarian) : (saldo>0?999:0);
-        // BEP versi gampang: rata-rata C1+C2+C3 ~ diwakili operasional 3 bln (fallback ops setting bila kosong)
-        let bep = last3.length ? Math.round(last3.reduce((s,r)=>s+(r.operasional||0),0)/last3.length) : 0;
-        try{
-          const ops = await ownFetch('/ops/settings').catch(()=>null);
-          if(!bep && ops){ bep = (Number(ops.gaji_nominal||0)+Number(ops.wifi_nominal||0)+Number(ops.listrik_nominal||0)) || 0; }
-        }catch(e){}
-        if(!bep) bep = (cur.operasional||0) || 1;
-        const pctBep = Math.min(999, Math.round((cur.omzet||0)/bep*100));
-        const margin = cur.omzet ? Math.round(((cur.omzet-cur.hpp)/cur.omzet)*100) : 0;
-        // Banner
-        const omNaik = (cur.omzet||0) - (prev.omzet||0);
-        const omPct = prev.omzet ? Math.round(omNaik/prev.omzet*100) : (cur.omzet?100:0);
+        const avgKeluar = last3.length ? last3.reduce((s, r) => s + (r.kas_keluar || 0), 0) / last3.length : 0;
+        const burnHarian = avgKeluar ? avgKeluar / 30 : 0;
+        const runway = burnHarian > 0 ? Math.floor(saldo / burnHarian) : (saldo > 0 ? 999 : 0);
+        const margin = L.omzet ? Math.round(((L.kotor || 0) / L.omzet) * 100) : 0;
+        const omNaik = (cur.omzet || 0) - (prev.omzet || 0);
+        const omPct = prev.omzet ? Math.round(omNaik / prev.omzet * 100) : (cur.omzet ? 100 : 0);
+
+        // ---- banner ----
         const ban = document.getElementById('bosBanner');
         const bT = document.getElementById('bosBannerTitle');
         const bS = document.getElementById('bosBannerSub');
@@ -2163,94 +2218,100 @@
           ban.style.display = '';
           let cls = 'warn', icon = '⚠️';
           if(runway >= 30 && omNaik >= 0 && margin >= 30){ cls = 'ok'; icon = '✅'; }
-          if(runway < 14 || (arusCur < 0 && arusPrev < 0)){ cls = 'bad'; icon = '🔴'; }
+          if(runway < 14 || (arusBln < 0 && arusPrev < 0)){ cls = 'bad'; icon = '🔴'; }
           ban.className = 'bos-banner ' + cls;
-          if(bT) bT.textContent = `${icon} ${rp(saldo)} • ${runway>=999?'30+':runway} hari • omzet ${omNaik>=0?'+':''}${Math.abs(omPct)}%`;
-          if(bS) bS.textContent = `${rp(cur.omzet||0)} (${cur.masuk||0} unit) • bersih ${rp(arusCur)} • BEP ${pctBep}% • margin ${margin}%`;
+          if(bT) bT.textContent = `${icon} Saldo kas ${rp(saldo)} • ${runway >= 999 ? '30+' : runway} hari aman • omzet ${omNaik >= 0 ? '+' : ''}${Math.abs(omPct)}%`;
+          if(bS) bS.textContent = `Bln ini: masuk ${rp(kasMasuk)} − keluar ${rp(kasKeluar)} = ${rp(arusBln)} • laba bersih ${rp(L.bersih || 0)}`;
           let watch = [];
           if(runway < 30) watch.push(`kas ${runway} hari`);
-          if(margin < 30) watch.push(`margin ${margin}% tipis`);
-          if(pctBep < 100) watch.push(`BEP ${pctBep}%`);
+          if(arusBln < 0) watch.push(`kas bln ini minus ${rp(Math.abs(arusBln))}`);
+          if(margin < 30 && L.omzet) watch.push(`margin ${margin}% tipis`);
+          if((N.hpp || 0) + (N.operasional || 0) > 0) watch.push(`belum dibayar ${rp((N.hpp || 0) + (N.operasional || 0))}`);
           if(!watch.length) watch.push('aman');
           if(bW) bW.textContent = '👀 ' + watch.join(' • ');
         }
-        const set = (id,v)=>{ try{ document.getElementById(id).textContent = v; }catch(e){} };
-        set('bosArus', rp(arusCur));
-        set('bosArusSub', `${dArus>=0?'+':''}${rp(dArus)} vs lalu`);
-        try{ document.getElementById('bosArus').style.color = arusCur<0?'#dc2626':'#059669'; }catch(e){}
+
+        // ---- 4 angka KAS ----
+        const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+        set('bosMasuk', rp(kasMasuk));
+        set('bosMasukSub', `service ${rp(K.masuk_service || 0)} • modal ${rp(K.masuk_modal || 0)}`);
+        set('bosKeluarKas', rp(kasKeluar));
+        set('bosKeluarKasSub', `belanja ${rp(K.keluar_belanja || 0)} • gajian ${rp(K.keluar_gajian || 0)}`);
         set('bosSaldo', rp(saldo));
-        set('bosSaldoSub', `±${runway>=999?'30+':runway} hari • ${rp(Math.round(burnHarian))}/hari`);
-        set('bosBep', rp(bep));
-        set('bosBepSub', `${pctBep}% • ${rp(cur.omzet||0)}`);
+        const mTxt = Object.entries(saldoMedia).filter(([, v]) => v)
+          .map(([k, v]) => `${({ kas_utama: 'laci', kas_kecil: 'kecil', bank: 'bank', qris: 'QRIS' })[k] || k} ${rp(v)}`).join(' • ');
+        set('bosSaldoSub', mTxt ? `±${runway >= 999 ? '30+' : runway} hari • ${mTxt}` : `±${runway >= 999 ? '30+' : runway} hari`);
+        set('bosArus', rp(arusBln));
+        try{ document.getElementById('bosArus').style.color = arusBln < 0 ? '#dc2626' : '#059669'; }catch(e){}
+        set('bosArusSub', `${dArus >= 0 ? '+' : ''}${rp(dArus)} vs bln lalu`);
+
+        // ---- strip LABA ----
+        const c = v => v < 0 ? '#dc2626' : '#059669';
+        set('bosLomzet', rp(L.omzet || 0));
+        set('bosLhpp', rp(L.hpp || 0));
+        set('bosLkotor', rp(L.kotor || 0));
+        set('bosLops', rp(L.operasional || 0));
+        set('bosLlaba', rp(L.bersih || 0));
         set('bosMargin', margin + '%');
-        set('bosMarginSub', `${rp((cur.omzet||0)-(cur.hpp||0))} / ${rp(cur.omzet||0)}`);
-        // Grafik kas 6 bln: masuk=omzet, keluar=hpp+ops, bersih=selisih
+        try{
+          document.getElementById('bosLkotor').style.color = c(L.kotor || 0);
+          document.getElementById('bosLlaba').style.color = c(L.bersih || 0);
+        }catch(e){}
+
+        // ---- grafik kas 6 bln (masuk vs keluar, tren sekarang berbasis ledger) ----
         try{
           const ch = document.getElementById('bosKasChart');
-          const tb = document.getElementById('tbodyBosKas');
-          const maxV = Math.max(1, ...rows.map(r=>Math.max(r.omzet||0,(r.hpp||0)+(r.operasional||0))));
-          if(ch) ch.innerHTML = rows.map((r,i)=>{
-            const m = r.omzet||0, k = (r.hpp||0)+(r.operasional||0), n = m-k;
-            const hm = Math.max(3, Math.round(m/maxV*58)), hk = Math.max(3, Math.round(k/maxV*58));
-            const last = i===rows.length-1;
-            return `<div class="bos-bar-col" title="${r.label}: ${rp(m)} / ${rp(k)} / bersih ${rp(n)}"><div class="bos-bar-pair"><div class="bos-bar in" style="height:${hm}px"></div><div class="bos-bar out" style="height:${hk}px"></div></div><div class="bos-net-dot" style="background:${n<0?'#dc2626':'#2563eb'}" title="${rp(n)}"></div><span style="font-size:9px;color:${last?'#059669':'#6b7280'};font-weight:${last?700:400}">${r.label.slice(0,3)}</span></div>`;
-          }).join('');
-          if(tb) tb.innerHTML = '';
-          try{ document.getElementById('bosKasRange').textContent = rows.length?`${rows[0].label}—${rows[rows.length-1].label}`:''; }catch(e){}
+          const maxV = Math.max(1, ...rows.map(r => Math.max(r.kas_masuk || 0, r.kas_keluar || 0)));
+          if(ch) ch.innerHTML = rows.map((r, i) => {
+            const m = r.kas_masuk || 0, k = r.kas_keluar || 0, n = r.kas_bersih || 0;
+            const hm = Math.max(3, Math.round(m / maxV * 58)), hk = Math.max(3, Math.round(k / maxV * 58));
+            const last = i === rows.length - 1;
+            return `<div class="bos-bar-col" title="${r.label}: masuk ${rp(m)} / keluar ${rp(k)} / bersih ${rp(n)}"><div class="bos-bar-pair"><div class="bos-bar in" style="height:${hm}px"></div><div class="bos-bar out" style="height:${hk}px"></div></div><div class="bos-net-dot" style="background:${n < 0 ? '#dc2626' : '#2563eb'}" title="bersih ${rp(n)}"></div><span style="font-size:9px;color:${last ? '#059669' : '#6b7280'};font-weight:${last ? 700 : 400}">${r.label.slice(0, 3)}</span></div>`;
+          }).join('') || '<span style="font-size:11px;color:#8a8f98">Belum ada data</span>';
+          try{ document.getElementById('bosKasRange').textContent = rows.length ? `${rows[0].label}—${rows[rows.length - 1].label}` : ''; }catch(e){}
         }catch(e){}
-        // Rincian kas keluar bulan ini: coba dari expenses, fallback proporsi HPP/ops
+
+        // ---- rincian kas keluar bulan ini: LANGSUNG dari ledger (dulu ada tebakan 50/40/30) ----
         try{
-          const ex = await ownFetch('/finance/expenses').catch(()=>[]);
-          const arr = Array.isArray(ex)?ex:[];
-          const ym = curYm;
-          const sums = {sparepart:0,gaji:0,sewa:0,lain:0};
-          arr.forEach(r=>{ if(String(r.tanggal||'').slice(0,7)!==ym) return; const n=Number(r.nominal||0); const k=String(r.kategori||''); const kp=String(r.keperluan||'').toLowerCase(); if(k==='B1'||kp.includes('sparepart')||kp.includes('part')) sums.sparepart+=n; else if(k==='C1'||kp.includes('gaji')) sums.gaji+=n; else if(k==='C2'||kp.includes('sewa')) sums.sewa+=n; else sums.lain+=n; });
-          let tot = sums.sparepart+sums.gaji+sums.sewa+sums.lain;
-          if(!tot){ sums.sparepart=Math.round((cur.hpp||0)*0.5); sums.gaji=Math.round((cur.operasional||0)*0.4); sums.sewa=Math.round((cur.operasional||0)*0.3); sums.lain=(cur.hpp+cur.operasional)-sums.sparepart-sums.gaji-sums.sewa; tot=sums.sparepart+sums.gaji+sums.sewa+sums.lain; }
-          const row = (l,v)=>{ const p=tot?Math.round(v/tot*100):0; return `<div class="bos-kv"><span>${l} <span style="color:#8a8f98">(${p}%)</span></span><strong>${rp(v)}</strong></div>`; };
-          const el=document.getElementById('bosKeluarList');
-          if(el) el.innerHTML = row('🔩 Sparepart',sums.sparepart)+row('👷 Gaji',sums.gaji)+row('🏠 Sewa',sums.sewa)+row('🧾 Lainnya',sums.lain);
-          set('bosKeluarTot', rp(tot));
+          const el = document.getElementById('bosKeluarList');
+          const items = [
+            ['🔩 Belanja stok', K.keluar_belanja || 0],
+            ['👷 Gajian teknisi', K.keluar_gajian || 0],
+            ['🏠 Operasional', K.keluar_operasional || 0],
+            ['↩️ Refund', K.keluar_refund || 0],
+            ['🧾 Lainnya', K.keluar_lain || 0],
+          ].filter(x => x[1] > 0);
+          if(el) el.innerHTML = items.length ? items.map(([l, v]) => {
+            const p = kasKeluar ? Math.round(v / kasKeluar * 100) : 0;
+            return `<div class="bos-kv"><span>${l} <span style="color:#8a8f98">(${p}%)</span></span><strong>${rp(v)}</strong></div>`;
+          }).join('') : '<p style="font-size:11px;color:#8a8f98;margin:0">Belum ada kas keluar bulan ini.</p>';
+          set('bosKeluarTot', rp(kasKeluar));
         }catch(e){}
-        // Pertumbuhan + pelanggan + kesehatan (pakai service list, tanpa backend baru)
+
+        // ---- piutang + persediaan + yang belum dibayar ----
         try{
-          const svcs = await ownFetch('/services?limit=500').catch(()=>[]);
-          const arr = Array.isArray(svcs)?svcs:(svcs.rows||[]);
-          const inCur = arr.filter(s=>String(s.date||'').slice(0,7)===curYm).length;
-          const inPrev = arr.filter(s=>String(s.date||'').slice(0,7)===prevYm).length;
-          const dIn = prev?0:0;
-          const gOm = prev.omzet?Math.round(((cur.omzet||0)-prev.omzet)/prev.omzet*100):((cur.omzet||0)?100:0);
-          const gUnit = inPrev?Math.round((inCur-inPrev)/inPrev*100):(inCur?100:0);
-          const avgCur = cur.sukses?Math.round((cur.omzet||0)/cur.sukses):0;
-          const avgPrev = prev.sukses?Math.round((prev.omzet||0)/prev.sukses):0;
-          const refunds = await ownFetch('/finance/refunds').catch(()=>[]);
-          const rArr = Array.isArray(refunds)?refunds:[];
-          const garCur = rArr.filter(r=>String(r.tanggal||'').slice(0,7)===curYm).length;
-          const garRate = cur.sukses?Math.round(garCur/cur.sukses*100):0;
-          const gEl = document.getElementById('bosGrowth');
-          if(gEl) gEl.innerHTML = `<div class="bos-kv"><span>Omzet ${gOm>=0?'+':''}${gOm}%</span><strong>${rp(cur.omzet||0)}</strong></div><div class="bos-kv"><span>Unit ${inCur} (${gUnit>=0?'+':''}${gUnit}%)</span><strong>${rp(avgCur)}/svc</strong></div><div class="bos-kv"><span>Garansi ${garCur} (${garRate}%)</span><strong style="color:${garRate>10?'#dc2626':'#059669'}">${garRate>10?'cek!':'ok'}</strong></div>`;
-          // baru vs repeat by WA bulan ini
+          const svcs = await ownFetch('/services?limit=500').catch(() => []);
+          const arr = Array.isArray(svcs) ? svcs : (svcs.rows || []);
           const was = {};
-          arr.forEach(s=>{ const w=String(s.wa||'').trim(); if(w) was[w]=(was[w]||0)+1; });
-          const curWas = arr.filter(s=>String(s.date||'').slice(0,7)===curYm).map(s=>String(s.wa||'').trim()).filter(Boolean);
-          let baru=0; curWas.forEach(w=>{ if((was[w]||0)<=1) baru++; });
-          const repeat = curWas.length-baru;
-          const belum = await ownArus().then(a=>({n:a.ref?0:0})).catch(()=>null);
+          arr.forEach(s => { const w = String(s.wa || '').trim(); if(w) was[w] = (was[w] || 0) + 1; });
+          const curWas = arr.filter(s => String(s.date || '').slice(0, 7) === curYm)
+            .map(s => String(s.wa || '').trim()).filter(Boolean);
+          let baru = 0; curWas.forEach(w => { if((was[w] || 0) <= 1) baru++; });
+          const repeat = curWas.length - baru;
+          const SUKSES = ['Service Sukses', 'Sudah Diambil', 'Selesai'];
           let piut = 0, piutN = 0;
-          try{
-            const SUKSES=['Service Sukses','Sudah Diambil','Selesai'];
-            arr.filter(s=>SUKSES.includes(s.status)&&!(s.metode_bayar||'')).forEach(s=>{ piut+=Number(s.biaya||0); piutN++; });
-          }catch(e){}
+          arr.filter(s => SUKSES.includes(s.status) && !(s.metode_bayar || '')).forEach(s => { piut += Number(s.biaya) || 0; piutN++; });
           const cEl = document.getElementById('bosCust');
-          if(cEl) cEl.innerHTML = `<div class="bos-kv"><span>${baru} baru • ${repeat} repeat</span><strong>${curWas.length} nota</strong></div><div class="bos-kv"><span>Piutang</span><strong style="color:${piut?'#b45309':'#059669'}">${rp(piut)} (${piutN})</strong></div>`;
-          // kesehatan: kas 3 bln + modal
-          const k3 = rows.slice(-3).map(r=>{const m=r.omzet||0,k=(r.hpp||0)+(r.operasional||0);return {label:r.label,net:m-k};});
-          let modal = 0;
-          try{ modal = Number(ring.modal||0); }catch(e){}
-          const labaAkum = rows.reduce((s,r)=>s+((r.omzet||0)-(r.hpp||0)-(r.operasional||0)),0);
-          const roi = modal?Math.min(999,Math.round(labaAkum/modal*100)):null;
+          if(cEl) cEl.innerHTML = `<div class="bos-kv"><span>${baru} baru • ${repeat} repeat</span><strong>${curWas.length} nota</strong></div>`
+            + `<div class="bos-kv"><span>Piutang</span><strong style="color:${piut ? '#b45309' : '#059669'}">${rp(piut)} (${piutN})</strong></div>`;
+          const modal = L.modal || 0;
+          const labaAkum = rows.reduce((s, r) => s + (r.bersih || 0), 0);
+          const roi = modal ? Math.min(999, Math.round(labaAkum / modal * 100)) : null;
+          const belumBayar = (N.hpp || 0) + (N.operasional || 0);
           const hEl = document.getElementById('bosHealth');
-          if(hEl) hEl.innerHTML = `<div class="bos-kv"><span>Kas 3 bln</span><strong>${k3.map(k=>rp(k.net)).join(' / ')}</strong></div><div class="bos-kv"><span>Supplier</span><strong style="color:#059669">Rp 0</strong></div><div class="bos-kv"><span>Modal</span><strong>${roi===null?'isi E1 dulu':roi+'%'}</strong></div>`;
+          if(hEl) hEl.innerHTML = `<div class="bos-kv"><span>Belum dibayar teknisi</span><strong style="color:${belumBayar ? '#b45309' : '#059669'}">${rp(belumBayar)}</strong></div>`
+            + `<div class="bos-kv"><span>Persediaan di rak</span><strong>${rp((per && per.persediaan) || 0)}</strong></div>`
+            + `<div class="bos-kv"><span>ROI modal</span><strong>${roi === null ? 'isi E1 dulu' : roi + '%'}</strong></div>`;
         }catch(e){}
       }finally{ _bosBusy = false; }
     }
@@ -2614,8 +2675,12 @@
     let _ledCache = null, _ledAt = 0;
     async function ownLedCached(force){
       if(!force && _ledCache && (Date.now() - _ledAt) < 90000) return _ledCache;
-      _ledCache = await ownFetch('/finance/ledger?limit=500');
-      if(!Array.isArray(_ledCache)) _ledCache = [];
+      // paged=1 & per_page=200 (bukan ?limit=500 — param itu sudah dihapus).
+      // Dipakai untuk menjumlah baris di kartu hub, jadi 200 baris terbaru cukup.
+      try{
+        const r = await ownFetch('/finance/ledger?page=1&per_page=200');
+        _ledCache = Array.isArray(r) ? r : (r.items || []);
+      }catch(e){ _ledCache = []; }
       _ledAt = Date.now();
       return _ledCache;
     }
@@ -3001,7 +3066,7 @@
         set('mdKSub', `sistem • limit ${rp(lim)}`);
         set('mdNote', `Saldo sistem per media (buku besar, ${g ? g.count + ' baris' : 'belum termuat'}) • cocokkan fisik di Tutup Kas bawah.`);
       }catch(e){ set('mdNote', 'Gagal muat saldo: ' + e.message); }
-      try{ await Promise.allSettled([ownBayar(), ownClose()]); }catch(e){}
+      try{ await Promise.allSettled([ownBayar(), ownClose(), ownCloseRiwayat()]); }catch(e){}
     }
     function ownToday(){
       const d = new Date();
@@ -3499,17 +3564,30 @@
       try{
         const A = await ownArus();
         const row = (label, h, b) => `<tr><td>${label}</td><td style="text-align:right">${rp(h)}</td><td style="text-align:right">${rp(b)}</td></tr>`;
+        const DH = (A.detail && A.detail.H) || {}, DB = (A.detail && A.detail.B) || {};
+        const lab = (t) => `<tr><td style="font-weight:700;background:#f9fafb" colspan="3">${t}</td></tr>`;
         document.getElementById('tbodyLaba').innerHTML =
+          lab('💵 KAS — uang yang benar-benar bergerak') +
+          row('➕ Kas masuk', DH.kasMasuk || 0, DB.kasMasuk || 0) +
+          row('➖ Belanja stok (bukan beban, jadi persediaan)', -(DH.kasBelanja || 0), -(DB.kasBelanja || 0)) +
+          row('➖ Gajian teknisi', -(DH.kasGajian || 0), -(DB.kasGajian || 0)) +
+          row('➖ Operasional', -(DH.kasOps || 0), -(DB.kasOps || 0)) +
+          row('➖ Refund', -(DH.kasRefund || 0), -(DB.kasRefund || 0)) +
+          `<tr style="background:#f0fdf4;font-weight:800"><td>＝ Arus kas bersih</td><td style="text-align:right;color:${A.arusH < 0 ? '#dc2626' : '#059669'}">${rp(A.arusH)}</td><td style="text-align:right;color:${A.arusB < 0 ? '#dc2626' : '#059669'}">${rp(A.arusB)}</td></tr>` +
+          lab('📈 LABA — hasil usaha (bukan cek buku kas)') +
           row('➕ Omzet service cair', A.omSvcH, A.omSvcB) +
           row('➕ Omzet penjualan kasir', A.jualH, A.jualB) +
           row('➖ Refund (dari omzet)', -A.ref.h, -A.ref.b) +
+          row('＝ Omzet', A.omH, A.omB) +
           row('➖ Komisi teknisi (HPP)', -A.komH, -A.komB) +
           row('➖ Modal barang terjual (HPP)', -A.hppJualH, -A.hppJualB) +
+          row('➖ Part terpakai (HPP)', -(DH.hppPart || 0), -(DB.hppPart || 0)) +
           row('➖ Beban toko kecelakaan (HPP)', -A.cel.h, -A.cel.b) +
-          row('➕ Pemasukan lain/modal (bukan omzet)', A.inc.h, A.inc.b) +
-          row('➖ Uang hadir', -A.hadH, -A.hadB) +
+          row('＝ HPP', -A.hppH, -A.hppB) +
+          row('＝ Laba kotor', A.kotorH, A.kotorB) +
           row('➖ Pengeluaran operasional', -A.out.h, -A.out.b) +
-          `<tr style="background:#f9fafb;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${A.labaH < 0 ? '#dc2626' : '#059669'}">${rp(A.labaH)}</td><td style="text-align:right;color:${A.labaB < 0 ? '#dc2626' : '#059669'}">${rp(A.labaB)}</td></tr>`;
+          row('➖ Uang hadir', -A.hadH, -A.hadB) +
+          `<tr style="background:#ecfdf5;font-weight:800"><td>＝ Laba bersih</td><td style="text-align:right;color:${A.labaH < 0 ? '#dc2626' : '#059669'}">${rp(A.labaH)}</td><td style="text-align:right;color:${A.labaB < 0 ? '#dc2626' : '#059669'}">${rp(A.labaB)}</td></tr>`;
         set('labaHari', rp(A.labaH)); set('labaHariSub', `omzet ${rp(A.omH)} − HPP ${rp(A.hppH)} − ops ${rp(A.opsH)}`);
         set('labaBulan', rp(A.labaB)); set('labaBulanSub', `omzet ${rp(A.omB)} − HPP ${rp(A.hppB)} − ops ${rp(A.opsB)}`);
       }catch(e){
@@ -3564,57 +3642,70 @@
         }catch(e){}
         set('bbNote', `${g.count || 0} baris • manual + auto • belanja barang = persediaan (belum HPP) • HPP terbentuk saat terjual/terpakai • transfer tidak masuk omzet`);
       }catch(e){ set('bbNote', 'Gagal ringkasan: ' + e.message); }
-      try{
+try{
         const q = [];
         const j = document.getElementById('bbJenis')?.value || '';
         const k = document.getElementById('bbKat')?.value || '';
         const m = document.getElementById('bbMedia')?.value || '';
         const s = document.getElementById('bbSince')?.value || '';
+        const sp = document.getElementById('bbSampai')?.value || '';
+        const c = (document.getElementById('bbCari')?.value || '').trim();
         if(j) q.push('jenis=' + encodeURIComponent(j));
         if(k) q.push('kategori=' + encodeURIComponent(k));
         if(m) q.push('media=' + encodeURIComponent(m));
         if(s) q.push('since=' + encodeURIComponent(s));
-        const rows = await ownFetch('/finance/ledger' + (q.length ? '?' + q.join('&') : ''));
-        const arr = Array.isArray(rows) ? rows : [];
-        const jpill = jn => jn === 'masuk' ? '<span class="pill ok">masuk</span>' : jn === 'keluar' ? '<span class="pill warn">keluar</span>' : '<span class="pill">transfer</span>';
-        // paginasi 10/halaman — reset ke hal 1 jika filter berubah
-        const _bbKey = [j, k, m, s].join('|') + '#' + arr.length;
-        if(_bbKey !== window._bbKey){ window._bbKey = _bbKey; window._bbPage = 1; }
+        if(sp) q.push('sampai=' + encodeURIComponent(sp));
+        if(c) q.push('q=' + encodeURIComponent(c));
+        // PAGINASI DI SERVER. Dulu limit=300 + paginasi client -> baris ke-301+ hilang diam-diam.
+        const page = window._bbPage || 1;
+        q.push('page=' + page, 'per_page=' + BB_PER);
+        const res = await ownFetch('/finance/ledger' + '?' + q.join('&'));
+        const arr = Array.isArray(res) ? res : (res.items || []);
         window._bbRows = arr;
+        window._bbTotal = Array.isArray(res) ? arr.length : (res.total || arr.length);
+        window._bbHal = Array.isArray(res) ? Math.max(1, Math.ceil(arr.length / BB_PER)) : (res.total_halaman || 1);
         drawBuku();
       }catch(e){ if(tb) tb.innerHTML = `<tr><td colspan="8" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 150)}</td></tr>`; }
     }
-    const BB_PER = 10;
+    const BB_PER = 25;
+    function bbResetPage(){ window._bbPage = 1; ownBuku(); }
+    let _bbCariT = null;
+    function bbCariDebounce(){ clearTimeout(_bbCariT); _bbCariT = setTimeout(bbResetPage, 350); }
     function bbGo(p){
-      const n = (window._bbRows || []).length;
-      const max = Math.max(1, Math.ceil(n / BB_PER));
+      const max = window._bbHal || 1;
       if(p < 1 || p > max) return;
       window._bbPage = p;
-      drawBuku();
+      ownBuku();
     }
     function drawBuku(){
       const tb = document.getElementById('tbodyLedger');
       const info = document.getElementById('bbPageInfo');
       const wrap = document.getElementById('bbPageBtns');
       const arr = window._bbRows || [];
-      const max = Math.max(1, Math.ceil(arr.length / BB_PER));
-      if(!window._bbPage || window._bbPage > max) window._bbPage = 1;
+      const total = window._bbTotal != null ? window._bbTotal : arr.length;
+      const max = window._bbHal || 1;
+      if(!window._bbPage || window._bbPage > max){ window._bbPage = 1; }
       const page = window._bbPage;
       const jpill = jn => jn === 'masuk' ? '<span class="pill ok">masuk</span>' : jn === 'keluar' ? '<span class="pill warn">keluar</span>' : '<span class="pill">transfer</span>';
-      const slice = arr.slice((page - 1) * BB_PER, page * BB_PER);
-      if(tb) tb.innerHTML = slice.map(r => {
-        const neg = r.jenis !== 'masuk';
+      if(tb) tb.innerHTML = arr.map(r => {
+        // transfer bukan pengeluaran: jangan merah
+        const pos = r.jenis === 'transfer';
+        const neg = r.jenis === 'keluar';
+        const warn = neg ? ' style="color:#dc2626"' : '';
         const src = !r.ref_type || r.ref_type === 'manual' ? 'Manual' : r.ref_type === 'expense' ? '🧾 #' + r.ref_id : r.ref_type === 'income' ? '📥 #' + r.ref_id : esc(r.ref_type);
         const canDel = !r.ref_type || r.ref_type === 'manual';
+        const kas = r.pengaruh_kas === false;
         return `<tr><td style="white-space:nowrap">${esc(String(r.tanggal || '').slice(0, 10))}</td>`
           + `<td><strong>${esc(r.keterangan || r.kategori_nama || '-')}</strong><br><span style="font-size:10.5px;color:#8a8f98">${esc(r.dibuat_oleh || '')}</span></td>`
           + `<td>${jpill(r.jenis)}</td><td style="font-size:11.5px;font-weight:600">${esc(r.subkategori || r.kategori_nama || r.kategori || '')}</td>`
-          + `<td style="text-align:right;font-weight:700;color:${neg ? '#dc2626' : '#059669'}">${neg ? '−' : '+'}${rp(r.nominal || 0)}</td>`
+          + `<td style="text-align:right;font-weight:700${warn}">${neg ? '−' : pos ? '↔' : '+'}${rp(r.nominal || 0)}${kas ? '<br><span style="font-size:9.5px;font-weight:400;color:#b45309">tidak gerak kas</span>' : ''}</td>`
           + `<td style="font-size:11px">${esc(r.media_nama || r.media || '')}${r.media_tujuan ? '<br>→ ' + esc(r.media_tujuan) : ''}</td>`
           + `<td style="font-size:11px">${src}</td>`
           + `<td style="text-align:center">${canDel ? `<button class="btn btn-ghost small" style="padding:4px 8px;font-size:11px;color:#dc2626;border-color:#fecaca" onclick="ownLedDel(${r.id})">🗑</button>` : '<span title="Baris auto — hapus dari modul sumbernya">🔒</span>'}</td></tr>`;
-      }).join('') || '<tr><td colspan="8" style="text-align:center;color:#8a8f98">Belum ada transaksi — klik + Catat Manual</td></tr>';
-      if(info) info.textContent = arr.length ? `Menampilkan ${(page - 1) * BB_PER + 1}-${Math.min(arr.length, page * BB_PER)} dari ${arr.length}` : 'Tidak ada data';
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:#8a8f98">Tidak ada baris yang cocok filter</td></tr>';
+      const dari = total ? ((page - 1) * BB_PER + 1) : 0;
+      const sampai = Math.min(total, page * BB_PER);
+      if(info) info.textContent = total ? `Menampilkan ${dari}-${sampai} dari ${total} baris` : 'Tidak ada data';
       if(!wrap) return;
       if(max <= 1){ wrap.innerHTML = ''; return; }
       const b = (label, p, act, dis) => `<button class="btn btn-ghost small" style="padding:4px 10px;min-width:30px${act ? ';background:#111827;color:#fff;border-color:#111827' : ''}" ${dis ? 'disabled style="opacity:.4;padding:4px 10px;min-width:30px"' : ''} onclick="bbGo(${p})">${label}</button>`;
@@ -3707,6 +3798,31 @@
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
+    async function ownCloseRiwayat(){
+      const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
+      const tb = document.getElementById('tbodyRiwayat');
+      try{
+        const r = await ownFetch('/finance/cash/close/riwayat?limit=30');
+        set('risBersih', (r.persen_bersih || 0) + '%');
+        set('risBersihSub', `${r.selisih_nol || 0} dari ${r.jumlah || 0} hari ditutup`);
+        set('risRata', rp(r.rata_selisih || 0));
+        set('risTelat', (r.hari_bolong_30 || 0) + ' hari');
+        set('risHariIni', r.hari_ini_sudah ? '✅' : '❌');
+        set('risHariIniSub', r.hari_ini_sudah ? 'sudah tutup kas' : 'belum — ritual malam ini');
+        try{ document.getElementById('risHariIni').style.color = r.hari_ini_sudah ? '#059669' : '#dc2626'; }catch(e){}
+        if(tb) tb.innerHTML = (r.items || []).map(i => {
+          const z = Number(i.selisih || 0) === 0;
+          return `<tr><td style="white-space:nowrap">${esc(String(i.tanggal || '').slice(0, 10))}</td>`
+            + `<td style="text-align:right">${rp(i.sistem || 0)}</td>`
+            + `<td style="text-align:right">${rp(i.fisik || 0)}</td>`
+            + `<td style="text-align:right;font-weight:700;color:${z ? '#059669' : '#dc2626'}">${z ? 'Rp0' : rp(i.selisih || 0)}</td>`
+            + `<td style="font-size:11px">${esc(i.ditutup_oleh || '-')}</td>`
+            + `<td style="font-size:11px;color:#8a8f98">${esc(i.catatan || '')}</td></tr>`;
+        }).join('') || '<tr><td colspan="6" style="text-align:center;color:#8a8f98">Belum pernah tutup kas. Mulai malam ini — 2 menit, dan selisihnya jadi ketahuan.</td></tr>';
+      }catch(e){
+        if(tb) tb.innerHTML = `<tr><td colspan="6" style="color:#dc2626;text-align:center">Gagal: ${esc(e.message).slice(0, 140)}</td></tr>`;
+      }
+    }
     async function ownClose(){
       const set = (id, v) => { try{ document.getElementById(id).textContent = v; }catch(e){} };
       try{
@@ -3782,6 +3898,7 @@
         const r = await ownFetch('/finance/cash/close', {method: 'POST', body: JSON.stringify({tanggal: tgl, fisik, catatan: document.getElementById('clsCatatan')?.value?.trim() || undefined})});
         try{ ownAlert('ok', r.ok ? '🌙 Tutup kas cocok Rp0 — mantap!' : `Tutup kas tersimpan, selisih ${rp(r.selisih)} — cari penyebabnya malam ini.`); }catch(e){}
         await ownClose();
+        await ownCloseRiwayat();
       }catch(e){ try{ ownAlert('err', 'Gagal simpan tutup kas: ' + e.message); }catch(_){} }
     }
     async function ownKasLimit(){

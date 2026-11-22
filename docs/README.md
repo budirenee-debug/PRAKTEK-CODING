@@ -14,6 +14,7 @@ docs/
 ├── ERD_REVO.md      ← 🗺️ ERD visual Revo
 ├── DOKUMENTASI.md   ← 📖 Dokumentasi API & Model FastAPI+SQLite (legacy lengkap)
 ├── AUDIT.md         ← 🛡️ Audit Revo (temuan & fix sebelum migrasi)
+├── PRINT-LOG.md     ← 🖨️ Log print detail (nama file + jam, server Ubuntu)
 ├── RECRUITMENT.md   ← 👥 Teks rekrutmen (IG, WA, poster)
 └── REKRUTMEN.txt    ← 📄 Versi teks pendek rekrutmen
 ```
@@ -28,6 +29,7 @@ docs/
 | **ERD Visual** | [`ERD_REVO.md`](./ERD_REVO.md) | Diagram ASCII & contoh data seeded |
 | **API Umum** | [`DOKUMENTASI.md`](./DOKUMENTASI.md) | Model `Service/Customer/Technician`, endpoint `/api/services`, `/api/customers`, `/api/stats`, cara seed |
 | **Audit & Migrasi** | [`AUDIT.md`](./AUDIT.md) | Skor 5.5→8.5, bug localStorage, fix `escapeHtml`, `generate_invoice` |
+| **Log Print** | [`PRINT-LOG.md`](./PRINT-LOG.md) | Pencatatan nama file + jam print di server, `deploy/print-log.sh`, `tools/cek-print-log.ps1` |
 | **Rekrutmen** | [`RECRUITMENT.md`](./RECRUITMENT.md) | 3 versi (pendek, lengkap, WA broadcast) + checklist internal |
 
 ---

@@ -2053,6 +2053,13 @@ async function buildNotifCards(){
   if(low.length) cards.push({tone:'amber', icon:'📦', title:`${low.length} Part Perlu Restock`,
     desc:'Stok menipis (≤2 unit). Segera pesan.', label:'Cek Sparepart', view:'inventory-sparepart'});
 
+  if(typeof buildKasMemoCards === 'function'){
+    try{
+      const memos = await buildKasMemoCards();
+      if(Array.isArray(memos)) cards.push(...memos);
+    }catch(e){}
+  }
+
   return cards;
 }
 
@@ -2068,7 +2075,7 @@ function _notifTone(tone){
 function renderNotifBadge(){
   const bell = document.getElementById('notifBell');
   const count = document.getElementById('notifCount');
-  const n = _notifCards.length;
+  const n = _notifCards.filter(c => !c.info).length;
   if(count) count.textContent = String(n);
   if(bell){
     if(n > 0) bell.classList.add('has-notif');
@@ -2079,7 +2086,9 @@ function renderNotifBadge(){
 function renderNotifPanel(){
   const list = document.getElementById('notifList');
   const badge = document.getElementById('notifPerhatian');
-  if(badge) badge.textContent = `${_notifCards.length} Perhatian`;
+  const n = _notifCards.filter(c => !c.info).length;
+  const info = _notifCards.length - n;
+  if(badge) badge.textContent = `${n} Perhatian` + (info ? ` • ${info} Info` : '');
   if(!list) return;
   if(!_notifCards.length){
     list.innerHTML = '<div class="notif-empty">✅ Semua aman — tidak ada tugas mendesak.</div>';

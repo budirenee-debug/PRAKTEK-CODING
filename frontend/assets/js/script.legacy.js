@@ -9,7 +9,9 @@ const defaultData = [
   {id:'INV-2026-0122', nama:'Fajar Pratama', wa:'081987654321', device:'iPhone XR', keluhan:'Face ID tidak berfungsi', teknisi:'Sinta', biaya:650000, status:'Antri', date:'2026-09-02', kelengkapan:['HP Saja','+ Charger']},
 ];
 
-let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData;
+let data = defaultData;
+try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData; } catch { data = defaultData; }
+if (!Array.isArray(data)) data = defaultData;
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
 let selectedKelengkapan = new Set();

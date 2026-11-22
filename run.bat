@@ -74,15 +74,64 @@ if errorlevel 1 (
 )
 
 :: ---------- 4. Cek port ----------
+:: PENTING: port LISTENING belum tentu server kita. Dulu script ini langsung
+:: menganggap "server sudah jalan" lalu membuka browser - padahal yang occupying
+:: port bisa aplikasi lain, sehingga browsernya kebuka halaman 404.
+:: Sekarang dicek 2 penanda milik B_gadget POS:
+::   1) /health membalas {"status":"ok","db":"sqlite"}   (backend/app/main.py)
+::   2) /frontend/... membalas HTTP 200  (hanya app ini yang mount /frontend)
 set "PORT_BUSY=0"
+set "PORT_PID="
+set "HEALTH_OK=0"
+set "FRONT_OK=0"
+
 netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>nul
-if not errorlevel 1 (
-  set "PORT_BUSY=1"
-  echo [WARN] Port %PORT% sudah LISTENING ^(server mungkin sudah jalan^).
-  echo        Cek: http://127.0.0.1:%PORT%/health
-  echo        -^> Browser akan tetap dibuka^, backend tidak di-start ulang.
-  echo.
-)
+if errorlevel 1 goto PORT_FREE
+
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTENING"') do set "PORT_PID=%%p"
+
+curl.exe -s --max-time 3 http://127.0.0.1:%PORT%/health 2>nul | findstr /i "sqlite" >nul 2>nul
+if not errorlevel 1 set "HEALTH_OK=1"
+
+curl.exe -s -o nul -w "%%{http_code}" --max-time 3 "http://127.0.0.1:%PORT%%LOGIN_PATH%" 2>nul | findstr /b "200" >nul 2>nul
+if not errorlevel 1 set "FRONT_OK=1"
+
+if "%HEALTH_OK%"=="1" if "%FRONT_OK%"=="1" goto PORT_OURS
+goto PORT_FOREIGN
+
+:PORT_FREE
+echo [OK] Port %PORT% bebas.
+goto PORT_DONE
+
+:PORT_OURS
+set "PORT_BUSY=1"
+echo [OK] Port %PORT% memang dipakai B_gadget POS - server sudah jalan.
+echo        Backend tidak di-start ulang, browser tetap dibuka.
+goto PORT_DONE
+
+:PORT_FOREIGN
+echo.
+echo [ERROR] Port %PORT% sudah dipakai proses LAIN - bukan B_gadget POS.
+echo.
+echo         PID pelakunya   : %PORT_PID%
+for /f "usebackq delims=" %%h in (`curl.exe -s --max-time 3 http://127.0.0.1:%PORT%/health`) do echo         Isi /health    : %%h
+echo         Seharusnya      : {"status":"ok","db":"sqlite"}
+echo         Halaman frontend: http://127.0.0.1:%PORT%%LOGIN_PATH%
+echo.
+echo         Server kita TIDAK dijalankan dan browser TIDAK dibuka, supaya ga
+echo         membuka halaman 404 lalu disalahartikan sebagai "web rusak".
+echo.
+echo         >> Bunuh pelakunya dulu, lalu jalankan run.bat lagi:
+echo              taskkill /PID %PORT_PID% /F
+echo.
+echo         >> Kalau proses itu aplikasi lain yang SEDANG DIPAKAI, jalankan
+echo            aplikasinya di port berbeda. Jangan bunuh tanpa dicek.
+echo.
+pause
+exit /b 1
+
+:PORT_DONE
+echo.
 
 :: ---------- 5. Info ----------
 echo [INFO] Mode: LOKAL ONLY - tanpa cloudflared/tunnel

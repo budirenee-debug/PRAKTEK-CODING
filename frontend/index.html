@@ -6,7 +6,7 @@
     <title>B_gadget — POS Service HP Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=notif1">
+    <link rel="stylesheet" href="assets/css/style.css?v=notif2">
     <style>html.guard-lock body{visibility:hidden}</style>
     <script>
     // Guard dini anti-bocor: sembunyikan body sampai lolos auth.
@@ -899,11 +899,26 @@
                     <button class="tab" data-kasview="saya" onclick="setKasView('saya')">👤 Kas Saya</button>
                 </div>
                 <div id="kasPanel-toko">
+                <div id="kasCustomBar" class="card-head toolbar" style="display:none;margin-bottom:10px;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+                    <div class="toolbar-left">
+                        <span style="font-size:12px;font-weight:700">🎯 Periode pilihan</span>
+                        <button class="tab" data-kascu="day" onclick="setKasCustomMode('day')">Hari</button>
+                        <button class="tab" data-kascu="month" onclick="setKasCustomMode('month')">Bulan</button>
+                        <button class="tab" data-kascu="year" onclick="setKasCustomMode('year')">Tahun</button>
+                        <input type="date" id="kasCustomDate" onchange="setKasCustomValue(this.value)" style="padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+                        <input type="month" id="kasCustomMonth" onchange="setKasCustomValue(this.value)" style="display:none;padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff">
+                        <select id="kasCustomYear" onchange="setKasCustomValue(this.value)" style="display:none;padding:7px 9px;border:1px solid #ececec;border-radius:10px;font-size:12px;background:#fff"></select>
+                        <button class="btn btn-ghost small" onclick="kasCustomShift(-1)" title="Periode sebelumnya">◀</button>
+                        <button class="btn btn-ghost small" onclick="kasCustomShift(1)" title="Periode berikutnya">▶</button>
+                    </div>
+                    <div class="toolbar-right"><button class="btn btn-dark small" onclick="kasCustomReset()">Kembali ke hari ini</button></div>
+                </div>
                 <div id="kasPanel-arus">
                 <div class="tabs" style="margin-bottom:10px">
                     <button class="tab active" data-kasf="today" onclick="setKasTokoFilter('today')">📅 Harian</button>
                     <button class="tab" data-kasf="week" onclick="setKasTokoFilter('week')">🗓️ Mingguan (Senin–Sabtu)</button>
                     <button class="tab" data-kasf="month" onclick="setKasTokoFilter('month')">📆 Bulanan</button>
+                    <button class="tab" data-kasf="custom" onclick="setKasTokoFilter('custom')">🎯 Pilih Tanggal</button>
                     <span class="muted" id="kasTokoFilterInfo" style="margin-left:auto;font-size:11px"></span>
                 </div>
                 <div class="stats" style="margin-bottom:10px">
@@ -911,9 +926,7 @@
                     <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-head"><span>Total Keluar</span></div><h3 id="kasTokoKeluar" style="color:#dc2626">Rp 0</h3><p class="trend" id="kasTokoKeluarSub">komisi + hadir + refund + beban toko</p></div>
                     <div class="stat-card" style="border-left:4px solid #2563eb"><div class="stat-head"><span>Sisa Kas</span></div><h3 id="kasTokoSisa">Rp 0</h3><p class="trend">masuk − keluar</p></div>
                 </div>
-                <details style="margin-bottom:10px;font-size:11px;color:#8a8f98"><summary style="cursor:pointer;list-style:none">❓ Kenapa angka begini? <span style="font-size:10px">(klik)</span></summary><p style="margin-top:6px">Toko main <strong>harian / mingguan / bulanan</strong> aja. Masuk = pendapatan cair + penjualan kasir + pemasukan lain (di luar modal). Keluar = yang <strong>beneran keluar tunai</strong> (refund + beban tunai + operasional). <strong>Modal & jatah teknisi gak ngurangin sisa</strong> — adanya di Owner Space & Gajian Sabtu.</p></details>
-                <div id="kasTokoJatah" style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:10px">💰 Menghitung jatah teknisi...</div>
-                <div id="opsMemo" style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:12px;padding:10px 12px;font-size:12px;color:#065f46;margin-bottom:10px">🏠 Memuat tabungan operasional...</div>
+                <details style="margin-bottom:10px;font-size:11px;color:#8a8f98"><summary style="cursor:pointer;list-style:none">❓ Kenapa angka begini? <span style="font-size:10px">(klik)</span></summary><p style="margin-top:6px">Toko main <strong>harian / mingguan / bulanan</strong> atau <strong>pilih tanggal, bulan, tahun</strong> sendiri. Masuk = pendapatan cair + penjualan kasir + pemasukan lain (di luar modal). Keluar = yang <strong>beneran keluar tunai</strong> (refund + beban tunai + operasional). <strong>Modal & jatah teknisi gak ngurangin sisa</strong> — adanya di Owner Space & Gajian Sabtu. Memo jatah & operasional ada di 🔔 notifikasi.</p></details>
                 <div class="table-wrap"><table class="table compact"><thead><tr><th>Tanggal</th><th>Invoice / Ref</th><th>Tipe</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th>Keterangan</th><th style="text-align:center">Aksi</th></tr></thead><tbody id="tbodyKasToko"><tr><td colspan="7" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                 <div class="pagination"><span id="kasTokoPaginationInfo"></span><div id="kasTokoPaginationBtns"></div></div>
                 </div>
@@ -922,6 +935,7 @@
                     <button class="tab active" data-rkf="today" onclick="setRkFilter('today')">📅 Harian</button>
                     <button class="tab" data-rkf="week" onclick="setRkFilter('week')">🗓️ Mingguan (Senin–Sabtu)</button>
                     <button class="tab" data-rkf="month" onclick="setRkFilter('month')">📆 Bulanan</button>
+                    <button class="tab" data-rkf="custom" onclick="setRkFilter('custom')">🎯 Pilih Tanggal</button>
                     <span class="muted" id="rkFilterInfo" style="margin-left:auto;font-size:11px"></span>
                 </div>
                 <div class="stats" style="margin-bottom:10px">
@@ -1485,7 +1499,7 @@
     <div id="printArea"></div>
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
-    <script src="assets/js/script.js?v=pengaturan3"></script>
-    <script src="assets/js/engine.js?v=eng28-rincianfilter"></script>
+    <script src="assets/js/script.js?v=notifmemo2"></script>
+    <script src="assets/js/engine.js?v=eng30-notifmemo"></script>
 </body>
 </html>
