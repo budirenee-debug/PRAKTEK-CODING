@@ -1368,6 +1368,9 @@ if(typeof window !== 'undefined'){ window.wcOpen = wcOpen; window.wcClose = wcCl
             || String(localStorage.getItem('role') || '').toLowerCase() === 'teknisi';
           document.querySelectorAll('[data-kas="toko"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
           document.querySelectorAll('[data-kasview="arus"],[data-kasview="rincian"]').forEach(b=>{ b.style.display = isTek ? 'none' : ''; });
+          const bolehLaba = _labaBoleh();
+          document.querySelectorAll('[data-kasview="laba"]').forEach(b=>{ b.style.display = bolehLaba ? '' : 'none'; });
+          if(!bolehLaba && _kasSub==='laba') setKasSub('arus');
           const bolehKomisi = _ktBoleh();
           document.querySelectorAll('[data-kasview="komisi"]').forEach(b=>{ b.style.display = bolehKomisi ? '' : 'none'; });
           if(!bolehKomisi && _kasSub==='komisi') setKasSub('arus');
@@ -1409,19 +1412,22 @@ function applyRkFilter(){
   drawRincianKeluar();
 }
 function setKasSub(t){
+  if(t === 'laba' && !_labaBoleh()) t = 'arus';
   if(t === 'komisi' && !_ktBoleh()) t = 'arus';
-  _kasSub = (t === 'rincian' || t === 'komisi') ? t : 'arus';
+  _kasSub = (t === 'rincian' || t === 'komisi' || t === 'laba') ? t : 'arus';
   try{ document.querySelectorAll('[data-kassub]').forEach(b=>b.classList.toggle('active', b.dataset.kassub===_kasSub)); }catch(e){}
   try{ document.getElementById('kasPanel-arus').style.display = _kasSub==='arus'?'':'none'; }catch(e){}
   try{ document.getElementById('kasPanel-rincian').style.display = _kasSub==='rincian'?'':'none'; }catch(e){}
   try{ document.getElementById('kasPanel-komisi').style.display = _kasSub==='komisi'?'':'none'; }catch(e){}
-  try{ document.getElementById('tksCard').style.display = _kasSub==='komisi'?'none':''; }catch(e){}
+  try{ document.getElementById('kasPanel-laba').style.display = _kasSub==='laba'?'':'none'; }catch(e){}
+  try{ document.getElementById('tksCard').style.display = (_kasSub==='komisi'||_kasSub==='laba')?'none':''; }catch(e){}
   if(_kasSub === 'rincian') renderRincianKeluar();
   if(_kasSub === 'komisi') renderKomisiTeknisi();
+  if(_kasSub === 'laba') renderLabaToko();
   kasCustomSyncUI();
   _kasViewSync();
 }
-// Sub-tab kas satu baris: Arus Toko | Rincian Keluar | Komisi Teknisi | Kas Saya.
+// Sub-tab kas satu baris: Arus Toko | Rincian Keluar | Laba-Rugi | Komisi Teknisi | Kas Saya.
 function _kasViewSync(){
   try{
     const v = (_kasTab === 'saya') ? 'saya' : _kasSub;
@@ -1429,12 +1435,16 @@ function _kasViewSync(){
   }catch(e){}
 }
 function setKasView(v){
+  if(v === 'laba' && !_labaBoleh()){
+    try{ showToast('Laba-Rugi khusus owner/superadmin'); }catch(e){}
+    v = 'arus';
+  }
   if(v === 'komisi' && !_ktBoleh()){
     try{ showToast('Komisi teknisi khusus owner/admin'); }catch(e){}
     v = 'arus';
   }
   if(v === 'saya') setKasTab('saya');
-  else { setKasTab('toko'); setKasSub(v === 'rincian' || v === 'komisi' ? v : 'arus'); }
+  else { setKasTab('toko'); setKasSub(v === 'rincian' || v === 'komisi' || v === 'laba' ? v : 'arus'); }
   _kasViewSync();
 }
 function rkGo(p){
@@ -1581,6 +1591,28 @@ function printSlipGaji(id){
 function _ktBoleh(){
   const role=String(localStorage.getItem('role')||'').toLowerCase();
   return role==='owner'||role==='admin'||role==='superadmin';
+}
+function _labaBoleh(){
+  const role=String(localStorage.getItem('role')||'').toLowerCase();
+  return role==='owner'||role==='superadmin';
+}
+async function renderLabaToko(){
+  const el=document.getElementById('labaTokoBersih'); if(!el || !_labaBoleh()) return;
+  const sub=document.getElementById('labaTokoSub');
+  const today=_kasTodayStr(), ym=today.slice(0,7), first=ym+'-01';
+  const fmt=s=>{ try{ return new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10)).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return s; } };
+  const range=fmt(first)+' – '+fmt(today);
+  if(sub) sub.textContent=range;
+  el.textContent='Memuat...';
+  try{
+    const j=await apiFetch('/finance/ledger/periode?bulan='+ym);
+    const laba=Number((j&&j.laba&&j.laba.bersih)||0);
+    el.textContent=_rp(laba);
+    el.style.color=laba<0?'#dc2626':'#059669';
+  }catch(e){
+    el.textContent='-';
+    if(sub) sub.textContent=range+' • gagal memuat';
+  }
 }
 function _ktSetTechUI(){
   const tabs=document.getElementById('ktTechTabs');

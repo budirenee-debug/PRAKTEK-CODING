@@ -898,6 +898,7 @@
                     <button class="tab" data-kasview="rincian" onclick="setKasView('rincian')">🧾 Rincian Keluar</button>
                     <button class="tab" data-kasview="komisi" onclick="setKasView('komisi')">Komisi Teknisi</button>
                     <button class="tab" data-kasview="saya" onclick="setKasView('saya')">👤 Kas Saya</button>
+                    <button class="tab" data-kasview="laba" style="display:none" onclick="setKasView('laba')">Laba-Rugi</button>
                 </div>
                 <div id="kasPanel-toko">
                 <div id="kasCustomBar" class="card-head toolbar" style="display:none;margin-bottom:10px;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
@@ -957,6 +958,11 @@
                 <div style="margin:0 0 10px;font-size:12px;color:#475569"><span id="ktPeriodeInfo" class="muted"></span><span id="ktRingkasan" style="margin-left:10px;color:#0f172a;font-weight:600"></span></div>
                 <div class="table-wrap"><table class="table compact"><thead id="ktHead"><tr><th>Tanggal</th><th>Teknisi</th><th>Keterangan</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th></tr></thead><tbody id="tbodyKomisiTeknisi"><tr><td colspan="5" style="text-align:center;padding:16px;color:#8a8f98">Memuat...</td></tr></tbody></table></div>
                 <div class="pagination"><span id="ktPaginationInfo"></span><div id="ktPaginationBtns"></div></div>
+                </div>
+                <div id="kasPanel-laba" style="display:none">
+                <div class="stats" style="margin-bottom:10px">
+                    <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-head"><span>Laba Bersih</span></div><h3 id="labaTokoBersih" style="color:#059669">Rp 0</h3><p class="trend" id="labaTokoSub">Bulan ini</p></div>
+                </div>
                 </div>
                 <div class="card" id="tksCard" style="margin-top:12px">
                     <div class="card-head toolbar">
@@ -1506,6 +1512,6 @@
 
     <script src="assets/js/auth.js?v=idx2-sess2h"></script>
     <script src="assets/js/script.js?v=komisi1"></script>
-    <script src="assets/js/engine.js?v=eng35-noops"></script>
+    <script src="assets/js/engine.js?v=eng38-laba-kanan"></script>
 </body>
 </html>
